@@ -220,6 +220,7 @@ const Auth = {
         }
     },
 
+    // ✅ FIX: Admin-Login wird in sessionStorage gemerkt
     async adminLogin(passwort) {
         const settings = await db.settings.get('admin_password');
         const storedHash = settings?.value || await Utils.hashPassword('admin123'); // Default password
@@ -227,6 +228,10 @@ const Auth = {
         const hash = await Utils.hashPassword(passwort);
         if (hash === storedHash) {
             State.isAdmin = true;
+
+            // ✅ Admin-Status für diese Browser-Session merken
+            sessionStorage.setItem('is_admin', '1');
+
             Utils.showToast('Admin-Login erfolgreich', 'success');
             return true;
         } else {
@@ -235,9 +240,14 @@ const Auth = {
         }
     },
 
+    // ✅ FIX: Logout löscht Admin-Session
     logout() {
         State.clearUser();
         State.isAdmin = false;
+
+        // ✅ Admin-Session löschen
+        sessionStorage.removeItem('is_admin');
+
         Router.navigate('login');
         Utils.showToast('Erfolgreich abgemeldet', 'info');
     },
@@ -328,38 +338,32 @@ const Buchungen = {
             query = query.filter(b => b.exportiert === filter.exportiert);
         }
 
-        if (filter.datum) {
-            query = query.filter(b => b.datum === filter.datum);
-        }
-
-        return await query.reverse().toArray();
+        return await query.toArray();
     },
 
     async markAsExported(buchung_ids) {
-        await db.buchungen.bulkUpdate(
-            buchung_ids.map(id => ({ key: id, changes: { exportiert: true, exportiert_am: new Date().toISOString() } }))
-        );
+        try {
+            for (const id of buchung_ids) {
+                await db.buchungen.update(id, { exportiert: true, sync_status: 'exported' });
+            }
+        } catch (error) {
+            console.error('Fehler beim Markieren als exportiert:', error);
+            throw error;
+        }
     }
 };
 
 /* ===== ARTIKEL SERVICE ===== */
 const Artikel = {
-    async getAll(filter = {}) {
-        let query = db.artikel.toCollection();
-
-        if (filter.aktiv !== undefined) {
-            query = query.filter(a => a.aktiv === filter.aktiv);
-        }
-
-        if (filter.kategorie_id) {
-            query = query.filter(a => a.kategorie_id === filter.kategorie_id);
-        }
-
-        return await query.sortBy('sortierung');
+    async getAll() {
+        return await db.artikel.where('aktiv').equals(true).toArray();
     },
 
-    async getById(artikel_id) {
-        return await db.artikel.get(artikel_id);
+    async getByKategorie(kategorie_id) {
+        return await db.artikel
+            .where('kategorie_id').equals(kategorie_id)
+            .and(a => a.aktiv === true)
+            .sortBy('sortierung');
     },
 
     async importFromCSV(csvText) {
@@ -367,52 +371,45 @@ const Artikel = {
             const lines = csvText.trim().split('\n');
             const headers = lines[0].split(',').map(h => h.trim());
 
-            const artikel = [];
+            // Expect: artikel_id,kategorie_id,name,name_kurz,preis,steuer_prozent,kategorie_name,aktiv,sortierung,icon
+            const artikelList = [];
+
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                const obj = {};
-                headers.forEach((header, index) => {
-                    obj[header] = values[index];
-                });
+                const row = {};
+                headers.forEach((h, idx) => row[h] = values[idx]);
 
-                artikel.push({
-                    artikel_id: parseInt(obj.artikel_id),
-                    name: obj.name,
-                    name_kurz: obj.name_kurz || obj.name,
-                    preis: parseFloat(obj.preis),
-                    steuer_prozent: parseFloat(obj.steuer_prozent || 10),
-                    kategorie_id: parseInt(obj.kategorie_id),
-                    kategorie_name: obj.kategorie_name,
-                    aktiv: obj.aktiv === '1' || obj.aktiv === 'true',
-                    sortierung: parseInt(obj.sortierung || 0),
-                    icon: obj.icon || '🍽️'
+                artikelList.push({
+                    artikel_id: parseInt(row.artikel_id, 10),
+                    kategorie_id: parseInt(row.kategorie_id, 10),
+                    name: row.name,
+                    name_kurz: row.name_kurz || row.name,
+                    preis: parseFloat(row.preis),
+                    steuer_prozent: parseInt(row.steuer_prozent || '10', 10),
+                    kategorie_name: row.kategorie_name || '',
+                    aktiv: row.aktiv === 'true' || row.aktiv === '1' || row.aktiv === true,
+                    sortierung: parseInt(row.sortierung || '0', 10),
+                    icon: row.icon || ''
                 });
             }
 
-            // Clear and re-add
             await db.artikel.clear();
-            await db.artikel.bulkAdd(artikel);
-
-            Utils.showToast(`${artikel.length} Artikel importiert`, 'success');
-            return artikel;
+            await db.artikel.bulkAdd(artikelList);
+            Utils.showToast(`${artikelList.length} Artikel importiert`, 'success');
         } catch (error) {
-            Utils.showToast('Fehler beim Import: ' + error.message, 'error');
+            Utils.showToast('Artikel-Import Fehler: ' + error.message, 'error');
             throw error;
         }
     },
 
     async seed() {
-        // Seed some default articles for testing
+        // Default articles (kann später per CSV überschrieben werden)
         const defaultArtikel = [
-            { artikel_id: 101, name: 'Almdudler 0.5l', name_kurz: 'Almdudler', preis: 3.50, steuer_prozent: 10, kategorie_id: 1, kategorie_name: 'Alkoholfreie Getränke', aktiv: true, sortierung: 10, icon: '🥤' },
-            { artikel_id: 102, name: 'Coca Cola 0.33l', name_kurz: 'Cola', preis: 3.00, steuer_prozent: 10, kategorie_id: 1, kategorie_name: 'Alkoholfreie Getränke', aktiv: true, sortierung: 20, icon: '🥤' },
-            { artikel_id: 201, name: 'Zipfer Märzen 0.5l', name_kurz: 'Zipfer', preis: 4.20, steuer_prozent: 10, kategorie_id: 2, kategorie_name: 'Biere', aktiv: true, sortierung: 10, icon: '🍺' },
-            { artikel_id: 202, name: 'Stiegl Goldbräu 0.5l', name_kurz: 'Stiegl', preis: 4.20, steuer_prozent: 10, kategorie_id: 2, kategorie_name: 'Biere', aktiv: true, sortierung: 20, icon: '🍺' },
-            { artikel_id: 301, name: 'Grüner Veltliner 0.25l', name_kurz: 'Grüner V.', preis: 4.80, steuer_prozent: 10, kategorie_id: 3, kategorie_name: 'Wein Weiß', aktiv: true, sortierung: 10, icon: '🍷' },
-            { artikel_id: 401, name: 'Zweigelt 0.25l', name_kurz: 'Zweigelt', preis: 5.20, steuer_prozent: 10, kategorie_id: 4, kategorie_name: 'Wein Rot', aktiv: true, sortierung: 10, icon: '🍷' },
-            { artikel_id: 501, name: 'Obstler 2cl', name_kurz: 'Obstler', preis: 3.50, steuer_prozent: 10, kategorie_id: 5, kategorie_name: 'Schnäpse', aktiv: true, sortierung: 10, icon: '🥃' },
-            { artikel_id: 601, name: 'Kaffee groß', name_kurz: 'Kaffee', preis: 3.50, steuer_prozent: 10, kategorie_id: 6, kategorie_name: 'Heiße Getränke', aktiv: true, sortierung: 10, icon: '☕' },
-            { artikel_id: 602, name: 'Tee', name_kurz: 'Tee', preis: 3.20, steuer_prozent: 10, kategorie_id: 6, kategorie_name: 'Heiße Getränke', aktiv: true, sortierung: 20, icon: '🍵' }
+            { artikel_id: 1, kategorie_id: 1, name: 'Apfelsaftschorle', name_kurz: 'Apfelsaft-', preis: 1.60, steuer_prozent: 10, kategorie_name: 'Alkoholfreie Getränke', aktiv: true, sortierung: 10, icon: '🍎' },
+            { artikel_id: 2, kategorie_id: 1, name: 'Orangensaft 1,0 L', name_kurz: 'Orangen-', preis: 4.00, steuer_prozent: 10, kategorie_name: 'Alkoholfreie Getränke', aktiv: true, sortierung: 20, icon: '🍊' },
+            { artikel_id: 3, kategorie_id: 2, name: 'Pils 0,33 L', name_kurz: 'Pils', preis: 2.00, steuer_prozent: 20, kategorie_name: 'Biere', aktiv: true, sortierung: 10, icon: '🍺' },
+            { artikel_id: 4, kategorie_id: 6, name: 'Kaffee', name_kurz: 'Kaffee', preis: 3.20, steuer_prozent: 10, kategorie_name: 'Heiße Getränke', aktiv: true, sortierung: 10, icon: '☕' },
+            { artikel_id: 5, kategorie_id: 6, name: 'Tee', name_kurz: 'Tee', preis: 3.20, steuer_prozent: 10, kategorie_name: 'Heiße Getränke', aktiv: true, sortierung: 20, icon: '🍵' }
         ];
 
         const count = await db.artikel.count();
@@ -506,103 +503,65 @@ const Router = {
     }
 };
 
-/* ===== UI COMPONENTS ===== */
+/* ===== UI RENDERER ===== */
 const UI = {
     render(html) {
         document.getElementById('app').innerHTML = html;
-    },
-
-    renderWarenkorb() {
-        const container = document.querySelector('.warenkorb');
-        if (!container || State.warenkorb.length === 0) {
-            if (container) container.remove();
-            return;
-        }
-
-        const total = State.getWarenkorbTotal();
-        const itemsHTML = State.warenkorb.map(item => `
-            <div class="warenkorb-item">
-                <span>${item.name_kurz || item.name} × ${item.menge}</span>
-                <span>${Utils.formatCurrency(item.preis * item.menge)}</span>
-            </div>
-        `).join('');
-
-        container.innerHTML = `
-            <div class="warenkorb-header">
-                <div class="warenkorb-title">🛒 Warenkorb (${State.warenkorb.length})</div>
-                <button class="btn-icon" onclick="State.clearWarenkorb()">✕</button>
-            </div>
-            <div class="warenkorb-items">${itemsHTML}</div>
-            <div class="warenkorb-total">
-                <span>Gesamt:</span>
-                <span>${Utils.formatCurrency(total)}</span>
-            </div>
-            <button class="btn btn-primary btn-block" onclick="handleBuchen()">Jetzt buchen</button>
-        `;
     }
 };
 
-/* ===== PAGE HANDLERS ===== */
-
-// Login Page
+// ===== LOGIN PAGE =====
 Router.register('login', () => {
     UI.render(`
         <div class="main-content">
-            <div style="text-align: center; margin-top: 60px;">
-                <div class="mountain-logo" style="margin: 0 auto 24px;">
-                    <svg viewBox="0 0 100 60" class="mountain-svg" style="width: 120px; height: 72px; color: var(--color-mountain-blue);">
-                        <path d="M0,60 L20,30 L35,45 L50,15 L65,40 L80,25 L100,60 Z" fill="currentColor"/>
-                    </svg>
-                </div>
-                <h1 style="font-family: var(--font-display); font-size: var(--text-3xl); margin-bottom: 8px;">Seollerhaus Kassa</h1>
-                <p style="color: var(--color-stone-dark); margin-bottom: 40px;">Self-Service Buchung</p>
+            <div style="max-width: 420px; margin: 60px auto;">
+                <h1 class="page-title" style="text-align:center;">Seollerhaus Kassa</h1>
+                <p style="text-align:center; color: var(--color-slate); margin-bottom: 30px;">Self-Service Buchung</p>
 
-                <div style="max-width: 400px; margin: 0 auto;">
-                    <form id="login-form" onsubmit="handleLogin(event)">
-                        <div class="form-group">
-                            <label class="form-label">Nachname</label>
-                            <input type="text" name="nachname" class="form-input" placeholder="z.B. Müller" required autofocus>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Passwort</label>
-                            <input type="password" name="passwort" class="form-input" placeholder="Mindestens 6 Zeichen" required>
-                        </div>
-                        <div class="form-checkbox mb-3">
-                            <input type="checkbox" name="remember" id="remember">
-                            <label for="remember">Passwort merken</label>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
-                    </form>
-
-                    <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--color-stone-medium);">
-                        <p style="color: var(--color-stone-dark); margin-bottom: 12px;">Noch kein Account?</p>
-                        <button class="btn btn-secondary btn-block" onclick="Router.navigate('register')">Jetzt registrieren</button>
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label">Nachname</label>
+                        <input type="text" name="nachname" class="form-input" required autocomplete="family-name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Passwort</label>
+                        <input type="password" name="passwort" class="form-input" required>
                     </div>
 
-                    <div style="margin-top: 24px;">
-                        <button class="btn btn-secondary btn-block" onclick="Router.navigate('admin-login')">Admin-Login</button>
+                    <div class="form-group" style="display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" id="remember" name="remember">
+                        <label for="remember" class="text-muted" style="margin:0;">Passwort merken</label>
                     </div>
-                </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
+
+                    <div style="height: 16px;"></div>
+                    <div style="text-align:center; color: #9aa4b2;">Noch kein Account?</div>
+                    <button type="button" class="btn btn-secondary btn-block mt-2" onclick="Router.navigate('register')">Jetzt registrieren</button>
+
+                    <div style="height: 10px;"></div>
+                    <button type="button" class="btn btn-secondary btn-block mt-2" onclick="Router.navigate('admin-login')">Admin-Login</button>
+                </form>
             </div>
         </div>
     `);
 });
 
-// Register Page
+// ===== REGISTER PAGE =====
 Router.register('register', () => {
     UI.render(`
         <div class="main-content">
-            <div style="max-width: 400px; margin: 40px auto;">
-                <h1 class="page-title">Account erstellen</h1>
+            <div style="max-width: 420px; margin: 40px auto;">
+                <h1 class="page-title">Registrieren</h1>
 
-                <form id="register-form" onsubmit="handleRegister(event)">
+                <form onsubmit="handleRegister(event)">
                     <div class="form-group">
                         <label class="form-label">Nachname *</label>
-                        <input type="text" name="nachname" class="form-input" required autofocus>
+                        <input type="text" name="nachname" class="form-input" required autocomplete="family-name">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Vorname</label>
-                        <input type="text" name="vorname" class="form-input">
+                        <input type="text" name="vorname" class="form-input" autocomplete="given-name">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Zimmernummer</label>
@@ -621,442 +580,6 @@ Router.register('register', () => {
                     <button type="submit" class="btn btn-primary btn-block">Account erstellen</button>
                     <button type="button" class="btn btn-secondary btn-block mt-2" onclick="Router.navigate('login')">Zurück zum Login</button>
                 </form>
-            </div>
-        </div>
-    `);
-});
-
-// Dashboard Page (Continued in next file due to length...)
-
-/* ===== GLOBAL EVENT HANDLERS ===== */
-window.handleLogin = async (event) => {
-    event.preventDefault();
-    const form = event.target;
-    const formData = new FormData(form);
-
-    try {
-        await Auth.login(
-            formData.get('nachname'),
-            formData.get('passwort'),
-            formData.get('remember')
-        );
-        Router.navigate('dashboard');
-    } catch (error) {
-        // Error handled in Auth.login
-    }
-};
-
-window.handleRegister = async (event) => {
-    event.preventDefault();
-    const form = event.target;
-    const formData = new FormData(form);
-
-    const passwort = formData.get('passwort');
-    const passwort2 = formData.get('passwort2');
-
-    if (passwort !== passwort2) {
-        Utils.showToast('Passwörter stimmen nicht überein', 'error');
-        return;
-    }
-
-    try {
-        await Auth.register(
-            formData.get('nachname'),
-            formData.get('vorname'),
-            formData.get('zimmernummer'),
-            passwort
-        );
-        Router.navigate('login');
-    } catch (error) {
-        // Error handled in Auth.register
-    }
-};
-
-window.handleBuchen = async () => {
-    try {
-        await Buchungen.createFromWarenkorb();
-        Router.navigate('dashboard');
-    } catch (error) {
-        // Error handled in Buchungen
-    }
-};
-
-/* ===== APP INITIALIZATION ===== */
-(async function initApp() {
-    // Hide loading screen after short delay
-    setTimeout(() => {
-        document.getElementById('loading-screen').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-    }, 1500);
-
-    // Seed default articles
-    await Artikel.seed();
-
-    // Try auto-login
-    const loggedIn = await Auth.autoLogin();
-    if (loggedIn) {
-        Router.navigate('dashboard');
-    } else {
-        Router.init();
-    }
-})();
-
-// ===== DASHBOARD PAGE =====
-Router.register('dashboard', async () => {
-    if (!State.currentUser) {
-        Router.navigate('login');
-        return;
-    }
-
-    const buchungen = await Buchungen.getByGast(State.currentUser.gast_id, 5);
-    const alleBuchungen = await Buchungen.getByGast(State.currentUser.gast_id);
-    
-    const heute = Utils.formatDate(new Date());
-    const heuteBuchungen = alleBuchungen.filter(b => b.datum === heute);
-    const heuteSum = heuteBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
-    
-    const wocheStart = new Date();
-    wocheStart.setDate(wocheStart.getDate() - 7);
-    const wocheBuchungen = alleBuchungen.filter(b => new Date(b.datum) >= wocheStart);
-    const wocheSum = wocheBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
-    
-    const gesamtSum = alleBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
-
-    const buchungenHTML = buchungen.map(b => `
-        <div class="list-item ${b.exportiert ? 'exportiert' : 'pending'}">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-weight: 500;">${b.artikel_name} × ${b.menge}</div>
-                    <small class="text-muted">Heute, ${b.uhrzeit.substring(0, 5)}</small>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-weight: 700; color: var(--color-mountain-blue);">${Utils.formatCurrency(b.preis * b.menge)}</div>
-                    ${b.exportiert ? '<small class="badge badge-success">✓ Gespeichert</small>' : '<small class="badge badge-warning">⏳ Ausstehend</small>'}
-                </div>
-            </div>
-        </div>
-    `).join('') || '<p class="text-muted text-center">Noch keine Buchungen vorhanden</p>';
-
-    UI.render(`
-        <div class="app-header">
-            <div class="header-left">
-                <button class="menu-btn" onclick="showMenu()">☰</button>
-                <div class="header-title">Seollerhaus</div>
-            </div>
-            <div class="header-right">
-                <div class="user-badge">👤 ${State.currentUser.vorname || State.currentUser.nachname}</div>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <h1 style="font-family: var(--font-display); font-size: var(--text-2xl); margin-bottom: 24px;">
-                Guten Tag, ${State.currentUser.vorname || State.currentUser.nachname}!
-            </h1>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value">${heuteBuchungen.length}</div>
-                    <div class="stat-label">Artikel heute</div>
-                    <div style="margin-top: 8px; font-size: var(--text-lg); font-weight: 600;">${Utils.formatCurrency(heuteSum)}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${wocheBuchungen.length}</div>
-                    <div class="stat-label">Diese Woche</div>
-                    <div style="margin-top: 8px; font-size: var(--text-lg); font-weight: 600;">${Utils.formatCurrency(wocheSum)}</div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">💰 Gesamtsumme (offen)</h2>
-                </div>
-                <div style="text-align: center; padding: 24px;">
-                    <div style="font-family: var(--font-display); font-size: var(--text-4xl); font-weight: 700; color: var(--color-mountain-blue);">
-                        ${Utils.formatCurrency(gesamtSum)}
-                    </div>
-                    <small class="text-muted">seit ${State.currentUser.anreise_datum || 'Ankunft'}</small>
-                </div>
-            </div>
-
-            <div class="card mt-3">
-                <div class="card-header">
-                    <h2 class="card-title">📝 Letzte Buchungen</h2>
-                    <button class="btn btn-secondary" onclick="Router.navigate('historie')">Alle anzeigen</button>
-                </div>
-                <div class="card-body">
-                    ${buchungenHTML}
-                </div>
-            </div>
-        </div>
-
-        <div class="bottom-nav">
-            <div class="nav-item active" onclick="Router.navigate('dashboard')">
-                <div class="nav-icon">🏠</div>
-                <div>Start</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('buchen')">
-                <div class="nav-icon">🍺</div>
-                <div>Buchen</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('historie')">
-                <div class="nav-icon">📋</div>
-                <div>Liste</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('profil')">
-                <div class="nav-icon">👤</div>
-                <div>Profil</div>
-            </div>
-        </div>
-    `);
-});
-
-// ===== BUCHEN PAGE =====
-Router.register('buchen', async () => {
-    if (!State.currentUser) {
-        Router.navigate('login');
-        return;
-    }
-
-    const kategorien = await db.kategorien.toArray();
-    const artikel = await Artikel.getAll({ aktiv: true });
-
-    const kategorieTabs = `
-        <div class="category-tabs">
-            <div class="category-tab ${!State.selectedCategory ? 'active' : ''}" onclick="filterCategory(null)">Alle</div>
-            ${kategorien.map(k => `
-                <div class="category-tab ${State.selectedCategory === k.kategorie_id ? 'active' : ''}" 
-                     onclick="filterCategory(${k.kategorie_id})">
-                    ${k.name}
-                </div>
-            `).join('')}
-        </div>
-    `;
-
-    const filteredArtikel = State.selectedCategory 
-        ? artikel.filter(a => a.kategorie_id === State.selectedCategory)
-        : artikel;
-
-    const artikelGrid = `
-        <div class="artikel-grid">
-            ${filteredArtikel.map(a => {
-                const color = getCategoryColor(a.kategorie_id);
-                return `
-                    <div class="artikel-tile" style="--tile-color: ${color}" onclick="addArtikel(${a.artikel_id})">
-                        <div class="artikel-icon">${a.icon}</div>
-                        <div class="artikel-name">${a.name_kurz || a.name}</div>
-                        <div class="artikel-price">${Utils.formatCurrency(a.preis)}</div>
-                    </div>
-                `;
-            }).join('')}
-        </div>
-    `;
-
-    UI.render(`
-        <div class="app-header">
-            <div class="header-left">
-                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
-                <div class="header-title">Artikel buchen</div>
-            </div>
-            <div class="header-right">
-                <div class="user-badge">👤 ${State.currentUser.vorname || State.currentUser.nachname}</div>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <div class="form-group">
-                <input type="text" class="form-input" placeholder="🔍 Artikel suchen..." oninput="searchArtikel(this.value)">
-            </div>
-
-            ${kategorieTabs}
-            ${artikelGrid}
-        </div>
-
-        ${State.warenkorb.length > 0 ? '<div class="warenkorb"></div>' : ''}
-
-        <div class="bottom-nav">
-            <div class="nav-item" onclick="Router.navigate('dashboard')">
-                <div class="nav-icon">🏠</div>
-                <div>Start</div>
-            </div>
-            <div class="nav-item active" onclick="Router.navigate('buchen')">
-                <div class="nav-icon">🍺</div>
-                <div>Buchen</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('historie')">
-                <div class="nav-icon">📋</div>
-                <div>Liste</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('profil')">
-                <div class="nav-icon">👤</div>
-                <div>Profil</div>
-            </div>
-        </div>
-    `);
-
-    UI.renderWarenkorb();
-});
-
-// ===== HISTORIE PAGE =====
-Router.register('historie', async () => {
-    if (!State.currentUser) {
-        Router.navigate('login');
-        return;
-    }
-
-    const buchungen = await Buchungen.getByGast(State.currentUser.gast_id);
-    const total = buchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
-
-    // Group by date
-    const byDate = {};
-    buchungen.forEach(b => {
-        if (!byDate[b.datum]) byDate[b.datum] = [];
-        byDate[b.datum].push(b);
-    });
-
-    const buchungenHTML = Object.keys(byDate).sort().reverse().map(datum => {
-        const items = byDate[datum];
-        const dayTotal = items.reduce((sum, b) => sum + (b.preis * b.menge), 0);
-        
-        return `
-            <div style="margin-bottom: 32px;">
-                <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: 12px; color: var(--color-mountain-blue);">
-                    ${new Date(datum).toLocaleDateString('de-AT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </h3>
-                ${items.map(b => `
-                    <div class="list-item ${b.exportiert ? 'exportiert' : 'pending'}">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="font-weight: 500;">${b.artikel_name} × ${b.menge}</div>
-                                <small class="text-muted">${b.uhrzeit.substring(0, 5)} Uhr</small>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="font-weight: 700;">${Utils.formatCurrency(b.preis * b.menge)}</div>
-                                ${b.exportiert ? '<small class="badge badge-success">✓</small>' : '<small class="badge badge-warning">⏳</small>'}
-                            </div>
-                        </div>
-                    </div>
-                `).join('')}
-                <div style="text-align: right; margin-top: 8px; font-weight: 600; color: var(--color-stone-dark);">
-                    Summe: ${Utils.formatCurrency(dayTotal)}
-                </div>
-            </div>
-        `;
-    }).join('') || '<p class="text-muted text-center">Noch keine Buchungen vorhanden</p>';
-
-    UI.render(`
-        <div class="app-header">
-            <div class="header-left">
-                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
-                <div class="header-title">Meine Buchungen</div>
-            </div>
-            <div class="header-right">
-                <div class="user-badge">👤 ${State.currentUser.vorname || State.currentUser.nachname}</div>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h2 class="card-title">💰 Gesamtsumme</h2>
-                </div>
-                <div style="text-align: center; padding: 16px;">
-                    <div style="font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 700; color: var(--color-mountain-blue);">
-                        ${Utils.formatCurrency(total)}
-                    </div>
-                    <small class="text-muted">${buchungen.length} Artikel insgesamt</small>
-                </div>
-            </div>
-
-            ${buchungenHTML}
-        </div>
-
-        <div class="bottom-nav">
-            <div class="nav-item" onclick="Router.navigate('dashboard')">
-                <div class="nav-icon">🏠</div>
-                <div>Start</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('buchen')">
-                <div class="nav-icon">🍺</div>
-                <div>Buchen</div>
-            </div>
-            <div class="nav-item active" onclick="Router.navigate('historie')">
-                <div class="nav-icon">📋</div>
-                <div>Liste</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('profil')">
-                <div class="nav-icon">👤</div>
-                <div>Profil</div>
-            </div>
-        </div>
-    `);
-});
-
-// ===== PROFIL PAGE =====
-Router.register('profil', () => {
-    if (!State.currentUser) {
-        Router.navigate('login');
-        return;
-    }
-
-    UI.render(`
-        <div class="app-header">
-            <div class="header-left">
-                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
-                <div class="header-title">Mein Profil</div>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h2 class="card-title">👤 Persönliche Daten</h2>
-                </div>
-                <div class="card-body">
-                    <div style="margin-bottom: 12px;">
-                        <strong>Nachname:</strong> ${State.currentUser.nachname}
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong>Vorname:</strong> ${State.currentUser.vorname || '-'}
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong>Zimmer:</strong> ${State.currentUser.zimmernummer || '-'}
-                    </div>
-                    <div>
-                        <strong>Anreise:</strong> ${State.currentUser.anreise_datum || '-'}
-                    </div>
-                </div>
-            </div>
-
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h2 class="card-title">ℹ️ Hilfe & Info</h2>
-                </div>
-                <div class="card-body">
-                    <p style="margin-bottom: 12px;">Bei Fragen wenden Sie sich bitte an die Rezeption.</p>
-                    <p style="margin-bottom: 12px;"><strong>Telefon:</strong> +43 XXX XXX XXX</p>
-                    <p><strong>Email:</strong> info@seollerhaus.at</p>
-                </div>
-            </div>
-
-            <button class="btn btn-danger btn-block" onclick="Auth.logout()">Abmelden</button>
-        </div>
-
-        <div class="bottom-nav">
-            <div class="nav-item" onclick="Router.navigate('dashboard')">
-                <div class="nav-icon">🏠</div>
-                <div>Start</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('buchen')">
-                <div class="nav-icon">🍺</div>
-                <div>Buchen</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('historie')">
-                <div class="nav-icon">📋</div>
-                <div>Liste</div>
-            </div>
-            <div class="nav-item active" onclick="Router.navigate('profil')">
-                <div class="nav-icon">👤</div>
-                <div>Profil</div>
             </div>
         </div>
     `);
@@ -1101,7 +624,7 @@ Router.register('admin-dashboard', async () => {
     const gaeste = await db.gaeste.where('aktiv').equals(true).toArray();
     const buchungen = await Buchungen.getAll();
     const nichtExportiert = await Buchungen.getAll({ exportiert: false });
-    
+
     const heute = Utils.formatDate(new Date());
     const heuteBuchungen = buchungen.filter(b => b.datum === heute);
     const heuteUmsatz = heuteBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
@@ -1136,92 +659,377 @@ Router.register('admin-dashboard', async () => {
                 </div>
             </div>
 
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h2 class="card-title">🔄 Daten-Management</h2>
-                </div>
+            <div class="card mt-3">
+                <div class="card-header"><h2 class="card-title">Export</h2></div>
                 <div class="card-body">
-                    <div style="padding: 16px; background: var(--color-stone-light); border-radius: var(--radius-md); margin-bottom: 16px;">
-                        <h3 style="font-weight: 600; margin-bottom: 8px;">📤 Buchungen exportieren</h3>
-                        <p style="color: var(--color-stone-dark); margin-bottom: 12px;">
-                            ${nichtExportiert.length} neue Buchungen zum Exportieren
-                        </p>
-                        <button class="btn btn-primary" onclick="handleExportBuchungen()">
-                            Export starten →
-                        </button>
-                    </div>
-
-                    <div style="padding: 16px; background: var(--color-stone-light); border-radius: var(--radius-md); margin-bottom: 16px;">
-                        <h3 style="font-weight: 600; margin-bottom: 8px;">📥 Artikel importieren</h3>
-                        <p style="color: var(--color-stone-dark); margin-bottom: 12px;">
-                            Preise & Sortiment aus Access aktualisieren
-                        </p>
-                        <input type="file" id="artikel-import" accept=".csv" style="display:none" onchange="handleArtikelImport(event)">
-                        <button class="btn btn-secondary" onclick="document.getElementById('artikel-import').click()">
-                            CSV hochladen →
-                        </button>
-                    </div>
-
-                    <div style="padding: 16px; background: var(--color-stone-light); border-radius: var(--radius-md);">
-                        <h3 style="font-weight: 600; margin-bottom: 8px;">🚪 Checkout-Liste importieren</h3>
-                        <p style="color: var(--color-stone-dark); margin-bottom: 12px;">
-                            Ausgecheckte Gäste deaktivieren
-                        </p>
-                        <input type="file" id="checkout-import" accept=".csv" style="display:none" onchange="handleCheckoutImport(event)">
-                        <button class="btn btn-secondary" onclick="document.getElementById('checkout-import').click()">
-                            CSV hochladen →
-                        </button>
-                    </div>
+                    <button class="btn btn-primary" onclick="handleExportBuchungen()">Buchungen exportieren (CSV)</button>
+                    <p class="text-muted mt-2">Exportiert alle neuen Buchungen und markiert sie danach als exportiert.</p>
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">👥 Gäste-Übersicht</h2>
-                </div>
+            <div class="card mt-3">
+                <div class="card-header"><h2 class="card-title">Artikel Import</h2></div>
                 <div class="card-body">
-                    ${gaeste.length > 0 ? gaeste.map(g => `
-                        <div class="list-item">
-                            <strong>${g.nachname}, ${g.vorname}</strong><br>
-                            <small class="text-muted">Zimmer: ${g.zimmernummer || '-'} | Anreise: ${g.anreise_datum || '-'}</small>
-                        </div>
-                    `).join('') : '<p class="text-muted">Keine Gäste vorhanden</p>'}
+                    <input type="file" accept=".csv" onchange="handleArtikelImport(event)">
+                    <p class="text-muted mt-2">CSV mit Artikel-IDs aus Access importieren.</p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header"><h2 class="card-title">Checkout Import</h2></div>
+                <div class="card-body">
+                    <input type="file" accept=".csv" onchange="handleCheckoutImport(event)">
+                    <p class="text-muted mt-2">CSV mit Gast-Web-UUIDs importieren und Gäste auschecken.</p>
                 </div>
             </div>
         </div>
     `);
 });
 
-// ===== HELPER FUNCTIONS =====
-window.filterCategory = (kategorie_id) => {
-    State.selectedCategory = kategorie_id;
-    Router.navigate('buchen');
+// ===== DASHBOARD PAGE =====
+Router.register('dashboard', async () => {
+    if (!State.currentUser) {
+        Router.navigate('login');
+        return;
+    }
+
+    const buchungen = await Buchungen.getByGast(State.currentUser.gast_id, 5);
+    const alleBuchungen = await Buchungen.getByGast(State.currentUser.gast_id);
+
+    const heute = Utils.formatDate(new Date());
+    const heuteBuchungen = alleBuchungen.filter(b => b.datum === heute);
+    const heuteSum = heuteBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
+
+    const wocheStart = new Date();
+    wocheStart.setDate(wocheStart.getDate() - 7);
+    const wocheBuchungen = alleBuchungen.filter(b => new Date(b.datum) >= wocheStart);
+    const wocheSum = wocheBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
+
+    const gesamtSum = alleBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
+
+    const buchungenHTML = buchungen.map(b => `
+        <div class="list-item ${b.exportiert ? 'exportiert' : 'pending'}">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 500;">${b.artikel_name} × ${b.menge}</div>
+                    <small class="text-muted">Heute, ${b.uhrzeit.substring(0, 5)}</small>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-weight: 700; color: var(--color-mountain-blue);">${Utils.formatCurrency(b.preis * b.menge)}</div>
+                    ${b.exportiert ? `<small class="text-muted">exportiert</small>` : `<small class="text-muted">neu</small>`}
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    UI.render(`
+        <div class="app-header">
+            <div class="header-left">
+                <button class="menu-btn" onclick="showMenu()">☰</button>
+                <div class="header-title">Seollerhaus Kassa</div>
+            </div>
+            <div class="header-right">
+                <div class="user-badge">👤 ${State.currentUser.nachname}</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <h1 class="page-title">Übersicht</h1>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">${Utils.formatCurrency(heuteSum)}</div>
+                    <div class="stat-label">Heute</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${Utils.formatCurrency(wocheSum)}</div>
+                    <div class="stat-label">Letzte 7 Tage</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${Utils.formatCurrency(gesamtSum)}</div>
+                    <div class="stat-label">Gesamt</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${alleBuchungen.length}</div>
+                    <div class="stat-label">Buchungen</div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h2 class="card-title">Letzte Buchungen</h2>
+                </div>
+                <div class="card-body">
+                    ${buchungenHTML || `<div class="empty-state">Noch keine Buchungen</div>`}
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item active" onclick="Router.navigate('dashboard')">
+                <div class="nav-icon">🏠</div>
+                <div>Start</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('buchen')">
+                <div class="nav-icon">🍺</div>
+                <div>Buchen</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('historie')">
+                <div class="nav-icon">📋</div>
+                <div>Liste</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('profil')">
+                <div class="nav-icon">👤</div>
+                <div>Profil</div>
+            </div>
+        </div>
+    `);
+});
+
+// ===== BUCHEN PAGE =====
+Router.register('buchen', async () => {
+    if (!State.currentUser) {
+        Router.navigate('login');
+        return;
+    }
+
+    const kategorien = await db.kategorien.orderBy('sortierung').toArray();
+    const artikel = State.selectedCategory
+        ? await Artikel.getByKategorie(State.selectedCategory)
+        : await Artikel.getAll();
+
+    const catsHTML = kategorien.map(k => `
+        <button class="chip ${State.selectedCategory === k.kategorie_id ? 'active' : ''}"
+                onclick="State.selectedCategory=${k.kategorie_id}; Router.navigate('buchen')">
+            ${k.name}
+        </button>
+    `).join('');
+
+    const artikelHTML = artikel.map(a => `
+        <button class="artikel-card" onclick="State.addToWarenkorb(${JSON.stringify(a).replace(/"/g, '&quot;')}, 1)">
+            <div class="artikel-icon">${a.icon || '🧾'}</div>
+            <div class="artikel-name">${a.name}</div>
+            <div class="artikel-price">${Utils.formatCurrency(a.preis)}</div>
+        </button>
+    `).join('');
+
+    UI.render(`
+        <div class="app-header">
+            <div class="header-left">
+                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
+                <div class="header-title">Buchen</div>
+            </div>
+            <div class="header-right">
+                <div class="user-badge">👤 ${State.currentUser.nachname}</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="chips-row">
+                <button class="chip ${!State.selectedCategory ? 'active' : ''}"
+                        onclick="State.selectedCategory=null; Router.navigate('buchen')">Alle</button>
+                ${catsHTML}
+            </div>
+
+            <div class="grid">
+                ${artikelHTML}
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h2 class="card-title">Warenkorb</h2>
+                </div>
+                <div class="card-body" id="warenkorb-area">
+                    <div>Gesamt: <b>${Utils.formatCurrency(State.getWarenkorbTotal())}</b></div>
+                    <button class="btn btn-primary mt-2" onclick="handleBuchen()">Jetzt buchen</button>
+                    <button class="btn btn-secondary mt-2" onclick="State.clearWarenkorb()">Warenkorb leeren</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item" onclick="Router.navigate('dashboard')">
+                <div class="nav-icon">🏠</div>
+                <div>Start</div>
+            </div>
+            <div class="nav-item active" onclick="Router.navigate('buchen')">
+                <div class="nav-icon">🍺</div>
+                <div>Buchen</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('historie')">
+                <div class="nav-icon">📋</div>
+                <div>Liste</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('profil')">
+                <div class="nav-icon">👤</div>
+                <div>Profil</div>
+            </div>
+        </div>
+    `);
+});
+
+// ===== HISTORIE PAGE =====
+Router.register('historie', async () => {
+    if (!State.currentUser) {
+        Router.navigate('login');
+        return;
+    }
+
+    const alleBuchungen = await Buchungen.getByGast(State.currentUser.gast_id);
+
+    const rows = alleBuchungen.map(b => `
+        <div class="list-item ${b.exportiert ? 'exportiert' : 'pending'}">
+            <div style="display:flex; justify-content:space-between;">
+                <div>
+                    <div style="font-weight:500;">${b.artikel_name} × ${b.menge}</div>
+                    <small class="text-muted">${b.datum} ${b.uhrzeit.substring(0,5)}</small>
+                </div>
+                <div style="font-weight:700; color: var(--color-mountain-blue);">
+                    ${Utils.formatCurrency(b.preis * b.menge)}
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    UI.render(`
+        <div class="app-header">
+            <div class="header-left">
+                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
+                <div class="header-title">Liste</div>
+            </div>
+            <div class="header-right">
+                <div class="user-badge">👤 ${State.currentUser.nachname}</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <h1 class="page-title">Alle Buchungen</h1>
+            ${rows || `<div class="empty-state">Noch keine Buchungen</div>`}
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item" onclick="Router.navigate('dashboard')">
+                <div class="nav-icon">🏠</div>
+                <div>Start</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('buchen')">
+                <div class="nav-icon">🍺</div>
+                <div>Buchen</div>
+            </div>
+            <div class="nav-item active" onclick="Router.navigate('historie')">
+                <div class="nav-icon">📋</div>
+                <div>Liste</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('profil')">
+                <div class="nav-icon">👤</div>
+                <div>Profil</div>
+            </div>
+        </div>
+    `);
+});
+
+// ===== PROFIL PAGE =====
+Router.register('profil', async () => {
+    if (!State.currentUser) {
+        Router.navigate('login');
+        return;
+    }
+
+    UI.render(`
+        <div class="app-header">
+            <div class="header-left">
+                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
+                <div class="header-title">Profil</div>
+            </div>
+            <div class="header-right">
+                <div class="user-badge">👤 ${State.currentUser.nachname}</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <h1 class="page-title">Profil</h1>
+
+            <div class="card">
+                <div class="card-body">
+                    <p><b>Nachname:</b> ${State.currentUser.nachname}</p>
+                    <p><b>Vorname:</b> ${State.currentUser.vorname || '-'}</p>
+                    <p><b>Zimmer:</b> ${State.currentUser.zimmernummer || '-'}</p>
+                    <button class="btn btn-secondary mt-2" onclick="Auth.logout()">Abmelden</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item" onclick="Router.navigate('dashboard')">
+                <div class="nav-icon">🏠</div>
+                <div>Start</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('buchen')">
+                <div class="nav-icon">🍺</div>
+                <div>Buchen</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('historie')">
+                <div class="nav-icon">📋</div>
+                <div>Liste</div>
+            </div>
+            <div class="nav-item active" onclick="Router.navigate('profil')">
+                <div class="nav-icon">👤</div>
+                <div>Profil</div>
+            </div>
+        </div>
+    `);
+});
+
+/* ===== GLOBAL EVENT HANDLERS ===== */
+window.handleLogin = async (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+
+    try {
+        await Auth.login(
+            formData.get('nachname'),
+            formData.get('passwort'),
+            formData.get('remember')
+        );
+        Router.navigate('dashboard');
+    } catch (error) {
+        // Error handled in Auth.login
+    }
 };
 
-window.addArtikel = async (artikel_id) => {
-    const artikel = await Artikel.getById(artikel_id);
-    State.addToWarenkorb(artikel);
-    Utils.showToast(`${artikel.name_kurz || artikel.name} zum Warenkorb hinzugefügt`, 'success');
+window.handleRegister = async (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+
+    const passwort = formData.get('passwort');
+    const passwort2 = formData.get('passwort2');
+
+    if (passwort !== passwort2) {
+        Utils.showToast('Passwörter stimmen nicht überein', 'error');
+        return;
+    }
+
+    try {
+        await Auth.register(
+            formData.get('nachname'),
+            formData.get('vorname'),
+            formData.get('zimmernummer'),
+            passwort
+        );
+        Router.navigate('login');
+    } catch (error) {
+        // Error handled in Auth.register
+    }
 };
 
-window.getCategoryColor = (kategorie_id) => {
-    const colors = {
-        1: '#FF6B6B', // Alkoholfrei
-        2: '#FFD93D', // Biere
-        3: '#95E1D3', // Wein Weiß
-        4: '#AA4465', // Wein Rot
-        5: '#F38181', // Schnäpse
-        6: '#6C5B7B', // Heiß
-        7: '#F8B500', // Süß
-        8: '#4A5859'  // Sonstiges
-    };
-    return colors[kategorie_id] || '#2C5F7C';
+window.handleBuchen = async () => {
+    try {
+        await Buchungen.createFromWarenkorb();
+        Router.navigate('dashboard');
+    } catch (error) {
+        // Error handled in Buchungen
+    }
 };
-
-window.searchArtikel = Utils.debounce(async (query) => {
-    // Implement search functionality
-    console.log('Searching for:', query);
-}, 300);
 
 window.handleExportBuchungen = async () => {
     await ExportService.exportBuchungenCSV();
@@ -1244,7 +1052,6 @@ window.handleCheckoutImport = async (event) => {
     try {
         const text = await file.text();
         const lines = text.trim().split('\n');
-        const headers = lines[0].split(',').map(h => h.trim());
 
         let count = 0;
         for (let i = 1; i < lines.length; i++) {
@@ -1286,13 +1093,39 @@ window.showMenu = () => {
             { kategorie_id: 7, name: 'Süßes/Salziges', sortierung: 70 },
             { kategorie_id: 8, name: 'Sonstiges', sortierung: 80 }
         ]);
-        window.Router = Router;
+    }
+})();
+
+/* ===== APP INITIALIZATION ===== */
+(async function initApp() {
+    // ✅ Admin-Status aus Session wiederherstellen
+    State.isAdmin = sessionStorage.getItem('is_admin') === '1';
+
+    // Hide loading screen after short delay
+    setTimeout(() => {
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+    }, 1500);
+
+    // Seed default articles
+    await Artikel.seed();
+
+    // ✅ Router IMMER initialisieren (damit #admin-dashboard stabil ist)
+    Router.init();
+
+    // Try auto-login (Gast)
+    const loggedIn = await Auth.autoLogin();
+    if (loggedIn) {
+        Router.navigate('dashboard');
+    }
+})();
+
+// ✅ WICHTIG: Global verfügbar machen (für onclick=...)
+// (weil app.js als type="module" geladen wird)
+window.Router = Router;
 window.State = State;
 window.Utils = Utils;
 window.Auth = Auth;
 window.Buchungen = Buchungen;
 window.Artikel = Artikel;
 window.ExportService = ExportService;
-
-    }
-})();
