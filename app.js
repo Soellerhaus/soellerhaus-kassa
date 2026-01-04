@@ -789,6 +789,86 @@ const ExportService = {
         a.click();
         await Buchungen.markAsExported(bs.map(b => b.buchung_id));
         Utils.showToast(`${bs.length} Buchungen exportiert`, 'success');
+    },
+    
+    // Excel-Export im Buchenungsdetail-Format für Registrierkasse
+    async exportBuchungenExcel() {
+        const bs = await Buchungen.getAll({ exportiert: false });
+        if (!bs.length) { Utils.showToast('Keine neuen Buchungen', 'warning'); return; }
+        
+        // Artikel-Cache für Kategorie-IDs aufbauen
+        const artikelCache = {};
+        const allArt = await db.artikel.toArray();
+        allArt.forEach(a => { artikelCache[a.artikel_id] = a; });
+        
+        // Letzte ID aus den Buchungen für fortlaufende Nummerierung
+        let lastId = parseInt(localStorage.getItem('lastExportId') || '0');
+        
+        // Daten im Format wie die Access-Tabelle vorbereiten
+        const rows = bs.map(b => {
+            lastId++;
+            const artikel = artikelCache[b.artikel_id];
+            
+            return {
+                'ID': lastId,
+                'Artikelnr': b.artikel_id || 0,
+                'Artikel': b.artikel_name || '',
+                'Preis': b.preis || 0,
+                'Datum': b.datum || '',
+                'Uhrzeit': b.uhrzeit || '',
+                'Gastid': b.gast_id || 0,
+                'Gastname': b.gast_nachname || '',
+                'Gastvorname': b.gast_vorname || '',
+                'Gastgruppe': b.gastgruppe || 'keiner Gruppe zugehörig',
+                'Gastgruppennr': 0,
+                'bezahlt': false,
+                'Steuer': b.steuer_prozent || 10,
+                'Anzahl': b.menge || 1,
+                'Rechdatum': '',
+                'Rechnummer': 0,
+                'ZNummer': 0,
+                'Warengruppe': artikel?.kategorie_id || 1,
+                'Bar': false,
+                'Unbar': false,
+                'Artikelreihenfolge': artikel?.sortierung || 0,
+                'Artikelgruppe2': 0,
+                'Artikelreihenfolge2': 0,
+                'Steuer1': 0,
+                'Anfang2': 0,
+                'Bestand2': 0,
+                'Basisbestand2': 0,
+                'Auffuellmenge2': 0,
+                'Fehlbestand2': 0,
+                'Warengruppe1': 0
+            };
+        });
+        
+        // SheetJS Workbook erstellen
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(rows);
+        
+        // Spaltenbreiten setzen
+        ws['!cols'] = [
+            {wch: 8}, {wch: 10}, {wch: 25}, {wch: 8}, {wch: 12}, {wch: 10},
+            {wch: 8}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 12}, {wch: 8},
+            {wch: 8}, {wch: 8}, {wch: 12}, {wch: 10}, {wch: 8}, {wch: 10},
+            {wch: 6}, {wch: 6}, {wch: 15}, {wch: 12}, {wch: 15}, {wch: 8},
+            {wch: 8}, {wch: 8}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}
+        ];
+        
+        XLSX.utils.book_append_sheet(wb, ws, 'Buchenungsdetail');
+        
+        // Datei herunterladen
+        const heute = new Date();
+        const datumStr = `${heute.getDate().toString().padStart(2,'0')}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getFullYear()}`;
+        XLSX.writeFile(wb, `Buchenungsdetail_${datumStr}.xlsx`);
+        
+        // ID speichern für nächsten Export
+        localStorage.setItem('lastExportId', lastId.toString());
+        
+        // Als exportiert markieren
+        await Buchungen.markAsExported(bs.map(b => b.buchung_id));
+        Utils.showToast(`${bs.length} Buchungen als Excel exportiert`, 'success');
     }
 };
 
@@ -977,6 +1057,13 @@ Router.register('admin-dashboard', async () => {
         <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:20px;font-size:1.2rem;margin-bottom:16px;">
             🍺 Auffüllliste (${nichtExp.length} Buchungen)
         </button>
+        
+        ${nichtExp.length ? `
+        <button class="btn btn-block" onclick="handleExportExcel()" style="padding:20px;font-size:1.2rem;margin-bottom:16px;background:linear-gradient(135deg, #217346, #1e6b3d);color:white;border:none;">
+            📥 EXCEL EXPORT (${nichtExp.length} Buchungen)<br>
+            <small style="opacity:0.9;">Für Registrierkasse herunterladen</small>
+        </button>
+        ` : ''}
         
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
@@ -1781,6 +1868,10 @@ window.handleAdminLogin = async () => {
     if (await Auth.adminLogin(pw)) Router.navigate('admin-dashboard');
 };
 window.handleExportBuchungen = async () => { await ExportService.exportBuchungenCSV(); Router.navigate('admin-dashboard'); };
+window.handleExportExcel = async () => { 
+    await ExportService.exportBuchungenExcel(); 
+    Router.navigate('admin-dashboard'); 
+};
 window.handleArtikelImport = async e => { const f = e.target.files[0]; if(!f) return; try { await Artikel.importFromCSV(await f.text()); Router.navigate('admin-articles'); } catch(er) {} e.target.value = ''; };
 window.handleSoftDeleteGuest = async id => { 
     if(confirm('Gast in den Papierkorb verschieben?')) { 
