@@ -34,6 +34,17 @@ db.version(3).stores({
     registeredGuests: '++id, firstName, passwordHash, createdAt, lastLoginAt'
 });
 
+db.version(4).stores({
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, [gast_id+datum]',
+    artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
+    kategorien: 'kategorie_id, name, sortierung',
+    settings: 'key',
+    exports: '++id, timestamp, anzahl_buchungen',
+    registeredGuests: '++id, firstName, passwordHash, createdAt, lastLoginAt',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen'
+});
+
 const DataProtection = {
     async createBackup() {
         try {
@@ -42,6 +53,7 @@ const DataProtection = {
                 buchungen: await db.buchungen.toArray(),
                 registeredGuests: await db.registeredGuests.toArray(),
                 artikel: await db.artikel.toArray(),
+                fehlendeGetraenke: await db.fehlendeGetraenke.toArray(),
                 timestamp: Date.now(),
                 version: '2.0'
             };
@@ -64,6 +76,9 @@ const DataProtection = {
                 }
                 if (backup.buchungen) {
                     for (const b of backup.buchungen) { try { await db.buchungen.add(b); } catch(e) {} }
+                }
+                if (backup.fehlendeGetraenke) {
+                    for (const f of backup.fehlendeGetraenke) { try { await db.fehlendeGetraenke.add(f); } catch(e) {} }
                 }
                 console.log('✅ Daten wiederhergestellt');
             }
@@ -398,6 +413,142 @@ const Buchungen = {
         Utils.showToast(`${ids.length} Buchungen zurückgesetzt`, 'success');
     },
     async markAsExported(ids) { for (const id of ids) await db.buchungen.update(id, { exportiert: true, exportiert_am: new Date().toISOString() }); }
+};
+
+// Fehlende Getränke Management
+const FehlendeGetraenke = {
+    async add(artikel_id, menge = 1) {
+        const artikel = await Artikel.getById(artikel_id);
+        if (!artikel) throw new Error('Artikel nicht gefunden');
+        
+        // Datum vom Vortag
+        const gestern = new Date();
+        gestern.setDate(gestern.getDate() - 1);
+        const datumVortag = Utils.formatDate(gestern);
+        
+        for (let i = 0; i < menge; i++) {
+            await db.fehlendeGetraenke.add({
+                artikel_id: artikel.artikel_id,
+                artikel_name: artikel.name,
+                artikel_preis: artikel.preis,
+                kategorie_id: artikel.kategorie_id,
+                icon: artikel.icon || '📦',
+                datum: datumVortag,
+                erstellt_am: new Date().toISOString(),
+                uebernommen: false,
+                uebernommen_von: null,
+                uebernommen_am: null
+            });
+        }
+        await DataProtection.createBackup();
+        Utils.showToast(`${menge}× ${artikel.name} als fehlend markiert`, 'success');
+    },
+    async getOffene() {
+        const alle = await db.fehlendeGetraenke.toArray();
+        return alle.filter(f => !f.uebernommen).sort((a, b) => b.id - a.id);
+    },
+    async uebernehmen(id, gastId, gastName) {
+        const fehlend = await db.fehlendeGetraenke.get(id);
+        if (!fehlend || fehlend.uebernommen) throw new Error('Nicht verfügbar');
+        
+        // Als übernommen markieren
+        await db.fehlendeGetraenke.update(id, {
+            uebernommen: true,
+            uebernommen_von: gastId,
+            uebernommen_von_name: gastName,
+            uebernommen_am: new Date().toISOString()
+        });
+        
+        // Buchung für den Gast erstellen
+        const artikel = await Artikel.getById(fehlend.artikel_id);
+        const b = {
+            buchung_id: Utils.uuid(),
+            gast_id: gastId,
+            gast_vorname: gastName,
+            gast_nachname: '',
+            gastgruppe: '',
+            artikel_id: fehlend.artikel_id,
+            artikel_name: fehlend.artikel_name,
+            preis: fehlend.artikel_preis,
+            steuer_prozent: artikel?.steuer_prozent || 10,
+            menge: 1,
+            datum: fehlend.datum, // Datum vom Vortag übernehmen
+            uhrzeit: Utils.formatTime(new Date()),
+            erstellt_am: new Date().toISOString(),
+            exportiert: false,
+            geraet_id: Utils.getDeviceId(),
+            sync_status: 'pending',
+            session_id: State.sessionId,
+            storniert: false,
+            fix: true, // Direkt fix, da vom Vortag
+            aus_fehlend: true
+        };
+        await db.buchungen.add(b);
+        await DataProtection.createBackup();
+        Utils.showToast(`${fehlend.artikel_name} übernommen!`, 'success');
+        return b;
+    },
+    async loeschen(id) {
+        await db.fehlendeGetraenke.delete(id);
+        await DataProtection.createBackup();
+        Utils.showToast('Gelöscht', 'success');
+    }
+};
+
+// Umlage auf alle Gäste
+const Umlage = {
+    async bucheAufAlle(artikel_id, beschreibung = 'Umlage') {
+        const artikel = await Artikel.getById(artikel_id);
+        if (!artikel) throw new Error('Artikel nicht gefunden');
+        
+        // Alle aktiven Gäste holen
+        const registrierte = await RegisteredGuests.getAll();
+        const legacy = (await db.gaeste.toArray()).filter(g => g.aktiv && !g.checked_out);
+        const alleGaeste = [...registrierte, ...legacy];
+        
+        if (alleGaeste.length === 0) throw new Error('Keine aktiven Gäste');
+        
+        // Preis pro Gast berechnen (aufgerundet auf 2 Dezimalen)
+        const preisProGast = Math.ceil((artikel.preis / alleGaeste.length) * 100) / 100;
+        
+        const heute = Utils.formatDate(new Date());
+        const uhrzeit = Utils.formatTime(new Date());
+        
+        // Für jeden Gast eine Buchung erstellen
+        for (const gast of alleGaeste) {
+            const gastId = gast.id || gast.gast_id;
+            const gastName = gast.firstName || gast.vorname;
+            
+            const b = {
+                buchung_id: Utils.uuid(),
+                gast_id: gastId,
+                gast_vorname: gastName,
+                gast_nachname: gast.nachname || '',
+                gastgruppe: gast.zimmernummer || '',
+                artikel_id: artikel.artikel_id,
+                artikel_name: `${artikel.name} (Umlage)`,
+                preis: preisProGast,
+                steuer_prozent: artikel.steuer_prozent || 10,
+                menge: 1,
+                datum: heute,
+                uhrzeit: uhrzeit,
+                erstellt_am: new Date().toISOString(),
+                exportiert: false,
+                geraet_id: Utils.getDeviceId(),
+                sync_status: 'pending',
+                session_id: null,
+                storniert: false,
+                fix: true,
+                ist_umlage: true,
+                umlage_beschreibung: beschreibung
+            };
+            await db.buchungen.add(b);
+        }
+        
+        await DataProtection.createBackup();
+        Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${alleGaeste.length} Gäste verteilt`, 'success');
+        return { preisProGast, anzahlGaeste: alleGaeste.length };
+    }
 };
 
 const Artikel = {
@@ -764,6 +915,8 @@ Router.register('admin-dashboard', async () => {
     const heute = Utils.formatDate(new Date());
     const heuteB = bs.filter(b => b.datum === heute);
     const nichtExp = bs.filter(b => !b.exportiert);
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
+    
     UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">🔧 Admin Dashboard</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="stats-grid">
@@ -773,9 +926,18 @@ Router.register('admin-dashboard', async () => {
             <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(heuteB.reduce((s,b) => s+b.preis*b.menge, 0))}</div><div class="stat-label">Umsatz heute</div></div>
         </div>
         
-        <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;">
+        <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:20px;font-size:1.2rem;margin-bottom:16px;">
             🍺 Auffüllliste (${nichtExp.length} Buchungen)
         </button>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+            <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
+                ⚠️ Fehlende Getränke<br><small>(${fehlendeOffen.length} offen)</small>
+            </button>
+            <button class="btn btn-danger" onclick="Router.navigate('admin-umlage')" style="padding:16px;">
+                💰 Umlage buchen<br><small>(auf alle Gäste)</small>
+            </button>
+        </div>
         
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
             <button class="btn btn-primary" onclick="Router.navigate('admin-guests')" style="padding:24px;">👥 Gästeverwaltung</button>
@@ -900,6 +1062,166 @@ window.resetAuffuellliste = async () => {
     if (confirm('Alle Buchungen als "aufgefüllt" markieren?\\n\\nDies setzt die Auffüllliste auf 0 zurück.')) {
         await Buchungen.resetAuffuellliste();
         Router.navigate('admin-auffuellliste');
+    }
+};
+
+// ============ FEHLENDE GETRÄNKE ROUTE ============
+Router.register('admin-fehlende', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
+    const kats = await db.kategorien.toArray();
+    const arts = await Artikel.getAll({ aktiv: true });
+    
+    // Nach Kategorie gruppieren
+    const byKat = {};
+    kats.forEach(k => { byKat[k.kategorie_id] = { name: k.name, artikel: [] }; });
+    arts.forEach(a => {
+        if (byKat[a.kategorie_id]) byKat[a.kategorie_id].artikel.push(a);
+    });
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">⚠️ Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3" style="background:#f39c12;color:white;">
+            <div style="padding:16px;text-align:center;">
+                <div style="font-size:1.5rem;font-weight:700;">${fehlendeOffen.length} offene Getränke</div>
+                <div>warten auf Übernahme durch Gäste</div>
+            </div>
+        </div>
+        
+        ${fehlendeOffen.length ? `
+        <div class="card mb-3">
+            <div class="card-header"><h3>Offene fehlende Getränke</h3></div>
+            <div class="card-body">
+                ${fehlendeOffen.map(f => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--color-stone-light);border-radius:8px;margin-bottom:6px;">
+                    <div>
+                        <strong>${f.artikel_name}</strong>
+                        <small style="color:var(--color-stone-dark);margin-left:8px;">${f.datum}</small>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-weight:600;">${Utils.formatCurrency(f.artikel_preis)}</span>
+                        <button class="btn btn-danger" onclick="deleteFehlendes(${f.id})" style="padding:4px 10px;">🗑️</button>
+                    </div>
+                </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+        
+        <div class="card">
+            <div class="card-header"><h3>Neues fehlendes Getränk hinzufügen</h3></div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Anzahl</label>
+                    <input type="number" id="fehlende-menge" class="form-input" value="1" min="1" max="99" style="width:100px;">
+                </div>
+                <p style="margin:16px 0;color:var(--color-stone-dark);">Artikel auswählen:</p>
+                ${Object.keys(byKat).map(katId => {
+                    const kat = byKat[katId];
+                    if (!kat.artikel.length) return '';
+                    return `
+                    <div style="margin-bottom:16px;">
+                        <div style="background:var(--color-alpine-green);color:white;padding:8px 12px;font-weight:600;border-radius:8px 8px 0 0;">${kat.name}</div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;padding:12px;background:var(--color-stone-light);border-radius:0 0 8px 8px;">
+                            ${kat.artikel.map(a => `
+                            <button class="btn btn-secondary" onclick="addFehlendesGetraenk(${a.artikel_id})" style="padding:12px 8px;text-align:center;">
+                                <div style="font-size:1.5rem;">${a.icon||'📦'}</div>
+                                <div style="font-size:0.85rem;font-weight:500;">${a.name_kurz||a.name}</div>
+                                <div style="font-size:0.8rem;color:var(--color-stone-dark);">${Utils.formatCurrency(a.preis)}</div>
+                            </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    </div>`);
+});
+
+window.addFehlendesGetraenk = async (artikelId) => {
+    const menge = parseInt(document.getElementById('fehlende-menge')?.value) || 1;
+    await FehlendeGetraenke.add(artikelId, menge);
+    Router.navigate('admin-fehlende');
+};
+
+window.deleteFehlendes = async (id) => {
+    if (confirm('Eintrag löschen?')) {
+        await FehlendeGetraenke.loeschen(id);
+        Router.navigate('admin-fehlende');
+    }
+};
+
+// ============ UMLAGE ROUTE ============
+Router.register('admin-umlage', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    const guests = await RegisteredGuests.getAll();
+    const legacyGuests = (await db.gaeste.toArray()).filter(g => g.aktiv && !g.checked_out);
+    const totalGuests = guests.length + legacyGuests.length;
+    const kats = await db.kategorien.toArray();
+    const arts = await Artikel.getAll({ aktiv: true });
+    
+    // Nach Kategorie gruppieren
+    const byKat = {};
+    kats.forEach(k => { byKat[k.kategorie_id] = { name: k.name, artikel: [] }; });
+    arts.forEach(a => {
+        if (byKat[a.kategorie_id]) byKat[a.kategorie_id].artikel.push(a);
+    });
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">💰 Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3" style="background:var(--color-danger);color:white;">
+            <div style="padding:16px;text-align:center;">
+                <div style="font-size:1.5rem;font-weight:700;">${totalGuests} aktive Gäste</div>
+                <div>Kosten werden gleichmäßig verteilt</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header"><h3>Artikel für Umlage auswählen</h3></div>
+            <div class="card-body">
+                <p style="margin-bottom:16px;color:var(--color-stone-dark);">
+                    <strong>Achtung:</strong> Der Preis des Artikels wird auf alle ${totalGuests} Gäste aufgeteilt!
+                </p>
+                ${Object.keys(byKat).map(katId => {
+                    const kat = byKat[katId];
+                    if (!kat.artikel.length) return '';
+                    return `
+                    <div style="margin-bottom:16px;">
+                        <div style="background:var(--color-alpine-green);color:white;padding:8px 12px;font-weight:600;border-radius:8px 8px 0 0;">${kat.name}</div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;padding:12px;background:var(--color-stone-light);border-radius:0 0 8px 8px;">
+                            ${kat.artikel.map(a => {
+                                const preisProGast = totalGuests > 0 ? Math.ceil((a.preis / totalGuests) * 100) / 100 : a.preis;
+                                return `
+                                <button class="btn btn-secondary" onclick="bucheUmlage(${a.artikel_id})" style="padding:12px 8px;text-align:center;">
+                                    <div style="font-size:1.5rem;">${a.icon||'📦'}</div>
+                                    <div style="font-size:0.85rem;font-weight:500;">${a.name_kurz||a.name}</div>
+                                    <div style="font-size:0.9rem;color:var(--color-danger);font-weight:700;">${Utils.formatCurrency(preisProGast)}/Gast</div>
+                                    <div style="font-size:0.75rem;color:var(--color-stone-dark);">Gesamt: ${Utils.formatCurrency(a.preis)}</div>
+                                </button>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    </div>`);
+});
+
+window.bucheUmlage = async (artikelId) => {
+    const artikel = await Artikel.getById(artikelId);
+    if (!artikel) return;
+    
+    const guests = await RegisteredGuests.getAll();
+    const legacyGuests = (await db.gaeste.toArray()).filter(g => g.aktiv && !g.checked_out);
+    const totalGuests = guests.length + legacyGuests.length;
+    const preisProGast = totalGuests > 0 ? Math.ceil((artikel.preis / totalGuests) * 100) / 100 : artikel.preis;
+    
+    if (confirm(`${artikel.name} als Umlage buchen?\n\n${Utils.formatCurrency(preisProGast)} × ${totalGuests} Gäste = ${Utils.formatCurrency(preisProGast * totalGuests)}`)) {
+        await Umlage.bucheAufAlle(artikelId);
+        Router.navigate('admin-dashboard');
     }
 };
 
@@ -1035,9 +1357,13 @@ Router.register('buchen', async () => {
     const kats = await db.kategorien.toArray();
     const arts = await Artikel.getAll({ aktiv: true });
     const name = State.currentUser.firstName || State.currentUser.vorname;
+    const gastId = State.currentUser.id || State.currentUser.gast_id;
     const filtered = State.selectedCategory ? arts.filter(a => a.kategorie_id === State.selectedCategory) : arts;
     const sessionBuchungen = await Buchungen.getSessionBuchungen();
     const sessionTotal = sessionBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
+    
+    // Fehlende Getränke laden
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
     
     const renderTileContent = (a) => {
         if (a.bild && a.bild.startsWith('data:')) {
@@ -1054,6 +1380,29 @@ Router.register('buchen', async () => {
         <div class="header-right"><button class="btn btn-secondary" onclick="handleGastAbmelden()">Abmelden</button></div>
     </div>
     <div class="main-content" style="padding-bottom:20px;">
+        ${fehlendeOffen.length ? `
+        <div class="fehlende-box" style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:20px;color:white;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                <span style="font-size:1.5rem;">⚠️</span>
+                <div>
+                    <div style="font-weight:700;font-size:1.1rem;">Fehlende Getränke vom Vortag</div>
+                    <div style="font-size:0.9rem;opacity:0.9;">Bitte übernehmen, falls Sie diese vergessen haben zu buchen</div>
+                </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                ${fehlendeOffen.map(f => `
+                <button onclick="uebernehmeFehlend(${f.id})" style="background:white;color:#333;border:none;border-radius:12px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                    <span style="font-size:1.2rem;">${f.icon || '🍺'}</span>
+                    <div style="text-align:left;">
+                        <div style="font-weight:600;font-size:0.9rem;">${f.artikel_name}</div>
+                        <div style="font-size:0.75rem;color:#666;">${f.datum} • ${Utils.formatCurrency(f.artikel_preis)}</div>
+                    </div>
+                </button>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+        
         <div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="searchArtikel(this.value)"></div>
         <div class="category-tabs">
             <div class="category-tab ${!State.selectedCategory?'active':''}" onclick="filterCategory(null)">Alle</div>
@@ -1091,6 +1440,20 @@ Router.register('buchen', async () => {
     </div>
     ` : ''}`);
 });
+
+// Fehlende Getränke übernehmen
+window.uebernehmeFehlend = async (id) => {
+    const gastId = State.currentUser?.id || State.currentUser?.gast_id;
+    const gastName = State.currentUser?.firstName || State.currentUser?.vorname;
+    if (!gastId) return;
+    
+    try {
+        await FehlendeGetraenke.uebernehmen(id, gastId, gastName);
+        Router.navigate('buchen'); // Seite neu laden - Artikel verschwindet
+    } catch (e) {
+        Utils.showToast(e.message || 'Fehler', 'error');
+    }
+};
 
 // Direktes Buchen
 window.bucheArtikelDirekt = async (id) => {
