@@ -588,12 +588,12 @@ const UI = {
                         <span style="font-size: 1.5rem;">⌫</span>
                     </button>
                     <button class="pin-btn" onclick="handlePinInput('0')">0</button>
-                    <button class="pin-btn pin-btn-ok" onclick="${onComplete}">
+                    <button class="pin-btn pin-btn-ok" onclick="${onComplete}()">
                         <span style="font-size: 1.2rem;">✓ OK</span>
                     </button>
                 </div>
                 ${onCancel ? `
-                    <button class="btn btn-secondary btn-block mt-2" onclick="${onCancel}" style="max-width: 400px; margin: 16px auto 0;">
+                    <button class="btn btn-secondary btn-block mt-2" onclick="${onCancel}()" style="max-width: 400px; margin: 16px auto 0;">
                         Abbrechen
                     </button>
                 ` : ''}
@@ -913,18 +913,26 @@ window.handleNameSelect = (gast_id) => {
 
 // Login Handler
 window.handlePinLogin = async () => {
+    console.log('=== PIN LOGIN CLICKED ===');
+    console.log('Current PIN:', State.currentPin);
+    console.log('Selected Gast ID:', window.selectedGastId);
+    
     if (State.currentPin.length < 1) {
+        console.log('ERROR: No PIN entered');
         Utils.showToast('Bitte PIN eingeben', 'warning');
         return;
     }
 
+    console.log('Attempting login...');
     try {
         await Auth.login(window.selectedGastId, State.currentPin);
+        console.log('Login successful!');
         State.currentPin = '';
         window.selectedGastId = null;
         window.currentLetter = null;
         Router.navigate('dashboard');
     } catch (error) {
+        console.error('Login error:', error);
         State.currentPin = '';
         Router.handleRoute(); // Re-render to clear PIN display
     }
@@ -932,27 +940,37 @@ window.handlePinLogin = async () => {
 
 // Register Handlers
 window.handleRegisterPinComplete = async () => {
-    console.log('Register PIN complete clicked');
+    console.log('=== REGISTER PIN COMPLETE CLICKED ===');
+    console.log('Current PIN:', State.currentPin);
+    console.log('PIN Length:', State.currentPin.length);
+    
     const vornameInput = document.getElementById('register-vorname');
+    console.log('Vorname input element:', vornameInput);
+    
     const vorname = vornameInput ? vornameInput.value : '';
+    console.log('Vorname value:', vorname);
 
     if (!vorname || !vorname.trim()) {
+        console.log('ERROR: Vorname ist leer');
         Utils.showToast('Bitte Vorname eingeben', 'warning');
         return;
     }
 
     if (State.currentPin.length < 1 || State.currentPin.length > 6) {
+        console.log('ERROR: PIN-Länge ungültig:', State.currentPin.length);
         Utils.showToast('PIN muss 1-6 Ziffern lang sein', 'warning');
         return;
     }
 
-    console.log('Registering user:', vorname, 'PIN length:', State.currentPin.length);
+    console.log('Validation passed! Registering user:', vorname.trim(), 'PIN length:', State.currentPin.length);
 
     try {
         await Auth.register(vorname.trim(), State.currentPin);
+        console.log('Registration successful!');
         State.currentPin = '';
         Utils.showToast('Registrierung erfolgreich! Bitte melden Sie sich an.', 'success');
         setTimeout(() => {
+            console.log('Navigating to login...');
             Router.navigate('login');
         }, 1000);
     } catch (error) {
