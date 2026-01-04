@@ -143,7 +143,7 @@ db.open().then(async () => {
 const Utils = {
     uuid: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c=='x'?r:(r&0x3|0x8)).toString(16); }),
     getDeviceId() { let d = localStorage.getItem('device_id'); if(!d) { d = this.uuid(); localStorage.setItem('device_id', d); } return d; },
-    formatDate: d => (d instanceof Date ? d : new Date(d)).toISOString().split('T')[0],
+    formatDate: d => { const dt = d instanceof Date ? d : new Date(d); return dt.toLocaleDateString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric'}); },
     formatTime: d => (d instanceof Date ? d : new Date(d)).toTimeString().split(' ')[0],
     formatCurrency: a => new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(a),
     generateSalt: () => { const a = new Uint8Array(16); crypto.getRandomValues(a); return Array.from(a, b => b.toString(16).padStart(2,'0')).join(''); },
@@ -233,7 +233,7 @@ const RegisteredGuests = {
         if (!firstName?.trim()) throw new Error('Vorname erforderlich');
         if (!password) throw new Error('Passwort erforderlich');
         const salt = Utils.generateSalt();
-        const guest = { firstName: firstName.trim(), passwordHash: await Utils.hashPassword(password, salt), salt, createdAt: new Date().toISOString(), lastLoginAt: null };
+        const guest = { firstName: firstName.trim(), passwordHash: await Utils.hashPassword(password, salt), salt, createdAt: new Date().toISOString(), lastLoginAt: null, geloescht: false };
         guest.id = await db.registeredGuests.add(guest);
         await DataProtection.createBackup();
         Utils.showToast('Registrierung erfolgreich!', 'success');
@@ -242,6 +242,7 @@ const RegisteredGuests = {
     async login(id, password) {
         const g = await db.registeredGuests.get(id);
         if (!g) throw new Error('Gast nicht gefunden');
+        if (g.geloescht) throw new Error('Account deaktiviert');
         if (await Utils.hashPassword(password, g.salt) !== g.passwordHash) throw new Error('Falsches Passwort');
         await db.registeredGuests.update(id, { lastLoginAt: new Date().toISOString() });
         State.setUser(g);
@@ -250,12 +251,33 @@ const RegisteredGuests = {
     },
     async getByFirstLetter(letter) {
         const all = await db.registeredGuests.toArray();
-        const filtered = all.filter(g => g.firstName?.toUpperCase().startsWith(letter.toUpperCase())).sort((a,b) => a.firstName.localeCompare(b.firstName));
+        const filtered = all.filter(g => !g.geloescht && g.firstName?.toUpperCase().startsWith(letter.toUpperCase())).sort((a,b) => a.firstName.localeCompare(b.firstName));
         const cnt = {};
         return filtered.map(g => { cnt[g.firstName] = (cnt[g.firstName]||0)+1; return {...g, displayName: cnt[g.firstName] > 1 ? `${g.firstName} (${cnt[g.firstName]})` : g.firstName}; });
     },
-    async getAll() { return db.registeredGuests.toArray(); },
-    async delete(id) { await db.registeredGuests.delete(id); await DataProtection.createBackup(); Utils.showToast('Gast gelöscht', 'success'); }
+    async getAll() { 
+        const all = await db.registeredGuests.toArray();
+        return all.filter(g => !g.geloescht);
+    },
+    async getGeloeschte() {
+        const all = await db.registeredGuests.toArray();
+        return all.filter(g => g.geloescht);
+    },
+    async softDelete(id) { 
+        await db.registeredGuests.update(id, { geloescht: true, geloeschtAm: new Date().toISOString() }); 
+        await DataProtection.createBackup(); 
+        Utils.showToast('Gast in Papierkorb verschoben', 'success'); 
+    },
+    async restore(id) {
+        await db.registeredGuests.update(id, { geloescht: false, geloeschtAm: null });
+        await DataProtection.createBackup();
+        Utils.showToast('Gast wiederhergestellt', 'success');
+    },
+    async deletePermanent(id) { 
+        await db.registeredGuests.delete(id); 
+        await DataProtection.createBackup(); 
+        Utils.showToast('Gast endgültig gelöscht', 'success'); 
+    }
 };
 
 const Auth = {
@@ -1158,77 +1180,192 @@ Router.register('admin-umlage', async () => {
     const guests = await RegisteredGuests.getAll();
     const legacyGuests = (await db.gaeste.toArray()).filter(g => g.aktiv && !g.checked_out);
     const totalGuests = guests.length + legacyGuests.length;
-    const kats = await db.kategorien.toArray();
-    const arts = await Artikel.getAll({ aktiv: true });
     
-    // Nach Kategorie gruppieren
-    const byKat = {};
-    kats.forEach(k => { byKat[k.kategorie_id] = { name: k.name, artikel: [] }; });
-    arts.forEach(a => {
-        if (byKat[a.kategorie_id]) byKat[a.kategorie_id].artikel.push(a);
-    });
+    // Fehlende Getränke laden
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
+    const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
+    const preisProGast = totalGuests > 0 ? Math.ceil((gesamtPreis / totalGuests) * 100) / 100 : gesamtPreis;
     
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">💰 Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-danger);color:white;">
-            <div style="padding:16px;text-align:center;">
-                <div style="font-size:1.5rem;font-weight:700;">${totalGuests} aktive Gäste</div>
-                <div>Kosten werden gleichmäßig verteilt</div>
+            <div style="padding:20px;text-align:center;">
+                <div style="font-size:2rem;font-weight:700;">${totalGuests} aktive Gäste</div>
+                <div style="opacity:0.9;">Kosten werden gleichmäßig verteilt</div>
             </div>
         </div>
         
-        <div class="card">
-            <div class="card-header"><h3>Artikel für Umlage auswählen</h3></div>
+        ${fehlendeOffen.length ? `
+        <div class="card mb-3">
+            <div class="card-header" style="background:#f39c12;color:white;">
+                <h3 style="margin:0;">⚠️ Fehlende Getränke (${fehlendeOffen.length})</h3>
+            </div>
             <div class="card-body">
-                <p style="margin-bottom:16px;color:var(--color-stone-dark);">
-                    <strong>Achtung:</strong> Der Preis des Artikels wird auf alle ${totalGuests} Gäste aufgeteilt!
-                </p>
-                ${Object.keys(byKat).map(katId => {
-                    const kat = byKat[katId];
-                    if (!kat.artikel.length) return '';
-                    return `
-                    <div style="margin-bottom:16px;">
-                        <div style="background:var(--color-alpine-green);color:white;padding:8px 12px;font-weight:600;border-radius:8px 8px 0 0;">${kat.name}</div>
-                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;padding:12px;background:var(--color-stone-light);border-radius:0 0 8px 8px;">
-                            ${kat.artikel.map(a => {
-                                const preisProGast = totalGuests > 0 ? Math.ceil((a.preis / totalGuests) * 100) / 100 : a.preis;
-                                return `
-                                <button class="btn btn-secondary" onclick="bucheUmlage(${a.artikel_id})" style="padding:12px 8px;text-align:center;">
-                                    <div style="font-size:1.5rem;">${a.icon||'📦'}</div>
-                                    <div style="font-size:0.85rem;font-weight:500;">${a.name_kurz||a.name}</div>
-                                    <div style="font-size:0.9rem;color:var(--color-danger);font-weight:700;">${Utils.formatCurrency(preisProGast)}/Gast</div>
-                                    <div style="font-size:0.75rem;color:var(--color-stone-dark);">Gesamt: ${Utils.formatCurrency(a.preis)}</div>
-                                </button>
-                                `;
-                            }).join('')}
+                ${fehlendeOffen.map(f => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--color-stone-light);border-radius:8px;margin-bottom:6px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:1.5rem;">${f.icon || '🍺'}</span>
+                        <div>
+                            <div style="font-weight:600;">${f.artikel_name}</div>
+                            <div style="font-size:0.85rem;color:var(--color-stone-dark);">${f.datum}</div>
                         </div>
                     </div>
-                    `;
-                }).join('')}
+                    <div style="font-weight:700;">${Utils.formatCurrency(f.artikel_preis)}</div>
+                </div>
+                `).join('')}
+                
+                <div style="margin-top:16px;padding:16px;background:var(--color-stone-light);border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;font-size:1.2rem;font-weight:700;">
+                        <span>Gesamtsumme:</span>
+                        <span>${Utils.formatCurrency(gesamtPreis)}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:8px;color:var(--color-danger);font-weight:600;">
+                        <span>Pro Gast (${totalGuests}):</span>
+                        <span>${Utils.formatCurrency(preisProGast)}</span>
+                    </div>
+                </div>
+                
+                <button class="btn btn-danger btn-block" onclick="bucheUmlageFuerAlle()" style="margin-top:20px;padding:20px;font-size:1.3rem;font-weight:700;">
+                    💰 UMLAGE BUCHEN
+                </button>
+                <p style="text-align:center;margin-top:8px;color:var(--color-stone-dark);font-size:0.9rem;">
+                    ${Utils.formatCurrency(preisProGast)} × ${totalGuests} Gäste = ${Utils.formatCurrency(preisProGast * totalGuests)}
+                </p>
             </div>
         </div>
+        ` : `
+        <div class="card">
+            <div class="card-body" style="text-align:center;padding:40px;">
+                <div style="font-size:3rem;margin-bottom:16px;">✅</div>
+                <h3>Keine fehlenden Getränke</h3>
+                <p style="color:var(--color-stone-dark);">Es gibt nichts umzulegen.</p>
+            </div>
+        </div>
+        `}
     </div>`);
 });
 
-window.bucheUmlage = async (artikelId) => {
-    const artikel = await Artikel.getById(artikelId);
-    if (!artikel) return;
-    
+window.bucheUmlageFuerAlle = async () => {
     const guests = await RegisteredGuests.getAll();
     const legacyGuests = (await db.gaeste.toArray()).filter(g => g.aktiv && !g.checked_out);
-    const totalGuests = guests.length + legacyGuests.length;
-    const preisProGast = totalGuests > 0 ? Math.ceil((artikel.preis / totalGuests) * 100) / 100 : artikel.preis;
+    const alleGaeste = [...guests, ...legacyGuests];
+    const totalGuests = alleGaeste.length;
     
-    if (confirm(`${artikel.name} als Umlage buchen?\n\n${Utils.formatCurrency(preisProGast)} × ${totalGuests} Gäste = ${Utils.formatCurrency(preisProGast * totalGuests)}`)) {
-        await Umlage.bucheAufAlle(artikelId);
-        Router.navigate('admin-dashboard');
+    if (totalGuests === 0) {
+        Utils.showToast('Keine aktiven Gäste', 'error');
+        return;
     }
+    
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
+    if (fehlendeOffen.length === 0) {
+        Utils.showToast('Keine fehlenden Getränke', 'error');
+        return;
+    }
+    
+    const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
+    const preisProGast = Math.ceil((gesamtPreis / totalGuests) * 100) / 100;
+    
+    if (!confirm(`UMLAGE durchführen?\n\n${fehlendeOffen.length} fehlende Getränke\nGesamtwert: ${Utils.formatCurrency(gesamtPreis)}\n\n${Utils.formatCurrency(preisProGast)} × ${totalGuests} Gäste`)) {
+        return;
+    }
+    
+    const heute = Utils.formatDate(new Date());
+    const uhrzeit = Utils.formatTime(new Date());
+    
+    // Für jeden Gast eine Buchung erstellen
+    for (const gast of alleGaeste) {
+        const gastId = gast.id || gast.gast_id;
+        const gastName = gast.firstName || gast.vorname;
+        
+        const b = {
+            buchung_id: Utils.uuid(),
+            gast_id: gastId,
+            gast_vorname: gastName,
+            gast_nachname: gast.nachname || '',
+            gastgruppe: gast.zimmernummer || '',
+            artikel_id: 0,
+            artikel_name: `Umlage (${fehlendeOffen.length} Getränke)`,
+            preis: preisProGast,
+            steuer_prozent: 10,
+            menge: 1,
+            datum: heute,
+            uhrzeit: uhrzeit,
+            erstellt_am: new Date().toISOString(),
+            exportiert: false,
+            geraet_id: Utils.getDeviceId(),
+            sync_status: 'pending',
+            session_id: null,
+            storniert: false,
+            fix: true,
+            ist_umlage: true
+        };
+        await db.buchungen.add(b);
+    }
+    
+    // Alle fehlenden Getränke als umgelegt markieren
+    for (const f of fehlendeOffen) {
+        await db.fehlendeGetraenke.update(f.id, { 
+            uebernommen: true, 
+            uebernommen_am: new Date().toISOString(),
+            umgelegt: true
+        });
+    }
+    
+    await DataProtection.createBackup();
+    Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${totalGuests} Gäste verteilt`, 'success');
+    Router.navigate('admin-dashboard');
 };
 
 Router.register('admin-guests', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     const guests = await RegisteredGuests.getAll();
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div><div class="main-content"><div class="card"><div class="card-header"><h2 class="card-title">Registrierte Gäste (${guests.length})</h2><button class="btn btn-secondary" onclick="DataProtection.exportGuestsCSV()">📥 Export</button></div><div class="card-body"><div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="filterGuestList(this.value)"></div><div id="guest-list">${guests.length ? guests.map(g => `<div class="list-item guest-item" data-name="${g.firstName.toLowerCase()}"><div style="flex:1;"><strong>${g.firstName}</strong><br><small class="text-muted">ID: ${g.id} | ${new Date(g.createdAt).toLocaleDateString('de-AT')}</small></div><button class="btn btn-danger" onclick="handleDeleteGuest(${g.id})" style="padding:8px 16px;">🗑️</button></div>`).join('') : '<p class="text-muted text-center">Keine Gäste</p>'}</div></div></div></div>`);
+    const geloeschte = await RegisteredGuests.getGeloeschte();
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h2 class="card-title">Aktive Gäste (${guests.length})</h2>
+                <button class="btn btn-secondary" onclick="DataProtection.exportGuestsCSV()">📥 Export</button>
+            </div>
+            <div class="card-body">
+                <div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="filterGuestList(this.value)"></div>
+                <div id="guest-list">
+                    ${guests.length ? guests.map(g => `
+                    <div class="list-item guest-item" data-name="${g.firstName.toLowerCase()}">
+                        <div style="flex:1;">
+                            <strong>${g.firstName}</strong><br>
+                            <small class="text-muted">ID: ${g.id} | ${new Date(g.createdAt).toLocaleDateString('de-AT')}</small>
+                        </div>
+                        <button class="btn btn-danger" onclick="handleSoftDeleteGuest(${g.id})" style="padding:8px 16px;">🗑️</button>
+                    </div>
+                    `).join('') : '<p class="text-muted text-center">Keine Gäste</p>'}
+                </div>
+            </div>
+        </div>
+        
+        ${geloeschte.length ? `
+        <div class="card" style="border:2px dashed var(--color-stone-medium);">
+            <div class="card-header" style="background:var(--color-stone-light);">
+                <h2 class="card-title">🗑️ Papierkorb (${geloeschte.length})</h2>
+            </div>
+            <div class="card-body">
+                ${geloeschte.map(g => `
+                <div class="list-item" style="background:var(--color-stone-light);">
+                    <div style="flex:1;">
+                        <strong style="text-decoration:line-through;color:var(--color-stone-dark);">${g.firstName}</strong><br>
+                        <small class="text-muted">Gelöscht: ${g.geloeschtAm ? new Date(g.geloeschtAm).toLocaleDateString('de-AT') : '?'}</small>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-secondary" onclick="handleRestoreGuest(${g.id})" style="padding:8px 12px;">↩️ Wiederherstellen</button>
+                        <button class="btn btn-danger" onclick="handlePermanentDeleteGuest(${g.id})" style="padding:8px 12px;">❌ Endgültig</button>
+                    </div>
+                </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+    </div>`);
 });
 
 Router.register('admin-articles', async () => {
@@ -1358,7 +1495,11 @@ Router.register('buchen', async () => {
     const arts = await Artikel.getAll({ aktiv: true });
     const name = State.currentUser.firstName || State.currentUser.vorname;
     const gastId = State.currentUser.id || State.currentUser.gast_id;
-    const filtered = State.selectedCategory ? arts.filter(a => a.kategorie_id === State.selectedCategory) : arts;
+    
+    // Standard: Alkoholfrei (ID 1) beim ersten Mal
+    if (State.selectedCategory === null) State.selectedCategory = 1;
+    
+    const filtered = State.selectedCategory === 'alle' ? arts : arts.filter(a => a.kategorie_id === State.selectedCategory);
     const sessionBuchungen = await Buchungen.getSessionBuchungen();
     const sessionTotal = sessionBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
     
@@ -1405,8 +1546,8 @@ Router.register('buchen', async () => {
         
         <div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="searchArtikel(this.value)"></div>
         <div class="category-tabs">
-            <div class="category-tab ${!State.selectedCategory?'active':''}" onclick="filterCategory(null)">Alle</div>
-            ${kats.map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})">${k.name}</div>`).join('')}
+            ${kats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0)).map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})">${k.name}</div>`).join('')}
+            <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')">Alle</div>
         </div>
         <div class="artikel-grid">
             ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" onclick="bucheArtikelDirekt(${a.artikel_id})">${renderTileContent(a)}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
@@ -1544,7 +1685,22 @@ window.handleAdminLogin = async () => {
 };
 window.handleExportBuchungen = async () => { await ExportService.exportBuchungenCSV(); Router.navigate('admin-dashboard'); };
 window.handleArtikelImport = async e => { const f = e.target.files[0]; if(!f) return; try { await Artikel.importFromCSV(await f.text()); Router.navigate('admin-articles'); } catch(er) {} e.target.value = ''; };
-window.handleDeleteGuest = async id => { if(confirm('Gast löschen?')) { await RegisteredGuests.delete(id); Router.navigate('admin-guests'); } };
+window.handleSoftDeleteGuest = async id => { 
+    if(confirm('Gast in den Papierkorb verschieben?')) { 
+        await RegisteredGuests.softDelete(id); 
+        Router.navigate('admin-guests'); 
+    } 
+};
+window.handleRestoreGuest = async id => {
+    await RegisteredGuests.restore(id);
+    Router.navigate('admin-guests');
+};
+window.handlePermanentDeleteGuest = async id => { 
+    if(confirm('Gast ENDGÜLTIG löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden!')) { 
+        await RegisteredGuests.deletePermanent(id); 
+        Router.navigate('admin-guests'); 
+    } 
+};
 window.handleDeleteArticle = async id => { if(confirm('Artikel löschen?')) { await Artikel.delete(id); Router.navigate('admin-articles'); } };
 window.filterGuestList = q => { document.querySelectorAll('.guest-item').forEach(i => { i.style.display = i.dataset.name.includes(q.toLowerCase()) ? '' : 'none'; }); };
 window.filterArticleList = q => { const ql = q.toLowerCase(); document.querySelectorAll('.article-item').forEach(i => { i.style.display = (i.dataset.name.includes(ql) || i.dataset.sku.includes(ql)) ? '' : 'none'; }); };
