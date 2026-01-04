@@ -24,6 +24,16 @@ db.version(2).stores({
     registeredGuests: '++id, firstName, passwordHash, createdAt, lastLoginAt'
 });
 
+db.version(3).stores({
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, [gast_id+datum]',
+    artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
+    kategorien: 'kategorie_id, name, sortierung',
+    settings: 'key',
+    exports: '++id, timestamp, anzahl_buchungen',
+    registeredGuests: '++id, firstName, passwordHash, createdAt, lastLoginAt'
+});
+
 const DataProtection = {
     async createBackup() {
         try {
@@ -255,14 +265,17 @@ const Auth = {
         if (await Utils.hashPassword(pw) === stored) { State.isAdmin = true; Utils.showToast('Admin-Login OK', 'success'); return true; }
         Utils.showToast('Falsches Passwort', 'error'); return false;
     },
-    logout() { 
+    async logout() { 
         // Buchungen der Session als fix markieren (nicht mehr stornierbar durch Gast)
-        Buchungen.fixSessionBuchungen().then(() => {
-            State.clearUser(); 
-            State.isAdmin = false; 
-            Router.navigate('login'); 
-            Utils.showToast('Abgemeldet', 'info'); 
-        });
+        try {
+            await Buchungen.fixSessionBuchungen();
+        } catch (e) {
+            console.error('fixSessionBuchungen error:', e);
+        }
+        State.clearUser(); 
+        State.isAdmin = false; 
+        Router.navigate('login'); 
+        Utils.showToast('Abgemeldet', 'info'); 
     },
     async autoLogin() {
         const id = localStorage.getItem('current_user_id');
@@ -297,7 +310,8 @@ const Buchungen = {
         return b;
     },
     async storno(buchung_id) {
-        const b = await db.buchungen.where('buchung_id').equals(buchung_id).first();
+        const allBs = await db.buchungen.toArray();
+        const b = allBs.find(x => x.buchung_id === buchung_id);
         if (!b) throw new Error('Buchung nicht gefunden');
         // Gast kann nur eigene, nicht-fixe Buchungen stornieren
         if (!State.isAdmin && b.fix) throw new Error('Buchung bereits abgeschlossen');
@@ -308,11 +322,16 @@ const Buchungen = {
     async fixSessionBuchungen() {
         // Alle Buchungen der aktuellen Session als fix markieren
         if (!State.sessionId) return;
-        const bs = await db.buchungen.where('session_id').equals(State.sessionId).toArray();
-        for (const b of bs) {
-            if (!b.storniert) await db.buchungen.update(b.buchung_id, { fix: true });
+        try {
+            const allBs = await db.buchungen.toArray();
+            const bs = allBs.filter(b => b.session_id === State.sessionId);
+            for (const b of bs) {
+                if (!b.storniert) await db.buchungen.update(b.buchung_id, { fix: true });
+            }
+            await DataProtection.createBackup();
+        } catch (e) {
+            console.error('fixSessionBuchungen error:', e);
         }
-        await DataProtection.createBackup();
     },
     async getByGast(id, limit=null) {
         let r = await db.buchungen.where('gast_id').equals(id).reverse().toArray();
@@ -321,8 +340,14 @@ const Buchungen = {
     },
     async getSessionBuchungen() {
         if (!State.sessionId) return [];
-        let r = await db.buchungen.where('session_id').equals(State.sessionId).toArray();
-        return r.filter(b => !b.storniert).reverse();
+        try {
+            const allBs = await db.buchungen.toArray();
+            const r = allBs.filter(b => b.session_id === State.sessionId && !b.storniert);
+            return r.reverse();
+        } catch (e) {
+            console.error('getSessionBuchungen error:', e);
+            return [];
+        }
     },
     async getAll(filter={}) {
         let r = await db.buchungen.toArray();
@@ -1021,6 +1046,8 @@ Router.register('buchen', async () => {
         return `<div class="artikel-icon">${a.icon||'📦'}</div>`;
     };
     
+    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#F8B500',8:'#4A5859'})[id] || '#2C5F7C';
+    
     UI.render(`
     <div class="app-header">
         <div class="header-left"><div class="header-title">👤 ${name}</div></div>
@@ -1033,7 +1060,7 @@ Router.register('buchen', async () => {
             ${kats.map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})">${k.name}</div>`).join('')}
         </div>
         <div class="artikel-grid">
-            ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${getCategoryColor(a.kategorie_id)}" onclick="bucheArtikelDirekt(${a.artikel_id})">${renderTileContent(a)}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
+            ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" onclick="bucheArtikelDirekt(${a.artikel_id})">${renderTileContent(a)}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
         </div>
     </div>
     ${sessionBuchungen.length ? `
@@ -1136,7 +1163,7 @@ window.navigateToDashboard = () => Router.navigate('dashboard');
 window.navigateToBuchen = () => Router.navigate('buchen');
 window.navigateToHistorie = () => Router.navigate('historie');
 window.navigateToProfil = () => Router.navigate('profil');
-window.handleLogout = () => Auth.logout();
+window.handleLogout = async () => { await Auth.logout(); };
 window.handleLetterSelect = l => { window.currentLetter = l; Router.navigate('name-select'); };
 window.handleNameSelect = id => { window.selectedGastId = id; Router.navigate('pin-entry'); };
 window.handlePinCancel = () => { window.selectedGastId = null; Router.navigate('login'); };
@@ -1163,11 +1190,12 @@ window.getCategoryColor = id => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465
 window.searchArtikel = Utils.debounce(async q => {
     const arts = await Artikel.getAll({ aktiv: true, search: q });
     const grid = document.querySelector('.artikel-grid');
+    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#F8B500',8:'#4A5859'})[id] || '#2C5F7C';
     const renderTile = (a) => {
         const content = (a.bild && a.bild.startsWith('data:')) 
             ? `<img src="${a.bild}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">`
             : `<div class="artikel-icon">${a.icon||'📦'}</div>`;
-        return `<div class="artikel-tile" style="--tile-color:${getCategoryColor(a.kategorie_id)}" onclick="bucheArtikelDirekt(${a.artikel_id})">${content}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`;
+        return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" onclick="bucheArtikelDirekt(${a.artikel_id})">${content}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`;
     };
     if (grid) grid.innerHTML = arts.map(renderTile).join('') || '<p class="text-muted" style="grid-column:1/-1;text-align:center;">Keine Ergebnisse</p>';
 }, 300);
