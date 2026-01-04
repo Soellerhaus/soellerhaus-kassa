@@ -647,19 +647,19 @@ const Artikel = {
             throw new Error('CSV fehlt: ID, Artikelname oder Preis Spalte');
         }
         
-        // Category mapping based on Warengruppe values (1-8)
+        // Category mapping based on Warengruppe values (1-6)
         const katMap = {
             0: 'Sonstiges',
             1: 'Alkoholfreie Getränke',
             2: 'Biere',
             3: 'Wein',
-            4: 'Spirituosen',
+            4: 'Schnäpse',
             5: 'Heiße Getränke',
             6: 'Sonstiges',
-            7: 'Snacks',
-            8: 'Diverses'
+            7: 'Sonstiges',
+            8: 'Sonstiges'
         };
-        const iconMap = {0:'🍽️',1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍿',8:'📦'};
+        const iconMap = {0:'🍽️',1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍽️',8:'🍽️'};
         
         let imp=0, upd=0, skip=0;
         
@@ -813,9 +813,35 @@ const UI = {
 };
 
 // Routes
-Router.register('login', () => {
+Router.register('login', async () => {
     State.currentPin = ''; window.selectedGastId = null; window.currentLetter = null;
-    UI.render(`<div class="main-content"><div style="text-align:center;margin-top:40px;"><div class="mountain-logo" style="margin:0 auto 24px;"><svg viewBox="0 0 100 60" class="mountain-svg" style="width:120px;height:72px;color:var(--color-mountain-blue);"><path d="M0,60 L20,30 L35,45 L50,15 L65,40 L80,25 L100,60 Z" fill="currentColor"/></svg></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">Seollerhaus Kassa</h1><p style="color:var(--color-stone-dark);margin-bottom:40px;">Self-Service Buchung</p><div style="max-width:600px;margin:0 auto;">${UI.renderAlphabet('handleLetterSelect')}<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">Noch kein Account?</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">Neu registrieren</button></div><div style="margin-top:24px;"><button class="btn btn-secondary" onclick="handleAdminClick()">Admin-Login</button></div></div></div></div>`);
+    
+    // Fehlende Getränke laden und zusammenfassen
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
+    const zusammenfassung = {};
+    fehlendeOffen.forEach(f => {
+        if (!zusammenfassung[f.artikel_name]) {
+            zusammenfassung[f.artikel_name] = { name: f.artikel_name, icon: f.icon || '🍺', menge: 0, preis: f.artikel_preis };
+        }
+        zusammenfassung[f.artikel_name].menge++;
+    });
+    const fehlendeList = Object.values(zusammenfassung);
+    const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
+    
+    const fehlendeHtml = fehlendeList.length ? `
+    <div style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:24px;color:white;max-width:600px;margin:0 auto 24px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <span style="font-size:1.3rem;">⚠️</span>
+            <div style="font-weight:700;">Fehlende Getränke</div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            ${fehlendeList.map(f => `<span style="background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:20px;font-size:0.9rem;">${f.menge}× ${f.name}</span>`).join('')}
+        </div>
+        <div style="font-size:0.85rem;opacity:0.9;">Gesamt: ${Utils.formatCurrency(gesamtPreis)} • Bitte nach Login übernehmen</div>
+    </div>
+    ` : '';
+    
+    UI.render(`<div class="main-content"><div style="text-align:center;margin-top:40px;"><div class="mountain-logo" style="margin:0 auto 24px;"><svg viewBox="0 0 100 60" class="mountain-svg" style="width:120px;height:72px;color:var(--color-mountain-blue);"><path d="M0,60 L20,30 L35,45 L50,15 L65,40 L80,25 L100,60 Z" fill="currentColor"/></svg></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">Seollerhaus Kassa</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">Self-Service Buchung</p>${fehlendeHtml}<div style="max-width:600px;margin:0 auto;">${UI.renderAlphabet('handleLetterSelect')}<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">Noch kein Account?</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">Neu registrieren</button></div><div style="margin-top:24px;"><button class="btn btn-secondary" onclick="handleAdminClick()">Admin-Login</button></div></div></div></div>`);
 });
 
 Router.register('register', () => {
@@ -986,11 +1012,56 @@ Router.register('admin-dashboard', async () => {
                         <h3 style="font-weight:600;margin-bottom:8px;">📦 Artikel Export</h3>
                         <button class="btn btn-secondary" onclick="DataProtection.exportArticlesCSV()">CSV</button>
                     </div>
+                    <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
+                        <h3 style="font-weight:600;margin-bottom:8px;">🔧 Kategorien</h3>
+                        <button class="btn btn-secondary" onclick="repairCategories()">Reparieren</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>`);
 });
+
+// Kategorien reparieren - 7 und 8 zu 6 (Sonstiges)
+window.repairCategories = async () => {
+    // Kategorien-Tabelle aktualisieren
+    await db.kategorien.clear();
+    await db.kategorien.bulkAdd([
+        {kategorie_id:1,name:'Alkoholfreie Getränke',sortierung:10},
+        {kategorie_id:2,name:'Biere',sortierung:20},
+        {kategorie_id:3,name:'Wein',sortierung:30},
+        {kategorie_id:4,name:'Schnäpse',sortierung:40},
+        {kategorie_id:5,name:'Heiße Getränke',sortierung:50},
+        {kategorie_id:6,name:'Sonstiges',sortierung:60}
+    ]);
+    
+    // Artikel mit Kategorie 7 oder 8 auf 6 setzen
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️'};
+    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Schnäpse',5:'Heiße Getränke',6:'Sonstiges'};
+    
+    const arts = await db.artikel.toArray();
+    let fixed = 0;
+    for (const a of arts) {
+        if (a.kategorie_id === 7 || a.kategorie_id === 8) {
+            await db.artikel.update(a.artikel_id, { 
+                kategorie_id: 6, 
+                kategorie_name: 'Sonstiges',
+                icon: '🍽️'
+            });
+            fixed++;
+        } else if (a.kategorie_id >= 1 && a.kategorie_id <= 6) {
+            // Icon und Name aktualisieren
+            await db.artikel.update(a.artikel_id, {
+                kategorie_name: katMap[a.kategorie_id] || 'Sonstiges',
+                icon: a.bild ? a.icon : (iconMap[a.kategorie_id] || '🍽️')
+            });
+        }
+    }
+    
+    await DataProtection.createBackup();
+    Utils.showToast(`Kategorien repariert! ${fixed} Artikel korrigiert.`, 'success');
+    Router.navigate('admin-dashboard');
+};
 
 // Auffüllliste Route
 Router.register('admin-auffuellliste', async () => {
@@ -1318,8 +1389,9 @@ window.bucheUmlageFuerAlle = async () => {
 
 Router.register('admin-guests', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
-    const guests = await RegisteredGuests.getAll();
-    const geloeschte = await RegisteredGuests.getGeloeschte();
+    const alleInDb = await db.registeredGuests.toArray();
+    const guests = alleInDb.filter(g => !g.geloescht);
+    const geloeschte = alleInDb.filter(g => g.geloescht);
     
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
@@ -1345,7 +1417,7 @@ Router.register('admin-guests', async () => {
         </div>
         
         ${geloeschte.length ? `
-        <div class="card" style="border:2px dashed var(--color-stone-medium);">
+        <div class="card mb-3" style="border:2px dashed var(--color-stone-medium);">
             <div class="card-header" style="background:var(--color-stone-light);">
                 <h2 class="card-title">🗑️ Papierkorb (${geloeschte.length})</h2>
             </div>
@@ -1357,16 +1429,41 @@ Router.register('admin-guests', async () => {
                         <small class="text-muted">Gelöscht: ${g.geloeschtAm ? new Date(g.geloeschtAm).toLocaleDateString('de-AT') : '?'}</small>
                     </div>
                     <div style="display:flex;gap:8px;">
-                        <button class="btn btn-secondary" onclick="handleRestoreGuest(${g.id})" style="padding:8px 12px;">↩️ Wiederherstellen</button>
-                        <button class="btn btn-danger" onclick="handlePermanentDeleteGuest(${g.id})" style="padding:8px 12px;">❌ Endgültig</button>
+                        <button class="btn btn-secondary" onclick="handleRestoreGuest(${g.id})" style="padding:8px 12px;">↩️</button>
+                        <button class="btn btn-danger" onclick="handlePermanentDeleteGuest(${g.id})" style="padding:8px 12px;">❌</button>
                     </div>
                 </div>
                 `).join('')}
             </div>
         </div>
         ` : ''}
+        
+        <div class="card" style="background:#f8f9fa;">
+            <div class="card-header"><h3>🔧 Datenbank (${alleInDb.length} Einträge)</h3></div>
+            <div class="card-body">
+                <p style="color:var(--color-stone-dark);margin-bottom:12px;">Alle Gäste in der Datenbank:</p>
+                ${alleInDb.map(g => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:white;border-radius:8px;margin-bottom:4px;border:1px solid ${g.geloescht ? '#e74c3c' : '#27ae60'};">
+                    <div>
+                        <strong>${g.firstName}</strong>
+                        <small style="margin-left:8px;color:${g.geloescht ? '#e74c3c' : '#27ae60'};">${g.geloescht ? '(gelöscht)' : '(aktiv)'}</small>
+                    </div>
+                    <button class="btn btn-danger" onclick="handleForceDeleteGuest(${g.id})" style="padding:4px 10px;font-size:0.85rem;">❌ Entfernen</button>
+                </div>
+                `).join('')}
+            </div>
+        </div>
     </div>`);
 });
+
+window.handleForceDeleteGuest = async (id) => {
+    if (confirm('Gast SOFORT und ENDGÜLTIG aus der Datenbank entfernen?')) {
+        await db.registeredGuests.delete(id);
+        await DataProtection.createBackup();
+        Utils.showToast('Gast entfernt', 'success');
+        Router.navigate('admin-guests');
+    }
+};
 
 Router.register('admin-articles', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
@@ -1513,7 +1610,7 @@ Router.register('buchen', async () => {
         return `<div class="artikel-icon">${a.icon||'📦'}</div>`;
     };
     
-    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#F8B500',8:'#4A5859'})[id] || '#2C5F7C';
+    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B'})[id] || '#2C5F7C';
     
     UI.render(`
     <div class="app-header">
@@ -1705,11 +1802,11 @@ window.handleDeleteArticle = async id => { if(confirm('Artikel löschen?')) { aw
 window.filterGuestList = q => { document.querySelectorAll('.guest-item').forEach(i => { i.style.display = i.dataset.name.includes(q.toLowerCase()) ? '' : 'none'; }); };
 window.filterArticleList = q => { const ql = q.toLowerCase(); document.querySelectorAll('.article-item').forEach(i => { i.style.display = (i.dataset.name.includes(ql) || i.dataset.sku.includes(ql)) ? '' : 'none'; }); };
 window.filterCategory = id => { State.selectedCategory = id; Router.navigate('buchen'); };
-window.getCategoryColor = id => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#F8B500',8:'#4A5859'})[id] || '#2C5F7C';
+window.getCategoryColor = id => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B'})[id] || '#2C5F7C';
 window.searchArtikel = Utils.debounce(async q => {
     const arts = await Artikel.getAll({ aktiv: true, search: q });
     const grid = document.querySelector('.artikel-grid');
-    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#F8B500',8:'#4A5859'})[id] || '#2C5F7C';
+    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B'})[id] || '#2C5F7C';
     const renderTile = (a) => {
         const content = (a.bild && a.bild.startsWith('data:')) 
             ? `<img src="${a.bild}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">`
@@ -1735,7 +1832,7 @@ window.showAddArticleModal = () => {
         <div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" placeholder="0.00" step="0.01" min="0"></div>
         <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" placeholder="1" min="1" value="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
     </div>
-    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Wein</option><option value="4">Spirituosen</option><option value="5">Heiße Getränke</option><option value="6">Sonstiges</option><option value="7">Snacks</option><option value="8">Diverses</option></select></div>
+    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Wein</option><option value="4">Schnäpse</option><option value="5">Heiße Getränke</option><option value="6">Sonstiges</option></select></div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" checked><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveNewArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = null;
@@ -1761,7 +1858,7 @@ window.showEditArticleModal = async id => {
         <div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" value="${a.preis}" step="0.01" min="0"></div>
         <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" value="${a.sortierung||1}" min="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
     </div>
-    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7,8].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Spirituosen',5:'Heiße Getränke',6:'Sonstiges',7:'Snacks',8:'Diverses'}[i]}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Schnäpse',5:'Heiße Getränke',6:'Sonstiges'}[i]}</option>`).join('')}</select></div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = a.bild || null;
@@ -1786,8 +1883,8 @@ window.handleImagePreview = async (event) => {
 window.clearImagePreview = () => {
     window.currentArticleImage = null;
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍿',8:'📦'};
-    document.getElementById('article-image-preview').innerHTML = iconMap[katId] || '📦';
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️'};
+    document.getElementById('article-image-preview').innerHTML = iconMap[katId] || '🍽️';
     document.getElementById('article-image').value = '';
 };
 
@@ -1795,8 +1892,8 @@ window.saveNewArticle = async () => {
     const name = document.getElementById('article-name')?.value;
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
-    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Spirituosen',5:'Heiße Getränke',6:'Sonstiges',7:'Snacks',8:'Diverses'};
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍿',8:'📦'};
+    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Schnäpse',5:'Heiße Getränke',6:'Sonstiges'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️'};
     await Artikel.create({ 
         name: name.trim(), 
         name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
@@ -1804,10 +1901,10 @@ window.saveNewArticle = async () => {
         preis: parseFloat(document.getElementById('article-price')?.value) || 0, 
         steuer_prozent: 10, 
         kategorie_id: katId, 
-        kategorie_name: katMap[katId], 
+        kategorie_name: katMap[katId] || 'Sonstiges', 
         aktiv: document.getElementById('article-active')?.checked, 
         sortierung: parseInt(document.getElementById('article-sort')?.value) || 1, 
-        icon: iconMap[katId],
+        icon: iconMap[katId] || '🍽️',
         bild: window.currentArticleImage || null
     });
     closeArticleModal();
@@ -1820,8 +1917,8 @@ window.saveEditArticle = async () => {
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
     const newPos = parseInt(document.getElementById('article-sort')?.value) || 1;
-    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Spirituosen',5:'Heiße Getränke',6:'Sonstiges',7:'Snacks',8:'Diverses'};
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍿',8:'📦'};
+    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Schnäpse',5:'Heiße Getränke',6:'Sonstiges'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️'};
     
     // Alten Artikel holen für Positions-Tausch
     const oldArticle = await Artikel.getById(id);
@@ -1867,8 +1964,7 @@ window.saveEditArticle = async () => {
     if (await db.kategorien.count() === 0) {
         await db.kategorien.bulkAdd([
             {kategorie_id:1,name:'Alkoholfreie Getränke',sortierung:10},{kategorie_id:2,name:'Biere',sortierung:20},{kategorie_id:3,name:'Wein',sortierung:30},
-            {kategorie_id:4,name:'Spirituosen',sortierung:40},{kategorie_id:5,name:'Heiße Getränke',sortierung:50},{kategorie_id:6,name:'Sonstiges',sortierung:60},
-            {kategorie_id:7,name:'Snacks',sortierung:70},{kategorie_id:8,name:'Diverses',sortierung:80}
+            {kategorie_id:4,name:'Schnäpse',sortierung:40},{kategorie_id:5,name:'Heiße Getränke',sortierung:50},{kategorie_id:6,name:'Sonstiges',sortierung:60}
         ]);
     }
     if (await Auth.autoLogin()) Router.navigate('dashboard');
