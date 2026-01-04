@@ -545,16 +545,20 @@ const Router = {
     },
 
     navigate(path) {
+        console.log('Navigating to:', path);
         history.pushState({}, '', `#${path}`);
         this.handleRoute();
     },
 
     handleRoute() {
         const path = location.hash.slice(1) || 'login';
+        console.log('Current route:', path);
         const handler = this.routes[path] || this.routes['login'];
         State.currentPage = path;
         if (handler) {
             handler();
+        } else {
+            console.error('No handler for route:', path);
         }
     }
 };
@@ -618,7 +622,7 @@ const UI = {
             return `
                 <div class="name-list-empty">
                     <p>Keine Einträge gefunden</p>
-                    <button class="btn btn-secondary btn-block" onclick="Router.navigate('login')">
+                    <button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">
                         Zurück
                     </button>
                 </div>
@@ -636,7 +640,7 @@ const UI = {
                         </button>
                     `).join('')}
                 </div>
-                <button class="btn btn-secondary btn-block mt-3" onclick="Router.navigate('login')">
+                <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">
                     Zurück
                 </button>
             </div>
@@ -716,6 +720,10 @@ const UI = {
 
 // Login Page
 Router.register('login', () => {
+    State.currentPin = '';
+    window.selectedGastId = null;
+    window.currentLetter = null;
+    
     UI.render(`
         <div class="main-content">
             <div style="text-align: center; margin-top: 40px;">
@@ -732,13 +740,13 @@ Router.register('login', () => {
 
                     <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--color-stone-medium);">
                         <p style="color: var(--color-stone-dark); margin-bottom: 16px;">Noch kein Account?</p>
-                        <button class="btn btn-primary btn-block" style="max-width: 400px; margin: 0 auto;" onclick="Router.navigate('register')">
+                        <button class="btn btn-primary btn-block" style="max-width: 400px; margin: 0 auto;" onclick="handleRegisterClick()">
                             Neu registrieren
                         </button>
                     </div>
 
                     <div style="margin-top: 24px;">
-                        <button class="btn btn-secondary" onclick="Router.navigate('admin-login')" style="font-size: 0.9rem;">
+                        <button class="btn btn-secondary" onclick="handleAdminClick()" style="font-size: 0.9rem;">
                             Admin-Login
                         </button>
                     </div>
@@ -748,14 +756,34 @@ Router.register('login', () => {
     `);
 });
 
+// Helper functions for navigation
+window.handleRegisterClick = () => {
+    console.log('Register button clicked');
+    Router.navigate('register');
+};
+
+window.handleAdminClick = () => {
+    console.log('Admin button clicked');
+    Router.navigate('admin-login');
+};
+
+window.handleBackToLogin = () => {
+    console.log('Back to login clicked');
+    Router.navigate('login');
+};
+
 // Name Selection Page
 Router.register('name-select', async () => {
+    console.log('Name-select page, current letter:', window.currentLetter);
+    
     if (!window.currentLetter) {
+        console.log('No letter selected, going back to login');
         Router.navigate('login');
         return;
     }
 
     const gaeste = await Auth.getGaesteByLetter(window.currentLetter);
+    console.log('Found guests:', gaeste.length);
 
     UI.render(`
         <div class="main-content">
@@ -771,7 +799,10 @@ Router.register('name-select', async () => {
 
 // PIN Entry Page
 Router.register('pin-entry', () => {
+    console.log('PIN-entry page, selected guest:', window.selectedGastId);
+    
     if (!window.selectedGastId) {
+        console.log('No guest selected, going back to login');
         Router.navigate('login');
         return;
     }
@@ -787,36 +818,41 @@ Router.register('pin-entry', () => {
 
 // Register Page
 Router.register('register', () => {
+    console.log('Register page loaded');
     State.currentPin = '';
+    
     UI.render(`
         <div class="main-content">
             <div style="max-width: 500px; margin: 40px auto;">
                 <h1 class="page-title" style="text-align: center;">Neu registrieren</h1>
                 
-                <form id="register-form" onsubmit="handleRegisterSubmit(event)">
-                    <div class="form-group">
-                        <label class="form-label">Vorname *</label>
-                        <input type="text" 
-                               id="register-vorname" 
-                               name="vorname" 
-                               class="form-input" 
-                               placeholder="z.B. Maria" 
-                               required 
-                               autofocus
-                               style="font-size: 1.2rem; padding: 16px;">
-                    </div>
+                <div class="form-group">
+                    <label class="form-label">Vorname *</label>
+                    <input type="text" 
+                           id="register-vorname" 
+                           class="form-input" 
+                           placeholder="z.B. Maria" 
+                           required 
+                           autofocus
+                           style="font-size: 1.2rem; padding: 16px;">
+                </div>
 
-                    <div style="margin-top: 32px; padding: 24px; background: var(--color-stone-light); border-radius: var(--radius-lg);">
-                        ${UI.renderPinPad('handleRegisterPinComplete', null, 'PIN festlegen (1-6 Ziffern)')}
-                    </div>
-                </form>
+                <div style="margin-top: 32px; padding: 24px; background: var(--color-stone-light); border-radius: var(--radius-lg);">
+                    ${UI.renderPinPad('handleRegisterPinComplete', 'handleBackToLogin', 'PIN festlegen (1-6 Ziffern)')}
+                </div>
 
-                <button class="btn btn-secondary btn-block mt-3" onclick="Router.navigate('login')">
+                <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">
                     Zurück zum Login
                 </button>
             </div>
         </div>
     `);
+    
+    // Focus on the input field after render
+    setTimeout(() => {
+        const input = document.getElementById('register-vorname');
+        if (input) input.focus();
+    }, 100);
 });
 
 // Dashboard Page (Continued in next file due to length...)
@@ -844,11 +880,13 @@ window.handlePinCancel = () => {
 
 // Alphabet / Name Selection Handlers
 window.handleLetterSelect = async (letter) => {
+    console.log('Letter selected:', letter);
     window.currentLetter = letter;
     Router.navigate('name-select');
 };
 
 window.handleNameSelect = (gast_id) => {
+    console.log('Name selected, gast_id:', gast_id);
     window.selectedGastId = gast_id;
     State.currentPin = '';
     Router.navigate('pin-entry');
@@ -874,13 +912,10 @@ window.handlePinLogin = async () => {
 };
 
 // Register Handlers
-window.handleRegisterSubmit = (event) => {
-    event.preventDefault();
-    // Validation happens in handleRegisterPinComplete
-};
-
 window.handleRegisterPinComplete = async () => {
-    const vorname = document.getElementById('register-vorname')?.value;
+    console.log('Register PIN complete clicked');
+    const vornameInput = document.getElementById('register-vorname');
+    const vorname = vornameInput ? vornameInput.value : '';
 
     if (!vorname || !vorname.trim()) {
         Utils.showToast('Bitte Vorname eingeben', 'warning');
@@ -892,11 +927,17 @@ window.handleRegisterPinComplete = async () => {
         return;
     }
 
+    console.log('Registering user:', vorname, 'PIN length:', State.currentPin.length);
+
     try {
-        await Auth.register(vorname, State.currentPin);
+        await Auth.register(vorname.trim(), State.currentPin);
         State.currentPin = '';
-        Router.navigate('login');
+        Utils.showToast('Registrierung erfolgreich! Bitte melden Sie sich an.', 'success');
+        setTimeout(() => {
+            Router.navigate('login');
+        }, 1000);
     } catch (error) {
+        console.error('Registration error:', error);
         State.currentPin = '';
         Router.handleRoute();
     }
