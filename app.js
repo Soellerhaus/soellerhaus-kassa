@@ -587,6 +587,14 @@ Router.register('register', () => {
 
 // ===== ADMIN LOGIN =====
 Router.register('admin-login', () => {
+
+    // ✅ WICHTIG: Wenn bereits Admin → SOFORT ins Dashboard
+    if (State.isAdmin || sessionStorage.getItem('is_admin') === '1') {
+        State.isAdmin = true;
+        location.hash = '#admin-dashboard';
+        return;
+    }
+
     UI.render(`
         <div class="main-content">
             <div style="max-width: 400px; margin: 60px auto;">
@@ -598,12 +606,14 @@ Router.register('admin-login', () => {
                         <small class="text-muted">Standard: admin123</small>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
-                    <button type="button" class="btn btn-secondary btn-block mt-2" onclick="Router.navigate('login')">Zurück</button>
+                    <button type="button" class="btn btn-secondary btn-block mt-2"
+                            onclick="Router.navigate('login')">Zurück</button>
                 </form>
             </div>
         </div>
     `);
 });
+
 
 window.handleAdminLogin = async (event) => {
   event.preventDefault();
