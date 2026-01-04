@@ -271,7 +271,14 @@ const Auth = {
             
             const gaeste = await db.gaeste
                 .where('aktiv').equals(true)
-                .and(g => !g.checked_out && g.vorname.toUpperCase().startsWith(letter.toUpperCase()))
+                .and(g => {
+                    // Null-Check für vorname
+                    if (!g.vorname || typeof g.vorname !== 'string') {
+                        console.warn('Guest with invalid vorname:', g);
+                        return false;
+                    }
+                    return !g.checked_out && g.vorname.toUpperCase().startsWith(letter.toUpperCase());
+                })
                 .toArray();
 
             console.log('Filtered guests for letter', letter + ':', gaeste.length);
@@ -296,6 +303,7 @@ const Auth = {
             return result;
         } catch (error) {
             console.error('Fehler beim Laden der Gäste:', error);
+            console.error('Error stack:', error.stack);
             return [];
         }
     },
