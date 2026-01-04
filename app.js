@@ -817,6 +817,34 @@ window.handleBackToLogin = () => {
     Router.navigate('login');
 };
 
+// Navigation handlers for all pages
+window.navigateToDashboard = () => {
+    console.log('Navigate to dashboard');
+    Router.navigate('dashboard');
+};
+
+window.navigateToBuchen = () => {
+    console.log('Navigate to buchen');
+    Router.navigate('buchen');
+};
+
+window.navigateToHistorie = () => {
+    console.log('Navigate to historie');
+    Router.navigate('historie');
+};
+
+window.navigateToProfil = () => {
+    console.log('Navigate to profil');
+    Router.navigate('profil');
+};
+
+// Menu function
+window.showMenu = () => {
+    console.log('Show menu clicked');
+    // TODO: Implement menu overlay
+    alert('Menü-Funktion wird noch implementiert');
+};
+
 // Name Selection Page
 Router.register('name-select', async () => {
     console.log('Name-select page, current letter:', window.currentLetter);
@@ -1231,7 +1259,7 @@ Router.register('dashboard', async () => {
             <div class="card mt-3">
                 <div class="card-header">
                     <h2 class="card-title">📝 Letzte Buchungen</h2>
-                    <button class="btn btn-secondary" onclick="Router.navigate('historie')">Alle anzeigen</button>
+                    <button class="btn btn-secondary" onclick="navigateToHistorie()">Alle anzeigen</button>
                 </div>
                 <div class="card-body">
                     ${buchungenHTML}
@@ -1240,19 +1268,19 @@ Router.register('dashboard', async () => {
         </div>
 
         <div class="bottom-nav">
-            <div class="nav-item active" onclick="Router.navigate('dashboard')">
+            <div class="nav-item active" onclick="navigateToDashboard()">
                 <div class="nav-icon">🏠</div>
                 <div>Start</div>
             </div>
-            <div class="nav-item" onclick="Router.navigate('buchen')">
+            <div class="nav-item" onclick="navigateToBuchen()">
                 <div class="nav-icon">🍺</div>
                 <div>Buchen</div>
             </div>
-            <div class="nav-item" onclick="Router.navigate('historie')">
+            <div class="nav-item" onclick="navigateToHistorie()">
                 <div class="nav-icon">📋</div>
                 <div>Liste</div>
             </div>
-            <div class="nav-item" onclick="Router.navigate('profil')">
+            <div class="nav-item" onclick="navigateToProfil()">
                 <div class="nav-icon">👤</div>
                 <div>Profil</div>
             </div>
@@ -1310,7 +1338,7 @@ Router.register('buchen', async () => {
     UI.render(`
         <div class="app-header">
             <div class="header-left">
-                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
+                <button class="menu-btn" onclick="navigateToDashboard()">←</button>
                 <div class="header-title">Artikel buchen</div>
             </div>
             <div class="header-right">
@@ -1330,19 +1358,19 @@ Router.register('buchen', async () => {
         ${State.warenkorb.length > 0 ? '<div class="warenkorb"></div>' : ''}
 
         <div class="bottom-nav">
-            <div class="nav-item" onclick="Router.navigate('dashboard')">
+            <div class="nav-item" onclick="navigateToDashboard()">
                 <div class="nav-icon">🏠</div>
                 <div>Start</div>
             </div>
-            <div class="nav-item active" onclick="Router.navigate('buchen')">
+            <div class="nav-item active" onclick="navigateToBuchen()">
                 <div class="nav-icon">🍺</div>
                 <div>Buchen</div>
             </div>
-            <div class="nav-item" onclick="Router.navigate('historie')">
+            <div class="nav-item" onclick="navigateToHistorie()">
                 <div class="nav-icon">📋</div>
                 <div>Liste</div>
             </div>
-            <div class="nav-item" onclick="Router.navigate('profil')">
+            <div class="nav-item" onclick="navigateToProfil()">
                 <div class="nav-icon">👤</div>
                 <div>Profil</div>
             </div>
@@ -1402,7 +1430,7 @@ Router.register('historie', async () => {
     UI.render(`
         <div class="app-header">
             <div class="header-left">
-                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
+                <button class="menu-btn" onclick="navigateToDashboard()">←</button>
                 <div class="header-title">Meine Buchungen</div>
             </div>
             <div class="header-right">
@@ -1427,19 +1455,19 @@ Router.register('historie', async () => {
         </div>
 
         <div class="bottom-nav">
-            <div class="nav-item" onclick="Router.navigate('dashboard')">
+            <div class="nav-item" onclick="navigateToDashboard()">
                 <div class="nav-icon">🏠</div>
                 <div>Start</div>
             </div>
-            <div class="nav-item" onclick="Router.navigate('buchen')">
+            <div class="nav-item" onclick="navigateToBuchen()">
                 <div class="nav-icon">🍺</div>
                 <div>Buchen</div>
             </div>
-            <div class="nav-item active" onclick="Router.navigate('historie')">
+            <div class="nav-item active" onclick="navigateToHistorie()">
                 <div class="nav-icon">📋</div>
                 <div>Liste</div>
             </div>
-            <div class="nav-item" onclick="Router.navigate('profil')">
+            <div class="nav-item" onclick="navigateToProfil()">
                 <div class="nav-icon">👤</div>
                 <div>Profil</div>
             </div>
@@ -1457,7 +1485,7 @@ Router.register('profil', () => {
     UI.render(`
         <div class="app-header">
             <div class="header-left">
-                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
+                <button class="menu-btn" onclick="navigateToDashboard()">←</button>
                 <div class="header-title">Mein Profil</div>
             </div>
         </div>
@@ -1498,19 +1526,19 @@ Router.register('profil', () => {
         </div>
 
         <div class="bottom-nav">
-            <div class="nav-item" onclick="Router.navigate('dashboard')">
+            <div class="nav-item" onclick="navigateToDashboard()">
                 <div class="nav-icon">🏠</div>
                 <div>Start</div>
             </div>
-            <div class="nav-item" onclick="Router.navigate('buchen')">
+            <div class="nav-item" onclick="navigateToBuchen()">
                 <div class="nav-icon">🍺</div>
                 <div>Buchen</div>
             </div>
-            <div class="nav-item" onclick="Router.navigate('historie')">
+            <div class="nav-item" onclick="navigateToHistorie()">
                 <div class="nav-icon">📋</div>
                 <div>Liste</div>
             </div>
-            <div class="nav-item active" onclick="Router.navigate('profil')">
+            <div class="nav-item active" onclick="navigateToProfil()">
                 <div class="nav-icon">👤</div>
                 <div>Profil</div>
             </div>
@@ -1531,7 +1559,7 @@ Router.register('admin-login', () => {
                         <small class="text-muted">Standard: admin123</small>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
-                    <button type="button" class="btn btn-secondary btn-block mt-2" onclick="Router.navigate('login')">Zurück</button>
+                    <button type="button" class="btn btn-secondary btn-block mt-2" onclick="handleBackToLogin()">Zurück</button>
                 </form>
             </div>
         </div>
