@@ -606,20 +606,31 @@ Router.register('admin-login', () => {
 });
 
 window.handleAdminLogin = async (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.target);
-    const success = await Auth.adminLogin(formData.get('passwort'));
-    if (success) {
-        Router.navigate('admin-dashboard');
-    }
+  event.preventDefault();
+  const formData = new FormData(event.target);
+  const success = await Auth.adminLogin(formData.get('passwort'));
+  if (success) {
+    location.hash = '#admin-dashboard';
+  }
 };
+
 
 // ===== ADMIN DASHBOARD =====
 Router.register('admin-dashboard', async () => {
-    if (!State.isAdmin) {
-        Router.navigate('admin-login');
-        return;
-    }
+
+  // ✅ Harter Restore: falls State verloren ging, aber Session-Flag da ist
+  if (!State.isAdmin && sessionStorage.getItem('is_admin') === '1') {
+    State.isAdmin = true;
+  }
+
+  // ✅ Wenn immer noch nicht Admin → zurück zum Admin-Login
+  if (!State.isAdmin) {
+    location.hash = '#admin-login';   // bewusst direkt, um Router-Doppelungen zu umgehen
+    return;
+  }
+
+  // ... ab hier dein Dashboard-Code
+
 
     const gaeste = await db.gaeste.where('aktiv').equals(true).toArray();
     const buchungen = await Buchungen.getAll();
