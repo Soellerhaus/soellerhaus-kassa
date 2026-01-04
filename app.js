@@ -392,7 +392,29 @@ const Artikel = {
         Utils.showToast('Artikel erstellt', 'success');
         return data;
     },
-    async update(id, changes) { await db.artikel.update(id, changes); await DataProtection.createBackup(); Utils.showToast('Artikel aktualisiert', 'success'); },
+    async update(id, changes) { 
+        // Platztausch wenn Position geändert wird
+        if (changes.sortierung !== undefined) {
+            const artikel = await this.getById(id);
+            if (artikel && changes.sortierung !== artikel.sortierung) {
+                const katId = changes.kategorie_id || artikel.kategorie_id;
+                const newPos = changes.sortierung;
+                const oldPos = artikel.sortierung || 0;
+                
+                // Finde Artikel der aktuell auf der neuen Position ist
+                const allArtikel = await db.artikel.where('kategorie_id').equals(katId).toArray();
+                const conflicting = allArtikel.find(a => a.artikel_id !== id && a.sortierung === newPos);
+                
+                // Platztausch: Der andere Artikel bekommt die alte Position
+                if (conflicting) {
+                    await db.artikel.update(conflicting.artikel_id, { sortierung: oldPos });
+                }
+            }
+        }
+        await db.artikel.update(id, changes); 
+        await DataProtection.createBackup(); 
+        Utils.showToast('Artikel aktualisiert', 'success'); 
+    },
     async delete(id) { await db.artikel.delete(id); await DataProtection.createBackup(); Utils.showToast('Artikel gelöscht', 'success'); },
     async importFromCSV(text) {
         // Clean up text - handle Windows line endings and BOM
@@ -599,8 +621,48 @@ Router.register('login', () => {
 });
 
 Router.register('register', () => {
-    UI.render(`<div class="main-content"><div style="max-width:500px;margin:40px auto;"><h1 class="page-title" style="text-align:center;">Neu registrieren</h1><div class="card"><div class="form-group"><label class="form-label">Vorname *</label><input type="text" id="register-vorname" class="form-input" placeholder="z.B. Maria" autofocus style="font-size:1.2rem;padding:16px;"></div><div class="form-group"><label class="form-label">Passwort *</label><input type="password" id="register-password" class="form-input" placeholder="z.B. 1234" inputmode="numeric" style="font-size:1.2rem;padding:16px;"><small style="color:var(--color-stone-dark);">Merken Sie sich Ihr Passwort!</small></div><button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">✓ Registrieren</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← Zurück</button></div></div>`);
+    window.registerPin = '';
+    UI.render(`<div class="main-content"><div style="max-width:500px;margin:40px auto;">
+        <h1 class="page-title" style="text-align:center;">Neu registrieren</h1>
+        <div class="card">
+            <div class="form-group">
+                <label class="form-label">Vorname *</label>
+                <input type="text" id="register-vorname" class="form-input" placeholder="z.B. Maria" autofocus style="font-size:1.2rem;padding:16px;">
+            </div>
+            <div class="form-group">
+                <label class="form-label" style="text-align:center;display:block;">4-stelliger PIN-Code *</label>
+                <div class="pin-display" id="register-pin-display" style="display:flex;justify-content:center;gap:12px;margin:16px 0;">
+                    <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+                </div>
+                <div class="pin-buttons">
+                    ${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pin-btn" onclick="handleRegisterPinInput('${n}')">${n}</button>`).join('')}
+                    <button type="button" class="pin-btn" style="visibility:hidden;"></button>
+                    <button type="button" class="pin-btn" onclick="handleRegisterPinInput('0')">0</button>
+                    <button type="button" class="pin-btn pin-btn-delete" onclick="handleRegisterPinDelete()">⌫</button>
+                </div>
+            </div>
+            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">✓ Registrieren</button>
+        </div>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← Zurück</button>
+    </div></div>`);
 });
+
+window.handleRegisterPinInput = (d) => {
+    if (window.registerPin.length < 4) {
+        window.registerPin += d;
+        updateRegisterPinDisplay();
+    }
+};
+window.handleRegisterPinDelete = () => {
+    window.registerPin = window.registerPin.slice(0, -1);
+    updateRegisterPinDisplay();
+};
+function updateRegisterPinDisplay() {
+    const dots = document.querySelectorAll('#register-pin-display .pin-dot');
+    dots.forEach((dot, i) => {
+        dot.classList.toggle('filled', i < window.registerPin.length);
+    });
+}
 
 Router.register('name-select', async () => {
     if (!window.currentLetter) { Router.navigate('login'); return; }
@@ -610,9 +672,59 @@ Router.register('name-select', async () => {
 
 Router.register('pin-entry', () => {
     if (!window.selectedGastId) { Router.navigate('login'); return; }
-    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><div class="card"><div class="form-group"><label class="form-label" style="text-align:center;display:block;font-size:1.2rem;">Passwort eingeben</label><input type="password" id="login-password" class="form-input" placeholder="Ihr Passwort" autofocus inputmode="numeric" onkeydown="if(event.key==='Enter')handlePasswordLogin()" style="font-size:1.5rem;padding:20px;text-align:center;letter-spacing:8px;"></div><button class="btn btn-primary btn-block" onclick="handlePasswordLogin()" style="margin-top:16px;">✓ Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">← Zurück</button></div></div>`);
-    setTimeout(() => document.getElementById('login-password')?.focus(), 100);
+    window.loginPin = '';
+    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;">
+        <div class="card">
+            <label class="form-label" style="text-align:center;display:block;font-size:1.2rem;margin-bottom:16px;">PIN eingeben</label>
+            <div class="pin-display" id="login-pin-display" style="display:flex;justify-content:center;gap:12px;margin:16px 0;">
+                <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+            </div>
+            <div class="pin-buttons">
+                ${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pin-btn" onclick="handleLoginPinInput('${n}')">${n}</button>`).join('')}
+                <button type="button" class="pin-btn" style="visibility:hidden;"></button>
+                <button type="button" class="pin-btn" onclick="handleLoginPinInput('0')">0</button>
+                <button type="button" class="pin-btn pin-btn-delete" onclick="handleLoginPinDelete()">⌫</button>
+            </div>
+            <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;">✓ Anmelden</button>
+        </div>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">← Zurück</button>
+    </div></div>`);
 });
+
+window.handleLoginPinInput = (d) => {
+    if (window.loginPin.length < 4) {
+        window.loginPin += d;
+        updateLoginPinDisplay();
+        // Auto-Login bei 4 Stellen
+        if (window.loginPin.length === 4) {
+            setTimeout(() => handlePinLogin(), 200);
+        }
+    }
+};
+window.handleLoginPinDelete = () => {
+    window.loginPin = window.loginPin.slice(0, -1);
+    updateLoginPinDisplay();
+};
+function updateLoginPinDisplay() {
+    const dots = document.querySelectorAll('#login-pin-display .pin-dot');
+    dots.forEach((dot, i) => {
+        dot.classList.toggle('filled', i < window.loginPin.length);
+    });
+}
+window.handlePinLogin = async () => {
+    if (window.loginPin.length !== 4) {
+        Utils.showToast('Bitte 4-stelligen PIN eingeben', 'warning');
+        return;
+    }
+    try {
+        await Auth.login(window.selectedGastId, window.loginPin);
+        Router.navigate('buchen');
+    } catch (e) {
+        Utils.showToast(e.message, 'error');
+        window.loginPin = '';
+        updateLoginPinDisplay();
+    }
+};
 
 Router.register('admin-login', () => {
     UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;">🔐 Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← Zurück</button></div></div>`);
@@ -775,28 +887,31 @@ Router.register('admin-guests', async () => {
 Router.register('admin-articles', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     const articles = await Artikel.getAll();
+    const kats = await db.kategorien.toArray();
+    const katMap = {};
+    kats.forEach(k => katMap[k.kategorie_id] = k.name);
     
-    // Artikel nach Kategorie gruppieren und nummerieren
+    // Artikel nach Kategorie gruppieren
     const byCategory = {};
     articles.forEach(a => {
-        if (!byCategory[a.kategorie_id]) byCategory[a.kategorie_id] = [];
-        byCategory[a.kategorie_id].push(a);
-    });
-    // Innerhalb jeder Kategorie nach Sortierung sortieren und Position zuweisen
-    Object.keys(byCategory).forEach(katId => {
-        byCategory[katId].sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
-        byCategory[katId].forEach((a, idx) => { a.katPosition = idx + 1; });
+        const katId = a.kategorie_id || 0;
+        if (!byCategory[katId]) byCategory[katId] = [];
+        byCategory[katId].push(a);
     });
     
-    const renderArticleRow = (a) => {
+    // Innerhalb jeder Kategorie nach Sortierung sortieren
+    Object.keys(byCategory).forEach(katId => {
+        byCategory[katId].sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
+    });
+    
+    const renderArticleRow = (a, pos) => {
         const img = (a.bild && a.bild.startsWith('data:')) 
             ? `<img src="${a.bild}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">`
             : `<span style="font-size:1.5rem;">${a.icon||'📦'}</span>`;
         return `<tr class="article-row" data-name="${a.name.toLowerCase()}" data-sku="${(a.sku||'').toLowerCase()}">
+            <td style="width:40px;text-align:center;font-weight:700;color:var(--color-alpine-green);">${pos}</td>
             <td style="width:50px;text-align:center;">${img}</td>
             <td><strong>${a.name}</strong>${a.sku?` <small style="color:var(--color-stone-dark);">(${a.sku})</small>`:''}</td>
-            <td style="white-space:nowrap;">${a.kategorie_name||'?'}</td>
-            <td style="text-align:center;font-weight:600;">#${a.katPosition}</td>
             <td style="text-align:right;font-weight:600;">${Utils.formatCurrency(a.preis)}</td>
             <td style="text-align:center;">${a.aktiv?'✅':'❌'}</td>
             <td style="text-align:right;white-space:nowrap;">
@@ -805,6 +920,19 @@ Router.register('admin-articles', async () => {
             </td>
         </tr>`;
     };
+    
+    // Kategorien sortieren
+    const sortedKats = Object.keys(byCategory).sort((a, b) => parseInt(a) - parseInt(b));
+    
+    let tableContent = '';
+    sortedKats.forEach(katId => {
+        const katName = katMap[katId] || 'Sonstiges';
+        const artikelList = byCategory[katId];
+        tableContent += `<tr class="category-header"><td colspan="6" style="background:var(--color-alpine-green);color:white;padding:12px;font-weight:700;font-size:1.1rem;">${katName} (${artikelList.length})</td></tr>`;
+        artikelList.forEach((a, idx) => {
+            tableContent += renderArticleRow(a, idx + 1);
+        });
+    });
     
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
@@ -828,17 +956,16 @@ Router.register('admin-articles', async () => {
                     <table style="width:100%;border-collapse:collapse;" id="article-table">
                         <thead>
                             <tr style="background:var(--color-stone-light);text-align:left;">
-                                <th style="padding:12px 8px;"></th>
+                                <th style="padding:12px 8px;width:40px;">Pos.</th>
+                                <th style="padding:12px 8px;width:50px;"></th>
                                 <th style="padding:12px 8px;">Name</th>
-                                <th style="padding:12px 8px;">Kategorie</th>
-                                <th style="padding:12px 8px;text-align:center;">Pos.</th>
                                 <th style="padding:12px 8px;text-align:right;">Preis</th>
                                 <th style="padding:12px 8px;text-align:center;">Aktiv</th>
                                 <th style="padding:12px 8px;"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${articles.length ? articles.map(renderArticleRow).join('') : '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--color-stone-dark);">Keine Artikel</td></tr>'}
+                            ${tableContent || '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--color-stone-dark);">Keine Artikel</td></tr>'}
                         </tbody>
                     </table>
                 </div>
@@ -857,7 +984,7 @@ window.filterArticleTable = (q) => {
     });
 };
 
-// Tabellen-Styling dynamisch hinzufügen
+// Tabellen-Styling und PIN-Dots dynamisch hinzufügen
 if (!document.getElementById('table-styles')) {
     const style = document.createElement('style');
     style.id = 'table-styles';
@@ -865,21 +992,17 @@ if (!document.getElementById('table-styles')) {
         #article-table tbody tr { border-bottom: 1px solid var(--color-stone-medium); }
         #article-table tbody tr:hover { background: var(--color-stone-light); }
         #article-table td { padding: 12px 8px; vertical-align: middle; }
-        #article-table tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
-        #article-table tbody tr:nth-child(even):hover { background: var(--color-stone-light); }
+        #article-table .category-header:hover { background: var(--color-alpine-green) !important; }
+        .pin-dot { width: 20px; height: 20px; border-radius: 50%; border: 3px solid var(--color-alpine-green); background: white; transition: all 0.2s; }
+        .pin-dot.filled { background: var(--color-alpine-green); }
     `;
     document.head.appendChild(style);
 }
 
 Router.register('dashboard', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
-    const uid = State.currentUser.id || State.currentUser.gast_id;
-    const bs = await Buchungen.getByGast(uid, 5);
-    const allBs = await Buchungen.getByGast(uid);
-    const heute = Utils.formatDate(new Date());
-    const heuteB = allBs.filter(b => b.datum === heute);
-    const name = State.currentUser.firstName || State.currentUser.vorname;
-    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">👤 ${name}</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div><div class="main-content"><h1 style="font-family:var(--font-display);font-size:var(--text-2xl);margin-bottom:24px;">Guten Tag, ${name}!</h1><div class="stats-grid"><div class="stat-card"><div class="stat-value">${heuteB.length}</div><div class="stat-label">Artikel heute</div><div style="margin-top:8px;font-size:var(--text-lg);font-weight:600;">${Utils.formatCurrency(heuteB.reduce((s,b)=>s+b.preis*b.menge,0))}</div></div><div class="stat-card"><div class="stat-value">${allBs.length}</div><div class="stat-label">Gesamt</div><div style="margin-top:8px;font-size:var(--text-lg);font-weight:600;">${Utils.formatCurrency(allBs.reduce((s,b)=>s+b.preis*b.menge,0))}</div></div></div><div class="card mt-3"><div class="card-header"><h2 class="card-title">📝 Letzte Buchungen</h2><button class="btn btn-secondary" onclick="navigateToHistorie()">Alle</button></div><div class="card-body">${bs.length ? bs.map(b => `<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:500;">${b.artikel_name} × ${b.menge}</div><small class="text-muted">${b.datum}, ${b.uhrzeit.substring(0,5)}</small></div><div style="font-weight:700;color:var(--color-mountain-blue);">${Utils.formatCurrency(b.preis*b.menge)}</div></div></div>`).join('') : '<p class="text-muted text-center">Keine Buchungen</p>'}</div></div></div><div class="bottom-nav"><div class="nav-item active" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div><div class="nav-item" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div><div class="nav-item" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div><div class="nav-item" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div></div>`);
+    // Direkt zur Buchen-Seite weiterleiten
+    Router.navigate('buchen');
 });
 
 Router.register('buchen', async () => {
@@ -901,9 +1024,9 @@ Router.register('buchen', async () => {
     UI.render(`
     <div class="app-header">
         <div class="header-left"><div class="header-title">👤 ${name}</div></div>
-        <div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div>
+        <div class="header-right"><button class="btn btn-secondary" onclick="handleGastAbmelden()">Abmelden</button></div>
     </div>
-    <div class="main-content" style="padding-bottom:${sessionBuchungen.length ? '180px' : '80px'};">
+    <div class="main-content" style="padding-bottom:20px;">
         <div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="searchArtikel(this.value)"></div>
         <div class="category-tabs">
             <div class="category-tab ${!State.selectedCategory?'active':''}" onclick="filterCategory(null)">Alle</div>
@@ -914,40 +1037,73 @@ Router.register('buchen', async () => {
         </div>
     </div>
     ${sessionBuchungen.length ? `
-    <div class="session-buchungen" style="position:fixed;bottom:70px;left:0;right:0;background:white;border-top:2px solid var(--color-alpine-green);padding:12px;max-height:40vh;overflow-y:auto;box-shadow:0 -4px 12px rgba(0,0,0,0.1);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <strong>Aktuelle Buchungen</strong>
-            <span style="font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(sessionTotal)}</span>
-        </div>
-        ${sessionBuchungen.map(b => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--color-stone-light);border-radius:8px;margin-bottom:4px;">
-            <div>
-                <span style="font-weight:500;">${b.artikel_name}</span>
-                <span style="color:var(--color-stone-dark);">× ${b.menge}</span>
+    <div class="session-popup" style="position:fixed;bottom:20px;right:20px;left:20px;max-width:400px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2);border:2px solid var(--color-alpine-green);z-index:1000;">
+        <div style="padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <strong style="font-size:1.1rem;">🛒 Meine Buchungen</strong>
+                <span style="font-size:1.4rem;font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(sessionTotal)}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-weight:600;">${Utils.formatCurrency(b.preis * b.menge)}</span>
-                <button class="btn btn-danger" onclick="stornoBuchung('${b.buchung_id}')" style="padding:4px 8px;font-size:0.8rem;">✕</button>
+            <div style="max-height:200px;overflow-y:auto;">
+                ${sessionBuchungen.map(b => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--color-stone-light);border-radius:8px;margin-bottom:6px;">
+                    <div>
+                        <span style="font-weight:600;">${b.artikel_name}</span>
+                        <span style="color:var(--color-stone-dark);margin-left:8px;">× ${b.menge}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-weight:600;">${Utils.formatCurrency(b.preis * b.menge)}</span>
+                        <button class="btn btn-danger" onclick="stornoBuchung('${b.buchung_id}')" style="padding:4px 10px;font-size:0.85rem;">✕</button>
+                    </div>
+                </div>
+                `).join('')}
+            </div>
+            <div style="display:flex;gap:10px;margin-top:12px;">
+                <button class="btn btn-primary" onclick="handleGastAbmelden()" style="flex:1;padding:14px;font-size:1rem;">✓ Fertig & Abmelden</button>
             </div>
         </div>
-        `).join('')}
     </div>
-    ` : ''}
-    <div class="bottom-nav">
-        <div class="nav-item" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div>
-        <div class="nav-item active" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div>
-        <div class="nav-item" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div>
-        <div class="nav-item" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div>
-    </div>`);
+    ` : ''}`);
 });
 
-// Direktes Buchen ohne Warenkorb
+// Direktes Buchen
 window.bucheArtikelDirekt = async (id) => {
-    const a = await Artikel.getById(id);
-    if (!a) return;
-    await Buchungen.create(a, 1);
-    Utils.showToast(`${a.name_kurz||a.name} gebucht!`, 'success');
-    Router.navigate('buchen'); // Seite neu laden um Session-Buchungen zu aktualisieren
+    try {
+        const a = await Artikel.getById(id);
+        if (!a) { Utils.showToast('Artikel nicht gefunden', 'error'); return; }
+        await Buchungen.create(a, 1);
+        Utils.showToast(`${a.name_kurz||a.name} gebucht!`, 'success');
+        Router.navigate('buchen');
+    } catch (e) {
+        Utils.showToast(e.message || 'Fehler beim Buchen', 'error');
+    }
+};
+
+// Storno durch Gast
+window.stornoBuchung = async (buchung_id) => {
+    if (confirm('Buchung stornieren?')) {
+        try {
+            await Buchungen.storno(buchung_id);
+            Router.navigate('buchen');
+        } catch (e) {
+            Utils.showToast(e.message, 'error');
+        }
+    }
+};
+
+// Buchen und Abmelden
+window.handleBuchenUndAbmelden = async () => {
+    await Buchungen.fixSessionBuchungen();
+    State.clearUser();
+    Router.navigate('login');
+    Utils.showToast('Buchungen gespeichert. Auf Wiedersehen!', 'success');
+};
+
+// Gast Abmelden (gleiche Funktion, immer Buchungen speichern)
+window.handleGastAbmelden = async () => {
+    await Buchungen.fixSessionBuchungen();
+    State.clearUser();
+    Router.navigate('login');
+    Utils.showToast('Auf Wiedersehen!', 'success');
 };
 
 // Storno durch Gast
@@ -963,21 +1119,13 @@ window.stornoBuchung = async (buchung_id) => {
 };
 
 Router.register('historie', async () => {
-    if (!State.currentUser) { Router.navigate('login'); return; }
-    const uid = State.currentUser.id || State.currentUser.gast_id;
-    const bs = await Buchungen.getByGast(uid);
-    const total = bs.reduce((s,b) => s+b.preis*b.menge, 0);
-    const name = State.currentUser.firstName || State.currentUser.vorname;
-    const byDate = {};
-    bs.forEach(b => { if(!byDate[b.datum]) byDate[b.datum]=[]; byDate[b.datum].push(b); });
-    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">👤 ${name}</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div><div class="main-content"><div class="card mb-3"><div style="text-align:center;padding:16px;"><div style="font-family:var(--font-display);font-size:var(--text-3xl);font-weight:700;color:var(--color-mountain-blue);">${Utils.formatCurrency(total)}</div><small class="text-muted">${bs.length} Buchungen gesamt</small></div></div>${Object.keys(byDate).sort().reverse().map(d => {const items = byDate[d]; return `<div style="margin-bottom:32px;"><h3 style="font-size:var(--text-lg);font-weight:600;margin-bottom:12px;color:var(--color-mountain-blue);">${new Date(d).toLocaleDateString('de-AT',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</h3>${items.map(b => `<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:500;">${b.artikel_name} × ${b.menge}</div><small class="text-muted">${b.uhrzeit.substring(0,5)}</small></div><div style="font-weight:700;">${Utils.formatCurrency(b.preis*b.menge)}</div></div></div>`).join('')}<div style="text-align:right;margin-top:8px;font-weight:600;color:var(--color-stone-dark);">Summe: ${Utils.formatCurrency(items.reduce((s,b)=>s+b.preis*b.menge,0))}</div></div>`;}).join('')||'<p class="text-muted text-center">Keine Buchungen</p>'}</div><div class="bottom-nav"><div class="nav-item" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div><div class="nav-item" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div><div class="nav-item active" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div><div class="nav-item" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div></div>`);
+    // Direkt zur Buchen-Seite weiterleiten
+    Router.navigate('buchen');
 });
 
 Router.register('profil', () => {
-    if (!State.currentUser) { Router.navigate('login'); return; }
-    const name = State.currentUser.firstName || State.currentUser.vorname;
-    const created = State.currentUser.createdAt || State.currentUser.erstellt_am;
-    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">👤 ${name}</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div><div class="main-content"><div class="card"><div style="text-align:center;padding:32px;"><div style="font-size:4rem;margin-bottom:16px;">👤</div><h2 style="font-family:var(--font-display);font-size:var(--text-2xl);margin-bottom:8px;">${name}</h2>${created?`<p class="text-muted">Seit ${new Date(created).toLocaleDateString('de-AT')}</p>`:''}</div></div></div><div class="bottom-nav"><div class="nav-item" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div><div class="nav-item" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div><div class="nav-item" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div><div class="nav-item active" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div></div>`);
+    // Direkt zur Buchen-Seite weiterleiten
+    Router.navigate('buchen');
 });
 
 // Global handlers
@@ -992,17 +1140,11 @@ window.handleLogout = () => Auth.logout();
 window.handleLetterSelect = l => { window.currentLetter = l; Router.navigate('name-select'); };
 window.handleNameSelect = id => { window.selectedGastId = id; Router.navigate('pin-entry'); };
 window.handlePinCancel = () => { window.selectedGastId = null; Router.navigate('login'); };
-window.handlePasswordLogin = async () => {
-    const pw = document.getElementById('login-password')?.value;
-    if (!pw) { Utils.showToast('Passwort eingeben', 'warning'); return; }
-    try { await Auth.login(window.selectedGastId, pw); window.selectedGastId = null; Router.navigate('dashboard'); }
-    catch (e) { document.getElementById('login-password').value = ''; document.getElementById('login-password').focus(); }
-};
 window.handleRegisterSubmit = async () => {
     const v = document.getElementById('register-vorname')?.value;
-    const p = document.getElementById('register-password')?.value;
+    const p = window.registerPin;
     if (!v?.trim()) { Utils.showToast('Vorname eingeben', 'warning'); return; }
-    if (!p) { Utils.showToast('Passwort eingeben', 'warning'); return; }
+    if (!p || p.length !== 4) { Utils.showToast('4-stelligen PIN eingeben', 'warning'); return; }
     try { await RegisteredGuests.register(v.trim(), p); setTimeout(() => Router.navigate('login'), 1500); } catch(e) {}
 };
 window.handleAdminLogin = async () => {
@@ -1130,8 +1272,31 @@ window.saveEditArticle = async () => {
     const name = document.getElementById('article-name')?.value;
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
+    const newPos = parseInt(document.getElementById('article-sort')?.value) || 1;
     const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Spirituosen',5:'Heiße Getränke',6:'Sonstiges',7:'Snacks',8:'Diverses'};
     const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍿',8:'📦'};
+    
+    // Alten Artikel holen für Positions-Tausch
+    const oldArticle = await Artikel.getById(id);
+    const oldPos = oldArticle?.sortierung || 1;
+    const oldKat = oldArticle?.kategorie_id;
+    
+    // Wenn Position oder Kategorie geändert wurde, Platztausch prüfen
+    if (oldPos !== newPos || oldKat !== katId) {
+        // Finde Artikel der aktuell auf der neuen Position ist (in der neuen Kategorie)
+        const allArticles = await Artikel.getAll();
+        const artikelAufNeuerPos = allArticles.find(a => 
+            a.artikel_id !== id && 
+            a.kategorie_id === katId && 
+            a.sortierung === newPos
+        );
+        
+        // Platztausch: Der andere Artikel bekommt die alte Position
+        if (artikelAufNeuerPos) {
+            await db.artikel.update(artikelAufNeuerPos.artikel_id, { sortierung: oldPos });
+        }
+    }
+    
     await Artikel.update(id, { 
         name: name.trim(), 
         name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
@@ -1140,7 +1305,7 @@ window.saveEditArticle = async () => {
         kategorie_id: katId, 
         kategorie_name: katMap[katId], 
         aktiv: document.getElementById('article-active')?.checked, 
-        sortierung: parseInt(document.getElementById('article-sort')?.value) || 1,
+        sortierung: newPos,
         icon: iconMap[katId],
         bild: window.currentArticleImage || null
     });
