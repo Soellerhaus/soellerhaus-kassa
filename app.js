@@ -477,49 +477,34 @@ const ExportService = {
 
 /* ===== ROUTER ===== */
 const Router = {
-    routes: {},
+  routes: {},
 
-    init() {
-        window.addEventListener('hashchange', () => this.handleRoute());
-        this.handleRoute();
-    },
+  init() {
+    window.addEventListener('hashchange', () => this.handleRoute());
+    this.handleRoute();
+  },
 
-    register(path, handler) {
-        this.routes[path] = handler;
-    },
+  register(path, handler) {
+    this.routes[path] = handler;
+  },
 
-    navigate(path) {
-        if (location.hash !== `#${path}`) {
-            location.hash = `#${path}`;
-        } else {
-            // wenn gleiches hash, trotzdem rendern
-            this.handleRoute();
-        }
-    },
+  navigate(path) {
+    location.hash = `#${path}`;
+  },
 
-    handleRoute() {
-        const path = location.hash.slice(1) || 'login';
-        const handler = this.routes[path] || this.routes['login'];
-        State.currentPage = path;
+  async handleRoute() {
+    const path = location.hash.slice(1) || 'login';
+    const handler = this.routes[path] || this.routes['login'];
+    State.currentPage = path;
 
-        try {
-            const result = handler && handler();
-
-            // ✅ async handler sauber abfangen
-            if (result && typeof result.then === 'function') {
-                result.catch((err) => {
-                    console.error('Route error:', path, err);
-                    Utils.showToast(`Fehler in Seite "${path}": ${err?.message || err}`, 'error');
-                    // Zur Sicherheit zurück zum Login, sonst “hängt” es scheinbar
-                    if (path !== 'login') location.hash = '#login';
-                });
-            }
-        } catch (err) {
-            console.error('Route error (sync):', path, err);
-            Utils.showToast(`Fehler in Seite "${path}": ${err?.message || err}`, 'error');
-            if (path !== 'login') location.hash = '#login';
-        }
+    try {
+      await handler();
+    } catch (err) {
+      console.error('Route error in', path, err);
+      Utils.showToast(`Fehler in "${path}": ${err?.message || err}`, 'error');
+      if (path !== 'login') location.hash = '#login';
     }
+  }
 };
 
 
