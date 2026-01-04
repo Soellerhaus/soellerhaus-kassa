@@ -132,6 +132,28 @@ const Utils = {
         setTimeout(() => { t.style.animation = 'toastOut 0.3s ease forwards'; setTimeout(() => t.remove(), 300); }, 3000);
     },
     debounce(fn, w) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), w); }; },
+    // Bild verkleinern und als Base64 zurückgeben
+    async resizeImage(file, maxSize = 150) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let w = img.width, h = img.height;
+                    if (w > h) { if (w > maxSize) { h = h * maxSize / w; w = maxSize; } }
+                    else { if (h > maxSize) { w = w * maxSize / h; h = maxSize; } }
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    resolve(canvas.toDataURL('image/jpeg', 0.8));
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    },
     parseCSVLine(line, delimiter=null) {
         // Auto-detect delimiter from first line
         if (!delimiter) {
@@ -156,17 +178,26 @@ const Utils = {
 window.Utils = Utils;
 
 const State = {
-    currentUser: null, currentPage: 'login', warenkorb: [], selectedCategory: null,
+    currentUser: null, currentPage: 'login', selectedCategory: null,
     isAdmin: false, currentPin: '', inactivityTimer: null, inactivityTimeout: 120000,
-    setUser(u) { this.currentUser = u; localStorage.setItem('current_user_id', u.id || u.gast_id); localStorage.setItem('current_user_type', u.id ? 'registered' : 'legacy'); this.resetInactivityTimer(); },
-    clearUser() { this.currentUser = null; this.currentPin = ''; localStorage.removeItem('current_user_id'); localStorage.removeItem('current_user_type'); this.clearInactivityTimer(); },
+    sessionId: null,
+    setUser(u) { 
+        this.currentUser = u; 
+        this.sessionId = Utils.uuid(); // Neue Session starten
+        localStorage.setItem('current_user_id', u.id || u.gast_id); 
+        localStorage.setItem('current_user_type', u.id ? 'registered' : 'legacy'); 
+        this.resetInactivityTimer(); 
+    },
+    clearUser() { 
+        this.currentUser = null; 
+        this.currentPin = ''; 
+        this.sessionId = null;
+        localStorage.removeItem('current_user_id'); 
+        localStorage.removeItem('current_user_type'); 
+        this.clearInactivityTimer(); 
+    },
     resetInactivityTimer() { this.clearInactivityTimer(); if (this.currentUser && !['login','register'].includes(this.currentPage)) { this.inactivityTimer = setTimeout(() => { Utils.showToast('Auto-Logout', 'info'); Auth.logout(); }, this.inactivityTimeout); } },
-    clearInactivityTimer() { if (this.inactivityTimer) { clearTimeout(this.inactivityTimer); this.inactivityTimer = null; } },
-    addToWarenkorb(a, m=1) { const e = this.warenkorb.find(i => i.artikel_id === a.artikel_id); if(e) e.menge += m; else this.warenkorb.push({...a, menge: m}); this.updateWarenkorbUI(); this.resetInactivityTimer(); },
-    removeFromWarenkorb(id) { this.warenkorb = this.warenkorb.filter(i => i.artikel_id !== id); this.updateWarenkorbUI(); },
-    clearWarenkorb() { this.warenkorb = []; this.updateWarenkorbUI(); },
-    updateWarenkorbUI() { if (UI?.renderWarenkorb) UI.renderWarenkorb(); },
-    getWarenkorbTotal() { return this.warenkorb.reduce((s, i) => s + (i.preis * i.menge), 0); }
+    clearInactivityTimer() { if (this.inactivityTimer) { clearTimeout(this.inactivityTimer); this.inactivityTimer = null; } }
 };
 window.State = State;
 
@@ -224,7 +255,15 @@ const Auth = {
         if (await Utils.hashPassword(pw) === stored) { State.isAdmin = true; Utils.showToast('Admin-Login OK', 'success'); return true; }
         Utils.showToast('Falsches Passwort', 'error'); return false;
     },
-    logout() { State.clearUser(); State.isAdmin = false; Router.navigate('login'); Utils.showToast('Abgemeldet', 'info'); },
+    logout() { 
+        // Buchungen der Session als fix markieren (nicht mehr stornierbar durch Gast)
+        Buchungen.fixSessionBuchungen().then(() => {
+            State.clearUser(); 
+            State.isAdmin = false; 
+            Router.navigate('login'); 
+            Utils.showToast('Abgemeldet', 'info'); 
+        });
+    },
     async autoLogin() {
         const id = localStorage.getItem('current_user_id');
         const type = localStorage.getItem('current_user_type');
@@ -248,29 +287,90 @@ const Buchungen = {
             artikel_id: artikel.artikel_id, artikel_name: artikel.name, preis: artikel.preis,
             steuer_prozent: artikel.steuer_prozent || 10, menge,
             datum: Utils.formatDate(new Date()), uhrzeit: Utils.formatTime(new Date()),
-            erstellt_am: new Date().toISOString(), exportiert: false, geraet_id: Utils.getDeviceId(), sync_status: 'pending'
+            erstellt_am: new Date().toISOString(), exportiert: false, geraet_id: Utils.getDeviceId(), sync_status: 'pending',
+            session_id: State.sessionId,
+            storniert: false,
+            fix: false  // wird true wenn Gast sich abmeldet
         };
         await db.buchungen.add(b);
         await DataProtection.createBackup();
         return b;
     },
-    async createFromWarenkorb() {
-        if (!State.warenkorb.length) throw new Error('Warenkorb leer');
-        const bs = [];
-        for (const i of State.warenkorb) bs.push(await this.create(i, i.menge));
-        State.clearWarenkorb();
-        Utils.showToast(`${bs.length} Artikel gebucht!`, 'success');
-        return bs;
+    async storno(buchung_id) {
+        const b = await db.buchungen.where('buchung_id').equals(buchung_id).first();
+        if (!b) throw new Error('Buchung nicht gefunden');
+        // Gast kann nur eigene, nicht-fixe Buchungen stornieren
+        if (!State.isAdmin && b.fix) throw new Error('Buchung bereits abgeschlossen');
+        await db.buchungen.update(b.buchung_id, { storniert: true, storniert_am: new Date().toISOString() });
+        await DataProtection.createBackup();
+        Utils.showToast('Buchung storniert', 'success');
+    },
+    async fixSessionBuchungen() {
+        // Alle Buchungen der aktuellen Session als fix markieren
+        if (!State.sessionId) return;
+        const bs = await db.buchungen.where('session_id').equals(State.sessionId).toArray();
+        for (const b of bs) {
+            if (!b.storniert) await db.buchungen.update(b.buchung_id, { fix: true });
+        }
+        await DataProtection.createBackup();
     },
     async getByGast(id, limit=null) {
         let r = await db.buchungen.where('gast_id').equals(id).reverse().toArray();
+        r = r.filter(b => !b.storniert); // Stornierte ausblenden
         return limit ? r.slice(0, limit) : r;
+    },
+    async getSessionBuchungen() {
+        if (!State.sessionId) return [];
+        let r = await db.buchungen.where('session_id').equals(State.sessionId).toArray();
+        return r.filter(b => !b.storniert).reverse();
     },
     async getAll(filter={}) {
         let r = await db.buchungen.toArray();
         if (filter.exportiert !== undefined) r = r.filter(b => b.exportiert === filter.exportiert);
         if (filter.datum) r = r.filter(b => b.datum === filter.datum);
+        if (filter.includeStorniert !== true) r = r.filter(b => !b.storniert);
         return r.reverse();
+    },
+    async getAuffuellliste() {
+        // Alle nicht-exportierten, nicht-stornierten Buchungen gruppiert nach Kategorie und Artikel
+        const bs = await db.buchungen.toArray();
+        const aktiv = bs.filter(b => !b.storniert && !b.exportiert);
+        
+        // Gruppieren nach Artikel
+        const byArtikel = {};
+        for (const b of aktiv) {
+            const key = b.artikel_id;
+            if (!byArtikel[key]) {
+                const artikel = await Artikel.getById(b.artikel_id);
+                byArtikel[key] = {
+                    artikel_id: b.artikel_id,
+                    name: b.artikel_name,
+                    kategorie_id: artikel?.kategorie_id || 0,
+                    kategorie_name: artikel?.kategorie_name || 'Sonstiges',
+                    menge: 0
+                };
+            }
+            byArtikel[key].menge += b.menge;
+        }
+        
+        // Nach Kategorie gruppieren und sortieren
+        const liste = Object.values(byArtikel);
+        liste.sort((a, b) => {
+            if (a.kategorie_id !== b.kategorie_id) return a.kategorie_id - b.kategorie_id;
+            return b.menge - a.menge; // Innerhalb Kategorie nach Menge absteigend
+        });
+        
+        return liste;
+    },
+    async resetAuffuellliste() {
+        // Alle nicht-exportierten Buchungen als exportiert markieren
+        const bs = await db.buchungen.toArray();
+        const ids = bs.filter(b => !b.exportiert && !b.storniert).map(b => b.buchung_id);
+        for (const id of ids) {
+            await db.buchungen.update(id, { exportiert: true, exportiert_am: new Date().toISOString() });
+        }
+        await DataProtection.createBackup();
+        Utils.showToast(`${ids.length} Buchungen zurückgesetzt`, 'success');
     },
     async markAsExported(ids) { for (const id of ids) await db.buchungen.update(id, { exportiert: true, exportiert_am: new Date().toISOString() }); }
 };
@@ -489,11 +589,6 @@ const UI = {
     renderNameList(gaeste, onSelect) {
         if (!gaeste?.length) return `<div class="name-list-empty"><p>Keine Einträge</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">Zurück</button></div>`;
         return `<div class="name-list-container"><div class="name-list-title">Wählen Sie Ihren Namen:</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="${onSelect}(${g.id || `'${g.gast_id}'`})"><span class="name-text">${g.displayName}</span><span class="name-arrow">→</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">Zurück</button></div>`;
-    },
-    renderWarenkorb() {
-        const c = document.querySelector('.warenkorb');
-        if (!c || !State.warenkorb.length) { if(c) c.remove(); return; }
-        c.innerHTML = `<div class="warenkorb-header"><div class="warenkorb-title">🛒 Warenkorb (${State.warenkorb.length})</div><button class="btn-icon" onclick="State.clearWarenkorb()">✕</button></div><div class="warenkorb-items">${State.warenkorb.map(i => `<div class="warenkorb-item"><span>${i.name_kurz||i.name} × ${i.menge}</span><span>${Utils.formatCurrency(i.preis*i.menge)}</span></div>`).join('')}</div><div class="warenkorb-total"><span>Gesamt:</span><span>${Utils.formatCurrency(State.getWarenkorbTotal())}</span></div><button class="btn btn-primary btn-block" onclick="handleBuchen()">Jetzt buchen</button>`;
     }
 };
 
@@ -532,8 +627,144 @@ Router.register('admin-dashboard', async () => {
     const heute = Utils.formatDate(new Date());
     const heuteB = bs.filter(b => b.datum === heute);
     const nichtExp = bs.filter(b => !b.exportiert);
-    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">🔧 Admin Dashboard</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div><div class="main-content"><div class="stats-grid"><div class="stat-card"><div class="stat-value">${guests.length}</div><div class="stat-label">Gäste</div></div><div class="stat-card"><div class="stat-value">${artCount}</div><div class="stat-label">Artikel</div></div><div class="stat-card"><div class="stat-value">${heuteB.length}</div><div class="stat-label">Buchungen heute</div></div><div class="stat-card"><div class="stat-value">${Utils.formatCurrency(heuteB.reduce((s,b) => s+b.preis*b.menge, 0))}</div><div class="stat-label">Umsatz heute</div></div></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;"><button class="btn btn-primary" onclick="Router.navigate('admin-guests')" style="padding:24px;">👥 Gästeverwaltung</button><button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:24px;">📦 Artikelverwaltung</button></div><div class="card"><div class="card-header"><h2 class="card-title">🔄 Daten-Management</h2></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;"><div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);"><h3 style="font-weight:600;margin-bottom:8px;">💾 Backup</h3><button class="btn btn-secondary" onclick="DataProtection.manualExport()">JSON herunterladen</button></div><div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);"><h3 style="font-weight:600;margin-bottom:8px;">📤 Buchungen (${nichtExp.length})</h3><button class="btn btn-secondary" onclick="handleExportBuchungen()">CSV exportieren</button></div><div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);"><h3 style="font-weight:600;margin-bottom:8px;">👥 Gäste Export</h3><button class="btn btn-secondary" onclick="DataProtection.exportGuestsCSV()">CSV</button></div><div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);"><h3 style="font-weight:600;margin-bottom:8px;">📦 Artikel Export</h3><button class="btn btn-secondary" onclick="DataProtection.exportArticlesCSV()">CSV</button></div></div></div></div></div>`);
+    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">🔧 Admin Dashboard</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-value">${guests.length}</div><div class="stat-label">Gäste</div></div>
+            <div class="stat-card"><div class="stat-value">${artCount}</div><div class="stat-label">Artikel</div></div>
+            <div class="stat-card"><div class="stat-value">${heuteB.length}</div><div class="stat-label">Buchungen heute</div></div>
+            <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(heuteB.reduce((s,b) => s+b.preis*b.menge, 0))}</div><div class="stat-label">Umsatz heute</div></div>
+        </div>
+        
+        <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;">
+            🍺 Auffüllliste (${nichtExp.length} Buchungen)
+        </button>
+        
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
+            <button class="btn btn-primary" onclick="Router.navigate('admin-guests')" style="padding:24px;">👥 Gästeverwaltung</button>
+            <button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:24px;">📦 Artikelverwaltung</button>
+        </div>
+        
+        <div class="card">
+            <div class="card-header"><h2 class="card-title">🔄 Daten-Management</h2></div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
+                    <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
+                        <h3 style="font-weight:600;margin-bottom:8px;">💾 Backup</h3>
+                        <button class="btn btn-secondary" onclick="DataProtection.manualExport()">JSON herunterladen</button>
+                    </div>
+                    <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
+                        <h3 style="font-weight:600;margin-bottom:8px;">📤 Buchungen CSV</h3>
+                        <button class="btn btn-secondary" onclick="handleExportBuchungen()">Exportieren</button>
+                    </div>
+                    <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
+                        <h3 style="font-weight:600;margin-bottom:8px;">👥 Gäste Export</h3>
+                        <button class="btn btn-secondary" onclick="DataProtection.exportGuestsCSV()">CSV</button>
+                    </div>
+                    <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
+                        <h3 style="font-weight:600;margin-bottom:8px;">📦 Artikel Export</h3>
+                        <button class="btn btn-secondary" onclick="DataProtection.exportArticlesCSV()">CSV</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`);
 });
+
+// Auffüllliste Route
+Router.register('admin-auffuellliste', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    const liste = await Buchungen.getAuffuellliste();
+    
+    // Nach Kategorie gruppieren
+    const byKat = {};
+    liste.forEach(item => {
+        if (!byKat[item.kategorie_name]) byKat[item.kategorie_name] = [];
+        byKat[item.kategorie_name].push(item);
+    });
+    
+    const total = liste.reduce((s, i) => s + i.menge, 0);
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🍺 Auffüllliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
+            <div style="padding:20px;text-align:center;">
+                <div style="font-size:2rem;font-weight:700;">${total} Getränke</div>
+                <div>zum Auffüllen</div>
+            </div>
+        </div>
+        
+        <div style="display:flex;gap:12px;margin-bottom:24px;">
+            <button class="btn btn-primary" onclick="printAuffuellliste()" style="flex:1;">🖨️ Drucken</button>
+            <button class="btn btn-danger" onclick="resetAuffuellliste()" style="flex:1;">🔄 Zurücksetzen</button>
+        </div>
+        
+        <div id="auffuellliste-print">
+            ${Object.keys(byKat).length ? Object.keys(byKat).sort().map(kat => `
+                <div class="card mb-3">
+                    <div class="card-header" style="background:var(--color-stone-light);">
+                        <h3 style="font-weight:600;margin:0;">${kat}</h3>
+                    </div>
+                    <div class="card-body" style="padding:0;">
+                        <table style="width:100%;border-collapse:collapse;">
+                            ${byKat[kat].map(item => `
+                                <tr style="border-bottom:1px solid var(--color-stone-medium);">
+                                    <td style="padding:12px;font-weight:500;">${item.name}</td>
+                                    <td style="padding:12px;text-align:right;font-size:1.3rem;font-weight:700;color:var(--color-alpine-green);">${item.menge}×</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    </div>
+                </div>
+            `).join('') : '<p class="text-muted text-center" style="padding:40px;">Keine Getränke zum Auffüllen</p>'}
+        </div>
+    </div>`);
+});
+
+// Auffüllliste drucken
+window.printAuffuellliste = () => {
+    const content = document.getElementById('auffuellliste-print');
+    if (!content) return;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Auffüllliste - ${new Date().toLocaleDateString('de-AT')}</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h1 { text-align: center; margin-bottom: 20px; }
+                h3 { background: #f0f0f0; padding: 10px; margin: 20px 0 0 0; }
+                table { width: 100%; border-collapse: collapse; }
+                td { padding: 8px; border-bottom: 1px solid #ddd; }
+                td:last-child { text-align: right; font-weight: bold; font-size: 1.2em; }
+                .footer { margin-top: 30px; text-align: center; color: #888; font-size: 0.9em; }
+                @media print { 
+                    body { padding: 0; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <h1>🍺 Auffüllliste</h1>
+            <p style="text-align:center;">${new Date().toLocaleDateString('de-AT', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}</p>
+            ${content.innerHTML}
+            <div class="footer">Seollerhaus Kassa</div>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+};
+
+// Auffüllliste zurücksetzen
+window.resetAuffuellliste = async () => {
+    if (confirm('Alle Buchungen als "aufgefüllt" markieren?\\n\\nDies setzt die Auffüllliste auf 0 zurück.')) {
+        await Buchungen.resetAuffuellliste();
+        Router.navigate('admin-auffuellliste');
+    }
+};
 
 Router.register('admin-guests', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
@@ -544,8 +775,101 @@ Router.register('admin-guests', async () => {
 Router.register('admin-articles', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     const articles = await Artikel.getAll();
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div><div class="main-content"><div class="card mb-3"><div class="card-header"><h2 class="card-title">📥 CSV Import</h2></div><div class="card-body"><p style="margin-bottom:16px;color:var(--color-stone-dark);">CSV: <code>ID;SKU;Name;Kurzname;Preis;Kategorie;Sortierung;Aktiv</code><br><small>Bei gleicher SKU: Upsert</small></p><input type="file" id="artikel-import" accept=".csv" style="display:none" onchange="handleArtikelImport(event)"><button class="btn btn-primary" onclick="document.getElementById('artikel-import').click()">📄 CSV auswählen</button><button class="btn btn-secondary" onclick="DataProtection.exportArticlesCSV()" style="margin-left:8px;">📤 Export</button></div></div><div class="card"><div class="card-header"><h2 class="card-title">Artikel (${articles.length})</h2><button class="btn btn-primary" onclick="showAddArticleModal()">+ Neu</button></div><div class="card-body"><div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="filterArticleList(this.value)"></div><div id="article-list" style="max-height:60vh;overflow-y:auto;">${articles.length ? articles.map(a => `<div class="list-item article-item" data-name="${a.name.toLowerCase()}" data-sku="${(a.sku||'').toLowerCase()}"><div style="flex:1;"><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:1.5rem;">${a.icon||'📦'}</span><div><strong>${a.name}</strong>${a.sku?`<small style="color:var(--color-stone-dark);"> (${a.sku})</small>`:''}</div></div><small class="text-muted">${a.kategorie_name||'?'} | ${Utils.formatCurrency(a.preis)} | ${a.aktiv?'✅':'❌'}</small></div><div style="display:flex;gap:8px;"><button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:8px 16px;">✏️</button><button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:8px 16px;">🗑️</button></div></div>`).join('') : '<p class="text-muted text-center">Keine Artikel</p>'}</div></div></div></div><div id="article-modal-container"></div>`);
+    
+    // Artikel nach Kategorie gruppieren und nummerieren
+    const byCategory = {};
+    articles.forEach(a => {
+        if (!byCategory[a.kategorie_id]) byCategory[a.kategorie_id] = [];
+        byCategory[a.kategorie_id].push(a);
+    });
+    // Innerhalb jeder Kategorie nach Sortierung sortieren und Position zuweisen
+    Object.keys(byCategory).forEach(katId => {
+        byCategory[katId].sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
+        byCategory[katId].forEach((a, idx) => { a.katPosition = idx + 1; });
+    });
+    
+    const renderArticleRow = (a) => {
+        const img = (a.bild && a.bild.startsWith('data:')) 
+            ? `<img src="${a.bild}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">`
+            : `<span style="font-size:1.5rem;">${a.icon||'📦'}</span>`;
+        return `<tr class="article-row" data-name="${a.name.toLowerCase()}" data-sku="${(a.sku||'').toLowerCase()}">
+            <td style="width:50px;text-align:center;">${img}</td>
+            <td><strong>${a.name}</strong>${a.sku?` <small style="color:var(--color-stone-dark);">(${a.sku})</small>`:''}</td>
+            <td style="white-space:nowrap;">${a.kategorie_name||'?'}</td>
+            <td style="text-align:center;font-weight:600;">#${a.katPosition}</td>
+            <td style="text-align:right;font-weight:600;">${Utils.formatCurrency(a.preis)}</td>
+            <td style="text-align:center;">${a.aktiv?'✅':'❌'}</td>
+            <td style="text-align:right;white-space:nowrap;">
+                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✏️</button>
+                <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">🗑️</button>
+            </td>
+        </tr>`;
+    };
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3">
+            <div class="card-header"><h2 class="card-title">📥 CSV Import</h2></div>
+            <div class="card-body">
+                <p style="margin-bottom:16px;color:var(--color-stone-dark);">CSV: <code>ID,Artikelname,Preis,Warengruppe</code><br><small>Bei gleicher ID: Update</small></p>
+                <input type="file" id="artikel-import" accept=".csv" style="display:none" onchange="handleArtikelImport(event)">
+                <button class="btn btn-primary" onclick="document.getElementById('artikel-import').click()">📄 CSV auswählen</button>
+                <button class="btn btn-secondary" onclick="DataProtection.exportArticlesCSV()" style="margin-left:8px;">📤 Export</button>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Artikel (${articles.length})</h2>
+                <button class="btn btn-primary" onclick="showAddArticleModal()">+ Neu</button>
+            </div>
+            <div class="card-body">
+                <div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="filterArticleTable(this.value)"></div>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;" id="article-table">
+                        <thead>
+                            <tr style="background:var(--color-stone-light);text-align:left;">
+                                <th style="padding:12px 8px;"></th>
+                                <th style="padding:12px 8px;">Name</th>
+                                <th style="padding:12px 8px;">Kategorie</th>
+                                <th style="padding:12px 8px;text-align:center;">Pos.</th>
+                                <th style="padding:12px 8px;text-align:right;">Preis</th>
+                                <th style="padding:12px 8px;text-align:center;">Aktiv</th>
+                                <th style="padding:12px 8px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${articles.length ? articles.map(renderArticleRow).join('') : '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--color-stone-dark);">Keine Artikel</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="article-modal-container"></div>`);
 });
+
+// Filter für Artikel-Tabelle
+window.filterArticleTable = (q) => {
+    const ql = q.toLowerCase();
+    document.querySelectorAll('.article-row').forEach(row => {
+        const match = row.dataset.name.includes(ql) || row.dataset.sku.includes(ql);
+        row.style.display = match ? '' : 'none';
+    });
+};
+
+// Tabellen-Styling dynamisch hinzufügen
+if (!document.getElementById('table-styles')) {
+    const style = document.createElement('style');
+    style.id = 'table-styles';
+    style.textContent = `
+        #article-table tbody tr { border-bottom: 1px solid var(--color-stone-medium); }
+        #article-table tbody tr:hover { background: var(--color-stone-light); }
+        #article-table td { padding: 12px 8px; vertical-align: middle; }
+        #article-table tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+        #article-table tbody tr:nth-child(even):hover { background: var(--color-stone-light); }
+    `;
+    document.head.appendChild(style);
+}
 
 Router.register('dashboard', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
@@ -555,7 +879,7 @@ Router.register('dashboard', async () => {
     const heute = Utils.formatDate(new Date());
     const heuteB = allBs.filter(b => b.datum === heute);
     const name = State.currentUser.firstName || State.currentUser.vorname;
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="showMenu()">☰</button><div class="header-title">Seollerhaus</div></div><div class="header-right"><div class="user-badge">👤 ${name}</div></div></div><div class="main-content"><h1 style="font-family:var(--font-display);font-size:var(--text-2xl);margin-bottom:24px;">Guten Tag, ${name}!</h1><div class="stats-grid"><div class="stat-card"><div class="stat-value">${heuteB.length}</div><div class="stat-label">Artikel heute</div><div style="margin-top:8px;font-size:var(--text-lg);font-weight:600;">${Utils.formatCurrency(heuteB.reduce((s,b)=>s+b.preis*b.menge,0))}</div></div><div class="stat-card"><div class="stat-value">${allBs.length}</div><div class="stat-label">Gesamt</div><div style="margin-top:8px;font-size:var(--text-lg);font-weight:600;">${Utils.formatCurrency(allBs.reduce((s,b)=>s+b.preis*b.menge,0))}</div></div></div><div class="card mt-3"><div class="card-header"><h2 class="card-title">📝 Letzte Buchungen</h2><button class="btn btn-secondary" onclick="navigateToHistorie()">Alle</button></div><div class="card-body">${bs.length ? bs.map(b => `<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:500;">${b.artikel_name} × ${b.menge}</div><small class="text-muted">${b.datum}, ${b.uhrzeit.substring(0,5)}</small></div><div style="font-weight:700;color:var(--color-mountain-blue);">${Utils.formatCurrency(b.preis*b.menge)}</div></div></div>`).join('') : '<p class="text-muted text-center">Keine Buchungen</p>'}</div></div></div><div class="bottom-nav"><div class="nav-item active" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div><div class="nav-item" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div><div class="nav-item" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div><div class="nav-item" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div></div>`);
+    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">👤 ${name}</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div><div class="main-content"><h1 style="font-family:var(--font-display);font-size:var(--text-2xl);margin-bottom:24px;">Guten Tag, ${name}!</h1><div class="stats-grid"><div class="stat-card"><div class="stat-value">${heuteB.length}</div><div class="stat-label">Artikel heute</div><div style="margin-top:8px;font-size:var(--text-lg);font-weight:600;">${Utils.formatCurrency(heuteB.reduce((s,b)=>s+b.preis*b.menge,0))}</div></div><div class="stat-card"><div class="stat-value">${allBs.length}</div><div class="stat-label">Gesamt</div><div style="margin-top:8px;font-size:var(--text-lg);font-weight:600;">${Utils.formatCurrency(allBs.reduce((s,b)=>s+b.preis*b.menge,0))}</div></div></div><div class="card mt-3"><div class="card-header"><h2 class="card-title">📝 Letzte Buchungen</h2><button class="btn btn-secondary" onclick="navigateToHistorie()">Alle</button></div><div class="card-body">${bs.length ? bs.map(b => `<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:500;">${b.artikel_name} × ${b.menge}</div><small class="text-muted">${b.datum}, ${b.uhrzeit.substring(0,5)}</small></div><div style="font-weight:700;color:var(--color-mountain-blue);">${Utils.formatCurrency(b.preis*b.menge)}</div></div></div>`).join('') : '<p class="text-muted text-center">Keine Buchungen</p>'}</div></div></div><div class="bottom-nav"><div class="nav-item active" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div><div class="nav-item" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div><div class="nav-item" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div><div class="nav-item" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div></div>`);
 });
 
 Router.register('buchen', async () => {
@@ -564,9 +888,79 @@ Router.register('buchen', async () => {
     const arts = await Artikel.getAll({ aktiv: true });
     const name = State.currentUser.firstName || State.currentUser.vorname;
     const filtered = State.selectedCategory ? arts.filter(a => a.kategorie_id === State.selectedCategory) : arts;
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="navigateToDashboard()">←</button><div class="header-title">Artikel buchen</div></div><div class="header-right"><div class="user-badge">👤 ${name}</div></div></div><div class="main-content"><div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="searchArtikel(this.value)"></div><div class="category-tabs"><div class="category-tab ${!State.selectedCategory?'active':''}" onclick="filterCategory(null)">Alle</div>${kats.map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})">${k.name}</div>`).join('')}</div><div class="artikel-grid">${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${getCategoryColor(a.kategorie_id)}" onpointerdown="handleArtikelPointerDown(event,${a.artikel_id})" onpointerup="handleArtikelPointerUp(event)" onpointercancel="handleArtikelPointerUp(event)" onpointerleave="handleArtikelPointerUp(event)"><div class="artikel-icon">${a.icon}</div><div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}</div></div>${State.warenkorb.length?'<div class="warenkorb"></div>':''}<div class="bottom-nav"><div class="nav-item" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div><div class="nav-item active" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div><div class="nav-item" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div><div class="nav-item" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div></div>`);
-    UI.renderWarenkorb();
+    const sessionBuchungen = await Buchungen.getSessionBuchungen();
+    const sessionTotal = sessionBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
+    
+    const renderTileContent = (a) => {
+        if (a.bild && a.bild.startsWith('data:')) {
+            return `<img src="${a.bild}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">`;
+        }
+        return `<div class="artikel-icon">${a.icon||'📦'}</div>`;
+    };
+    
+    UI.render(`
+    <div class="app-header">
+        <div class="header-left"><div class="header-title">👤 ${name}</div></div>
+        <div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div>
+    </div>
+    <div class="main-content" style="padding-bottom:${sessionBuchungen.length ? '180px' : '80px'};">
+        <div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="searchArtikel(this.value)"></div>
+        <div class="category-tabs">
+            <div class="category-tab ${!State.selectedCategory?'active':''}" onclick="filterCategory(null)">Alle</div>
+            ${kats.map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})">${k.name}</div>`).join('')}
+        </div>
+        <div class="artikel-grid">
+            ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${getCategoryColor(a.kategorie_id)}" onclick="bucheArtikelDirekt(${a.artikel_id})">${renderTileContent(a)}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
+        </div>
+    </div>
+    ${sessionBuchungen.length ? `
+    <div class="session-buchungen" style="position:fixed;bottom:70px;left:0;right:0;background:white;border-top:2px solid var(--color-alpine-green);padding:12px;max-height:40vh;overflow-y:auto;box-shadow:0 -4px 12px rgba(0,0,0,0.1);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>Aktuelle Buchungen</strong>
+            <span style="font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(sessionTotal)}</span>
+        </div>
+        ${sessionBuchungen.map(b => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--color-stone-light);border-radius:8px;margin-bottom:4px;">
+            <div>
+                <span style="font-weight:500;">${b.artikel_name}</span>
+                <span style="color:var(--color-stone-dark);">× ${b.menge}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-weight:600;">${Utils.formatCurrency(b.preis * b.menge)}</span>
+                <button class="btn btn-danger" onclick="stornoBuchung('${b.buchung_id}')" style="padding:4px 8px;font-size:0.8rem;">✕</button>
+            </div>
+        </div>
+        `).join('')}
+    </div>
+    ` : ''}
+    <div class="bottom-nav">
+        <div class="nav-item" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div>
+        <div class="nav-item active" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div>
+        <div class="nav-item" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div>
+        <div class="nav-item" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div>
+    </div>`);
 });
+
+// Direktes Buchen ohne Warenkorb
+window.bucheArtikelDirekt = async (id) => {
+    const a = await Artikel.getById(id);
+    if (!a) return;
+    await Buchungen.create(a, 1);
+    Utils.showToast(`${a.name_kurz||a.name} gebucht!`, 'success');
+    Router.navigate('buchen'); // Seite neu laden um Session-Buchungen zu aktualisieren
+};
+
+// Storno durch Gast
+window.stornoBuchung = async (buchung_id) => {
+    if (confirm('Buchung wirklich stornieren?')) {
+        try {
+            await Buchungen.storno(buchung_id);
+            Router.navigate('buchen');
+        } catch (e) {
+            Utils.showToast(e.message, 'error');
+        }
+    }
+};
 
 Router.register('historie', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
@@ -576,14 +970,14 @@ Router.register('historie', async () => {
     const name = State.currentUser.firstName || State.currentUser.vorname;
     const byDate = {};
     bs.forEach(b => { if(!byDate[b.datum]) byDate[b.datum]=[]; byDate[b.datum].push(b); });
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="navigateToDashboard()">←</button><div class="header-title">Meine Buchungen</div></div><div class="header-right"><div class="user-badge">👤 ${name}</div></div></div><div class="main-content"><div class="card mb-3"><div style="text-align:center;padding:16px;"><div style="font-family:var(--font-display);font-size:var(--text-3xl);font-weight:700;color:var(--color-mountain-blue);">${Utils.formatCurrency(total)}</div><small class="text-muted">${bs.length} Artikel</small></div></div>${Object.keys(byDate).sort().reverse().map(d => {const items = byDate[d]; return `<div style="margin-bottom:32px;"><h3 style="font-size:var(--text-lg);font-weight:600;margin-bottom:12px;color:var(--color-mountain-blue);">${new Date(d).toLocaleDateString('de-AT',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</h3>${items.map(b => `<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:500;">${b.artikel_name} × ${b.menge}</div><small class="text-muted">${b.uhrzeit.substring(0,5)}</small></div><div style="font-weight:700;">${Utils.formatCurrency(b.preis*b.menge)}</div></div></div>`).join('')}<div style="text-align:right;margin-top:8px;font-weight:600;color:var(--color-stone-dark);">Summe: ${Utils.formatCurrency(items.reduce((s,b)=>s+b.preis*b.menge,0))}</div></div>`;}).join('')||'<p class="text-muted text-center">Keine Buchungen</p>'}</div><div class="bottom-nav"><div class="nav-item" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div><div class="nav-item" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div><div class="nav-item active" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div><div class="nav-item" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div></div>`);
+    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">👤 ${name}</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div><div class="main-content"><div class="card mb-3"><div style="text-align:center;padding:16px;"><div style="font-family:var(--font-display);font-size:var(--text-3xl);font-weight:700;color:var(--color-mountain-blue);">${Utils.formatCurrency(total)}</div><small class="text-muted">${bs.length} Buchungen gesamt</small></div></div>${Object.keys(byDate).sort().reverse().map(d => {const items = byDate[d]; return `<div style="margin-bottom:32px;"><h3 style="font-size:var(--text-lg);font-weight:600;margin-bottom:12px;color:var(--color-mountain-blue);">${new Date(d).toLocaleDateString('de-AT',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</h3>${items.map(b => `<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:500;">${b.artikel_name} × ${b.menge}</div><small class="text-muted">${b.uhrzeit.substring(0,5)}</small></div><div style="font-weight:700;">${Utils.formatCurrency(b.preis*b.menge)}</div></div></div>`).join('')}<div style="text-align:right;margin-top:8px;font-weight:600;color:var(--color-stone-dark);">Summe: ${Utils.formatCurrency(items.reduce((s,b)=>s+b.preis*b.menge,0))}</div></div>`;}).join('')||'<p class="text-muted text-center">Keine Buchungen</p>'}</div><div class="bottom-nav"><div class="nav-item" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div><div class="nav-item" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div><div class="nav-item active" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div><div class="nav-item" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div></div>`);
 });
 
 Router.register('profil', () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
     const name = State.currentUser.firstName || State.currentUser.vorname;
     const created = State.currentUser.createdAt || State.currentUser.erstellt_am;
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="navigateToDashboard()">←</button><div class="header-title">Mein Profil</div></div><div class="header-right"><div class="user-badge">👤 ${name}</div></div></div><div class="main-content"><div class="card"><div style="text-align:center;padding:32px;"><div style="font-size:4rem;margin-bottom:16px;">👤</div><h2 style="font-family:var(--font-display);font-size:var(--text-2xl);margin-bottom:8px;">${name}</h2>${created?`<p class="text-muted">Seit ${new Date(created).toLocaleDateString('de-AT')}</p>`:''}</div></div><button class="btn btn-danger btn-block mt-3" onclick="handleLogout()">🚪 Abmelden</button></div><div class="bottom-nav"><div class="nav-item" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div><div class="nav-item" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div><div class="nav-item" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div><div class="nav-item active" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div></div>`);
+    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">👤 ${name}</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div><div class="main-content"><div class="card"><div style="text-align:center;padding:32px;"><div style="font-size:4rem;margin-bottom:16px;">👤</div><h2 style="font-family:var(--font-display);font-size:var(--text-2xl);margin-bottom:8px;">${name}</h2>${created?`<p class="text-muted">Seit ${new Date(created).toLocaleDateString('de-AT')}</p>`:''}</div></div></div><div class="bottom-nav"><div class="nav-item" onclick="navigateToDashboard()"><div class="nav-icon">🏠</div><div>Start</div></div><div class="nav-item" onclick="navigateToBuchen()"><div class="nav-icon">🍺</div><div>Buchen</div></div><div class="nav-item" onclick="navigateToHistorie()"><div class="nav-icon">📋</div><div>Liste</div></div><div class="nav-item active" onclick="navigateToProfil()"><div class="nav-icon">👤</div><div>Profil</div></div></div>`);
 });
 
 // Global handlers
@@ -627,51 +1021,110 @@ window.getCategoryColor = id => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465
 window.searchArtikel = Utils.debounce(async q => {
     const arts = await Artikel.getAll({ aktiv: true, search: q });
     const grid = document.querySelector('.artikel-grid');
-    if (grid) grid.innerHTML = arts.map(a => `<div class="artikel-tile" style="--tile-color:${getCategoryColor(a.kategorie_id)}" onpointerdown="handleArtikelPointerDown(event,${a.artikel_id})" onpointerup="handleArtikelPointerUp(event)"><div class="artikel-icon">${a.icon}</div><div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('') || '<p class="text-muted" style="grid-column:1/-1;text-align:center;">Keine Ergebnisse</p>';
+    const renderTile = (a) => {
+        const content = (a.bild && a.bild.startsWith('data:')) 
+            ? `<img src="${a.bild}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">`
+            : `<div class="artikel-icon">${a.icon||'📦'}</div>`;
+        return `<div class="artikel-tile" style="--tile-color:${getCategoryColor(a.kategorie_id)}" onclick="bucheArtikelDirekt(${a.artikel_id})">${content}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`;
+    };
+    if (grid) grid.innerHTML = arts.map(renderTile).join('') || '<p class="text-muted" style="grid-column:1/-1;text-align:center;">Keine Ergebnisse</p>';
 }, 300);
-window.showMenu = () => Utils.showToast('Menü in Entwicklung', 'info');
-
-let longPressTimer = null, longPressTriggered = false, currentArtikelId = null;
-window.handleArtikelPointerDown = (e, id) => { e.preventDefault(); longPressTriggered = false; currentArtikelId = id; longPressTimer = setTimeout(async () => { longPressTriggered = true; const a = await Artikel.getById(id); if(a) showQuantityModal(a); }, 700); };
-window.handleArtikelPointerUp = () => { if(longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } if(!longPressTriggered && currentArtikelId) addArtikel(currentArtikelId); longPressTriggered = false; currentArtikelId = null; };
-window.addArtikel = async id => { const a = await Artikel.getById(id); State.addToWarenkorb(a, 1); Utils.showToast(`${a.name_kurz||a.name} hinzugefügt`, 'success'); };
-window.handleBuchen = async () => { try { await Buchungen.createFromWarenkorb(); Router.navigate('dashboard'); } catch(e) {} };
-
-let currentQuantity = '1';
-function showQuantityModal(a) {
-    currentQuantity = '1';
-    const m = document.createElement('div');
-    m.id = 'quantity-modal';
-    m.className = 'modal-container active';
-    m.innerHTML = `<div class="modal-backdrop" onclick="closeQuantityModal()"></div><div class="modal-content" style="max-width:400px;"><h2 style="margin-bottom:1rem;">${a.name}</h2><p style="margin-bottom:1.5rem;color:var(--color-stone-dark);">Preis: ${Utils.formatCurrency(a.preis)}</p><div class="quantity-display"><div class="quantity-value" id="quantity-value">1</div><div class="quantity-label">Anzahl</div></div><div class="pin-buttons" style="margin-bottom:1rem;">${[1,2,3,4,5,6,7,8,9].map(n => `<button class="pin-btn" onclick="handleQuantityInput('${n}')">${n}</button>`).join('')}<button class="pin-btn pin-btn-delete" onclick="handleQuantityDelete()">⌫</button><button class="pin-btn" onclick="handleQuantityInput('0')">0</button><button class="pin-btn" style="visibility:hidden;"></button></div><div style="display:flex;gap:1rem;"><button class="btn btn-secondary" style="flex:1;" onclick="closeQuantityModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="handleQuantityComplete(${a.artikel_id})">Hinzufügen</button></div></div>`;
-    document.body.appendChild(m);
-}
-window.closeQuantityModal = () => { document.getElementById('quantity-modal')?.remove(); currentQuantity = '1'; };
-window.handleQuantityInput = d => { if(currentQuantity==='1'&&d!=='0') currentQuantity=d; else if(currentQuantity.length<3) currentQuantity+=d; document.getElementById('quantity-value').textContent = currentQuantity; };
-window.handleQuantityDelete = () => { currentQuantity = currentQuantity.length > 1 ? currentQuantity.slice(0,-1) : '1'; document.getElementById('quantity-value').textContent = currentQuantity; };
-window.handleQuantityComplete = async id => { const m = parseInt(currentQuantity); if(m<1) { Utils.showToast('Min. 1', 'warning'); return; } const a = await Artikel.getById(id); if(a) { State.addToWarenkorb(a, m); Utils.showToast(`${m}× ${a.name_kurz||a.name} hinzugefügt`, 'success'); } closeQuantityModal(); };
 
 window.showAddArticleModal = () => {
     const c = document.getElementById('article-modal-container');
-    c.innerHTML = `<div class="modal-container active"><div class="modal-backdrop" onclick="closeArticleModal()"></div><div class="modal-content" style="max-width:500px;"><h2 style="margin-bottom:24px;">Neuer Artikel</h2><div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" placeholder="z.B. Cola 0.5l"></div><div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" placeholder="z.B. Cola"></div><div class="form-group"><label class="form-label">SKU</label><input type="text" id="article-sku" class="form-input" placeholder="z.B. COL-05"></div><div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" placeholder="0.00" step="0.01" min="0"></div><div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Wein</option><option value="4">Spirituosen</option><option value="5">Heiße Getränke</option><option value="6">Sonstiges</option><option value="7">Snacks</option><option value="8">Diverses</option></select></div><div class="form-checkbox"><input type="checkbox" id="article-active" checked><label for="article-active">Aktiv</label></div><div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveNewArticle()">Speichern</button></div></div></div>`;
+    c.innerHTML = `<div class="modal-container active"><div class="modal-backdrop" onclick="closeArticleModal()"></div><div class="modal-content" style="max-width:500px;max-height:90vh;overflow-y:auto;"><h2 style="margin-bottom:24px;">Neuer Artikel</h2>
+    <div class="form-group" style="text-align:center;">
+        <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;">📦</div>
+        <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;">📷 Foto wählen</button>
+        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✕</button>
+    </div>
+    <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" placeholder="z.B. Cola 0.5l"></div>
+    <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" placeholder="z.B. Cola"></div>
+    <div class="form-group"><label class="form-label">SKU</label><input type="text" id="article-sku" class="form-input" placeholder="z.B. COL-05"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" placeholder="0.00" step="0.01" min="0"></div>
+        <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" placeholder="1" min="1" value="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
+    </div>
+    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Wein</option><option value="4">Spirituosen</option><option value="5">Heiße Getränke</option><option value="6">Sonstiges</option><option value="7">Snacks</option><option value="8">Diverses</option></select></div>
+    <div class="form-checkbox"><input type="checkbox" id="article-active" checked><label for="article-active">Aktiv</label></div>
+    <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveNewArticle()">Speichern</button></div></div></div>`;
+    window.currentArticleImage = null;
 };
 window.showEditArticleModal = async id => {
     const a = await Artikel.getById(id);
     if (!a) return;
     const c = document.getElementById('article-modal-container');
-    c.innerHTML = `<div class="modal-container active"><div class="modal-backdrop" onclick="closeArticleModal()"></div><div class="modal-content" style="max-width:500px;"><h2 style="margin-bottom:24px;">Artikel bearbeiten</h2><input type="hidden" id="article-id" value="${a.artikel_id}"><div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" value="${a.name}"></div><div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" value="${a.name_kurz||''}"></div><div class="form-group"><label class="form-label">SKU</label><input type="text" id="article-sku" class="form-input" value="${a.sku||''}"></div><div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" value="${a.preis}" step="0.01" min="0"></div><div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7,8].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Spirituosen',5:'Heiße Getränke',6:'Sonstiges',7:'Snacks',8:'Diverses'}[i]}</option>`).join('')}</select></div><div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div><div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
+    const hasImage = a.bild && a.bild.startsWith('data:');
+    const previewContent = hasImage ? `<img src="${a.bild}" style="width:100%;height:100%;object-fit:cover;">` : (a.icon || '📦');
+    c.innerHTML = `<div class="modal-container active"><div class="modal-backdrop" onclick="closeArticleModal()"></div><div class="modal-content" style="max-width:500px;max-height:90vh;overflow-y:auto;"><h2 style="margin-bottom:24px;">Artikel bearbeiten</h2>
+    <input type="hidden" id="article-id" value="${a.artikel_id}">
+    <div class="form-group" style="text-align:center;">
+        <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;">${previewContent}</div>
+        <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;">📷 Foto wählen</button>
+        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✕</button>
+    </div>
+    <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" value="${a.name}"></div>
+    <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" value="${a.name_kurz||''}"></div>
+    <div class="form-group"><label class="form-label">SKU</label><input type="text" id="article-sku" class="form-input" value="${a.sku||''}"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" value="${a.preis}" step="0.01" min="0"></div>
+        <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" value="${a.sortierung||1}" min="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
+    </div>
+    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7,8].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Spirituosen',5:'Heiße Getränke',6:'Sonstiges',7:'Snacks',8:'Diverses'}[i]}</option>`).join('')}</select></div>
+    <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
+    <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
+    window.currentArticleImage = a.bild || null;
 };
-window.closeArticleModal = () => { document.getElementById('article-modal-container').innerHTML = ''; };
+window.closeArticleModal = () => { document.getElementById('article-modal-container').innerHTML = ''; window.currentArticleImage = null; };
+
+// Bild-Handler
+window.handleImagePreview = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+        Utils.showToast('Bild wird verarbeitet...', 'info');
+        const base64 = await Utils.resizeImage(file, 150);
+        window.currentArticleImage = base64;
+        const preview = document.getElementById('article-image-preview');
+        preview.innerHTML = `<img src="${base64}" style="width:100%;height:100%;object-fit:cover;">`;
+        Utils.showToast('Bild geladen!', 'success');
+    } catch (e) {
+        Utils.showToast('Fehler beim Laden', 'error');
+    }
+};
+window.clearImagePreview = () => {
+    window.currentArticleImage = null;
+    const katId = parseInt(document.getElementById('article-category')?.value) || 1;
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍿',8:'📦'};
+    document.getElementById('article-image-preview').innerHTML = iconMap[katId] || '📦';
+    document.getElementById('article-image').value = '';
+};
+
 window.saveNewArticle = async () => {
     const name = document.getElementById('article-name')?.value;
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
     const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Spirituosen',5:'Heiße Getränke',6:'Sonstiges',7:'Snacks',8:'Diverses'};
     const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍿',8:'📦'};
-    await Artikel.create({ name: name.trim(), name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), sku: document.getElementById('article-sku')?.value?.trim() || null, preis: parseFloat(document.getElementById('article-price')?.value) || 0, steuer_prozent: 10, kategorie_id: katId, kategorie_name: katMap[katId], aktiv: document.getElementById('article-active')?.checked, sortierung: 0, icon: iconMap[katId] });
+    await Artikel.create({ 
+        name: name.trim(), 
+        name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
+        sku: document.getElementById('article-sku')?.value?.trim() || null, 
+        preis: parseFloat(document.getElementById('article-price')?.value) || 0, 
+        steuer_prozent: 10, 
+        kategorie_id: katId, 
+        kategorie_name: katMap[katId], 
+        aktiv: document.getElementById('article-active')?.checked, 
+        sortierung: parseInt(document.getElementById('article-sort')?.value) || 1, 
+        icon: iconMap[katId],
+        bild: window.currentArticleImage || null
+    });
     closeArticleModal();
     Router.navigate('admin-articles');
 };
+
 window.saveEditArticle = async () => {
     const id = parseInt(document.getElementById('article-id')?.value);
     const name = document.getElementById('article-name')?.value;
@@ -679,7 +1132,18 @@ window.saveEditArticle = async () => {
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
     const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Spirituosen',5:'Heiße Getränke',6:'Sonstiges',7:'Snacks',8:'Diverses'};
     const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍿',8:'📦'};
-    await Artikel.update(id, { name: name.trim(), name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), sku: document.getElementById('article-sku')?.value?.trim() || null, preis: parseFloat(document.getElementById('article-price')?.value) || 0, kategorie_id: katId, kategorie_name: katMap[katId], aktiv: document.getElementById('article-active')?.checked, icon: iconMap[katId] });
+    await Artikel.update(id, { 
+        name: name.trim(), 
+        name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
+        sku: document.getElementById('article-sku')?.value?.trim() || null, 
+        preis: parseFloat(document.getElementById('article-price')?.value) || 0, 
+        kategorie_id: katId, 
+        kategorie_name: katMap[katId], 
+        aktiv: document.getElementById('article-active')?.checked, 
+        sortierung: parseInt(document.getElementById('article-sort')?.value) || 1,
+        icon: iconMap[katId],
+        bild: window.currentArticleImage || null
+    });
     closeArticleModal();
     Router.navigate('admin-articles');
 };
