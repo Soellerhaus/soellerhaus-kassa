@@ -131,12 +131,21 @@ const Utils = {
         setTimeout(() => { t.style.animation = 'toastOut 0.3s ease forwards'; setTimeout(() => t.remove(), 300); }, 3000);
     },
     debounce(fn, w) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), w); }; },
-    parseCSVLine(line) {
+    parseCSVLine(line, delimiter=null) {
+        // Auto-detect delimiter from first line
+        if (!delimiter) {
+            const semicolonCount = (line.match(/;/g) || []).length;
+            const commaCount = (line.match(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/g) || []).length;
+            delimiter = semicolonCount > commaCount ? ';' : ',';
+        }
         const r = []; let c = '', q = false;
         for (let i = 0; i < line.length; i++) {
             const ch = line[i];
-            if (ch === '"') q = !q;
-            else if ((ch === ';' || ch === ',') && !q) { r.push(c.trim()); c = ''; }
+            if (ch === '"') {
+                if (q && line[i+1] === '"') { c += '"'; i++; } // Escaped quote
+                else q = !q;
+            }
+            else if (ch === delimiter && !q) { r.push(c.trim()); c = ''; }
             else c += ch;
         }
         r.push(c.trim());
@@ -283,33 +292,152 @@ const Artikel = {
     async update(id, changes) { await db.artikel.update(id, changes); await DataProtection.createBackup(); Utils.showToast('Artikel aktualisiert', 'success'); },
     async delete(id) { await db.artikel.delete(id); await DataProtection.createBackup(); Utils.showToast('Artikel gelöscht', 'success'); },
     async importFromCSV(text) {
-        const lines = text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').trim().split('\n');
+        // Clean up text - handle Windows line endings and BOM
+        text = text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+        const lines = text.split('\n').filter(l => l.trim());
+        
         if (lines.length < 2) throw new Error('CSV ungültig');
-        const h = Utils.parseCSVLine(lines[0]).map(x => x.toLowerCase().trim());
-        const idx = { id: h.findIndex(x => x==='id'||x==='artikel_id'), sku: h.findIndex(x => x==='sku'||x==='artikelnummer'), name: h.findIndex(x => x==='name'||x==='artikelname'), kurz: h.findIndex(x => x==='kurzname'||x==='artikelkurz'), preis: h.findIndex(x => x==='preis'||x==='price'), kat: h.findIndex(x => x==='kategorie'||x==='artikelgruppe'), sort: h.findIndex(x => x==='sortierung'), aktiv: h.findIndex(x => x==='aktiv') };
-        const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Spirituosen',5:'Heiße Getränke',6:'Sonstiges',7:'Snacks',8:'Diverses'};
-        const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍿',8:'📦'};
-        let imp=0, upd=0, skip=0;
-        for (let i=1; i<lines.length; i++) {
-            const v = Utils.parseCSVLine(lines[i].trim());
-            const name = idx.name>=0 ? v[idx.name]?.replace(/^"|"$/g,'') : null;
-            if (!name) { skip++; continue; }
-            const sku = idx.sku>=0 ? v[idx.sku]?.replace(/^"|"$/g,'').trim() : null;
-            const id = idx.id>=0 ? parseInt(v[idx.id]) : null;
-            let preis = 0;
-            if (idx.preis>=0 && v[idx.preis]) preis = parseFloat(v[idx.preis].replace(/[€"]/g,'').replace(',','.').trim()) || 0;
-            let katId = idx.kat>=0 ? parseInt(v[idx.kat]?.replace(/"/g,'')) || 1 : 1;
-            let sort = idx.sort>=0 ? parseInt(v[idx.sort]) || 0 : 0;
-            let aktiv = preis > 0;
-            if (idx.aktiv>=0 && v[idx.aktiv]) { const av = v[idx.aktiv].toLowerCase().trim(); aktiv = av==='ja'||av==='yes'||av==='1'||av==='true'; }
-            const data = { name, name_kurz: idx.kurz>=0 ? v[idx.kurz]?.replace(/^"|"$/g,'') || name.substring(0,15) : name.substring(0,15), sku: sku||null, preis, steuer_prozent: 10, kategorie_id: katId, kategorie_name: katMap[katId]||'Sonstiges', aktiv, sortierung: sort, icon: iconMap[katId]||'🍽️' };
-            let existing = sku ? await this.getBySku(sku) : null;
-            if (!existing && id) existing = await this.getById(id);
-            if (existing) { await db.artikel.update(existing.artikel_id, data); upd++; }
-            else { if (id) data.artikel_id = id; else { const m = await db.artikel.orderBy('artikel_id').last(); data.artikel_id = (m?.artikel_id||0)+1; } await db.artikel.add(data); imp++; }
+        
+        // Parse header - detect delimiter (this CSV uses comma)
+        const firstLine = lines[0];
+        const h = Utils.parseCSVLine(firstLine, ',').map(x => x.toLowerCase().trim().replace(/^"|"$/g,''));
+        
+        console.log('CSV Headers:', h);
+        console.log('Header count:', h.length);
+        
+        // Find column indices - support Access column names
+        const idx = { 
+            id: h.findIndex(x => x==='id'), 
+            name: h.findIndex(x => x==='artikelname'), 
+            kurz: h.findIndex(x => x==='artikelkurz'), 
+            preis: h.findIndex(x => x==='preis'), 
+            kat: h.findIndex(x => x==='warengruppe'),  // Last column!
+            sort: h.findIndex(x => x==='artikelreihenfolge'),
+            steuer: h.findIndex(x => x==='steuer')
+        };
+        
+        console.log('Column indices:', idx);
+        
+        // Verify we found required columns
+        if (idx.id < 0 || idx.name < 0 || idx.preis < 0) {
+            console.error('Missing required columns! Found:', idx);
+            throw new Error('CSV fehlt: ID, Artikelname oder Preis Spalte');
         }
+        
+        // Category mapping based on Warengruppe values (1-8)
+        const katMap = {
+            0: 'Sonstiges',
+            1: 'Alkoholfreie Getränke',
+            2: 'Biere',
+            3: 'Wein',
+            4: 'Spirituosen',
+            5: 'Heiße Getränke',
+            6: 'Sonstiges',
+            7: 'Snacks',
+            8: 'Diverses'
+        };
+        const iconMap = {0:'🍽️',1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍿',8:'📦'};
+        
+        let imp=0, upd=0, skip=0;
+        
+        for (let i=1; i<lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            
+            const v = Utils.parseCSVLine(lines[i], ',');
+            
+            // Get ID
+            const id = parseInt(v[idx.id]?.replace(/"/g,''));
+            if (!id || isNaN(id)) { 
+                console.log(`Row ${i}: Skipping - no valid ID`);
+                skip++; 
+                continue; 
+            }
+            
+            // Get name - skip if empty
+            let name = v[idx.name]?.replace(/^"|"$/g,'').trim();
+            if (!name) { 
+                console.log(`Row ${i}: Skipping ID ${id} - no name`);
+                skip++; 
+                continue; 
+            }
+            
+            // Parse price - handle German format "3,90€" or "3,90 €"
+            let preis = 0;
+            if (idx.preis >= 0 && v[idx.preis]) {
+                let preisStr = v[idx.preis]
+                    .replace(/"/g, '')      // Remove quotes
+                    .replace(/€/g, '')      // Remove Euro sign
+                    .replace(/\s/g, '')     // Remove spaces
+                    .trim();
+                // German format: 3,90 -> 3.90
+                preis = parseFloat(preisStr.replace(',', '.')) || 0;
+            }
+            
+            // Skip items with price 0 (inactive/placeholder)
+            if (preis <= 0) {
+                console.log(`Row ${i}: Skipping ID ${id} "${name}" - price is 0`);
+                skip++;
+                continue;
+            }
+            
+            // Get category from Warengruppe
+            let katId = 6; // Default: Sonstiges
+            if (idx.kat >= 0 && v[idx.kat] !== undefined) {
+                katId = parseInt(v[idx.kat]?.replace(/"/g,'')) || 6;
+                if (katId < 0 || katId > 8) katId = 6;
+            }
+            
+            // Get sort order
+            let sort = 0;
+            if (idx.sort >= 0 && v[idx.sort]) {
+                sort = parseInt(v[idx.sort]?.replace(/"/g,'')) || 0;
+            }
+            
+            // Get tax rate
+            let steuer = 10;
+            if (idx.steuer >= 0 && v[idx.steuer]) {
+                steuer = parseInt(v[idx.steuer]?.replace(/"/g,'')) || 10;
+            }
+            
+            // Short name
+            let nameKurz = v[idx.kurz]?.replace(/^"|"$/g,'').trim() || name.substring(0, 15);
+            
+            const data = { 
+                name, 
+                name_kurz: nameKurz, 
+                sku: null,
+                preis, 
+                steuer_prozent: steuer, 
+                kategorie_id: katId, 
+                kategorie_name: katMap[katId] || 'Sonstiges', 
+                aktiv: true,
+                sortierung: sort, 
+                icon: iconMap[katId] || '🍽️' 
+            };
+            
+            console.log(`Row ${i}: ID=${id}, Name="${name}", Preis=${preis}, Kat=${katId}`);
+            
+            // Check if article exists by ID
+            const existing = await this.getById(id);
+            if (existing) { 
+                await db.artikel.update(id, data); 
+                upd++; 
+            } else { 
+                data.artikel_id = id;
+                try {
+                    await db.artikel.add(data); 
+                    imp++; 
+                } catch(e) {
+                    console.error('Import error for ID', id, e);
+                    skip++;
+                }
+            }
+        }
+        
         await DataProtection.createBackup();
-        Utils.showToast(`${imp} neu, ${upd} aktualisiert, ${skip} übersprungen`, 'success');
+        const msg = `✅ ${imp} neu, ${upd} aktualisiert, ${skip} übersprungen`;
+        console.log(msg);
+        Utils.showToast(msg, 'success');
         return {imp, upd, skip};
     },
     async seed() {
