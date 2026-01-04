@@ -838,6 +838,12 @@ window.navigateToProfil = () => {
     Router.navigate('profil');
 };
 
+// Logout handler
+window.handleLogout = () => {
+    console.log('Logout clicked');
+    Auth.logout();
+};
+
 // Menu function
 window.showMenu = () => {
     console.log('Show menu clicked');
@@ -1568,21 +1574,39 @@ Router.register('admin-login', () => {
 
 window.handleAdminLogin = async (event) => {
     event.preventDefault();
+    console.log('=== ADMIN LOGIN ATTEMPT ===');
     const formData = new FormData(event.target);
-    const success = await Auth.adminLogin(formData.get('passwort'));
+    const passwort = formData.get('passwort');
+    console.log('Password length:', passwort?.length);
+    
+    const success = await Auth.adminLogin(passwort);
+    console.log('Admin login success:', success);
+    
     if (success) {
-        Router.navigate('admin-dashboard');
+        console.log('Navigating to admin-dashboard...');
+        setTimeout(() => {
+            Router.navigate('admin-dashboard');
+        }, 500);
     }
 };
 
 // ===== ADMIN DASHBOARD =====
 Router.register('admin-dashboard', async () => {
+    console.log('=== ADMIN DASHBOARD LOADING ===');
+    console.log('isAdmin:', State.isAdmin);
+    
     if (!State.isAdmin) {
+        console.log('Not admin, redirecting to login');
         Router.navigate('admin-login');
         return;
     }
 
-    const gaeste = await db.gaeste.where('aktiv').equals(true).toArray();
+    // Alle Gäste laden und manuell filtern (statt .where)
+    const alleGaeste = await db.gaeste.toArray();
+    const gaeste = alleGaeste.filter(g => g.aktiv === true && !g.checked_out);
+    
+    console.log('Active guests:', gaeste.length);
+    
     const buchungen = await Buchungen.getAll();
     const nichtExportiert = await Buchungen.getAll({ exportiert: false });
     
@@ -1590,13 +1614,15 @@ Router.register('admin-dashboard', async () => {
     const heuteBuchungen = buchungen.filter(b => b.datum === heute);
     const heuteUmsatz = heuteBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
 
+    console.log('Rendering admin dashboard...');
+
     UI.render(`
         <div class="app-header">
             <div class="header-left">
                 <div class="header-title">🔧 Admin Dashboard</div>
             </div>
             <div class="header-right">
-                <button class="btn btn-secondary" onclick="Auth.logout()">Abmelden</button>
+                <button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button>
             </div>
         </div>
 
