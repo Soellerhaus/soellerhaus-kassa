@@ -14,6 +14,137 @@ db.version(1).stores({
     exports: '++id, timestamp, anzahl_buchungen'
 });
 
+/* ===== DATENSCHUTZ-SYSTEM ===== */
+// KRITISCH: Verhindert Datenverlust durch Browser-Cache-Löschung
+const DataProtection = {
+    // Backup in localStorage (überlebt Cache-Löschung)
+    async createBackup() {
+        try {
+            const data = {
+                gaeste: await db.gaeste.toArray(),
+                buchungen: await db.buchungen.toArray(),
+                timestamp: Date.now(),
+                version: '1.0'
+            };
+            localStorage.setItem('kassa_backup', JSON.stringify(data));
+            localStorage.setItem('kassa_backup_timestamp', Date.now().toString());
+            console.log('🔄 Auto-Backup:', data.gaeste.length, 'Gäste,', data.buchungen.length, 'Buchungen');
+            return true;
+        } catch (error) {
+            console.error('Backup-Fehler:', error);
+            return false;
+        }
+    },
+
+    // Daten wiederherstellen wenn IndexedDB leer ist
+    async restoreIfNeeded() {
+        try {
+            const gaesteCount = await db.gaeste.count();
+            
+            if (gaesteCount === 0) {
+                console.log('⚠️ IndexedDB leer - prüfe Backup...');
+                const backupStr = localStorage.getItem('kassa_backup');
+                
+                if (backupStr) {
+                    const backup = JSON.parse(backupStr);
+                    console.log('✅ Backup gefunden:', new Date(backup.timestamp).toLocaleString());
+                    console.log('📦 Wiederherstelle:', backup.gaeste.length, 'Gäste,', backup.buchungen.length, 'Buchungen');
+                    
+                    // Gäste wiederherstellen
+                    for (const gast of backup.gaeste) {
+                        await db.gaeste.add(gast);
+                    }
+                    
+                    // Buchungen wiederherstellen
+                    for (const buchung of backup.buchungen) {
+                        await db.buchungen.add(buchung);
+                    }
+                    
+                    console.log('✅ DATEN WIEDERHERGESTELLT!');
+                    setTimeout(() => {
+                        if (typeof Utils !== 'undefined' && Utils.showToast) {
+                            Utils.showToast('Daten erfolgreich wiederhergestellt!', 'success');
+                        }
+                    }, 1000);
+                    return true;
+                }
+            }
+            return false;
+        } catch (error) {
+            console.error('Wiederherstellungs-Fehler:', error);
+            return false;
+        }
+    },
+
+    // Persistent Storage anfordern (Chrome, Edge)
+    async requestPersistentStorage() {
+        if (navigator.storage && navigator.storage.persist) {
+            try {
+                const isPersisted = await navigator.storage.persist();
+                console.log(isPersisted ? '✅ Persistent Storage aktiv' : '⚠️ Persistent Storage nicht gewährt');
+                return isPersisted;
+            } catch (error) {
+                console.error('Persistent Storage Fehler:', error);
+                return false;
+            }
+        }
+        return false;
+    },
+
+    // Manueller Export als JSON-Download
+    async manualExport() {
+        try {
+            const data = {
+                gaeste: await db.gaeste.toArray(),
+                buchungen: await db.buchungen.toArray(),
+                artikel: await db.artikel.toArray(),
+                kategorien: await db.kategorien.toArray(),
+                exportDatum: new Date().toISOString(),
+                version: '1.0'
+            };
+            
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `kassa_backup_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Backup heruntergeladen!', 'success');
+            }
+            return true;
+        } catch (error) {
+            console.error('Export-Fehler:', error);
+            return false;
+        }
+    }
+};
+
+// Beim App-Start: Daten schützen & wiederherstellen
+db.open().then(async () => {
+    console.log('=== 🔒 DATENSCHUTZ-SYSTEM AKTIV ===');
+    
+    // 1. Persistent Storage anfordern
+    await DataProtection.requestPersistentStorage();
+    
+    // 2. Prüfen ob Wiederherstellung nötig
+    await DataProtection.restoreIfNeeded();
+    
+    // 3. Initiales Backup erstellen
+    await DataProtection.createBackup();
+    
+    // 4. Status anzeigen
+    const gaesteCount = await db.gaeste.count();
+    const buchungenCount = await db.buchungen.count();
+    console.log('📊 Datenbank:', gaesteCount, 'Gäste,', buchungenCount, 'Buchungen');
+    console.log('=== ✅ DATEN SIND GESCHÜTZT ===');
+}).catch(err => {
+    console.error('❌ Datenbank-Fehler:', err);
+});
+
 /* ===== UTILITY FUNCTIONS ===== */
 const Utils = {
     // UUID Generator
@@ -219,6 +350,10 @@ const Auth = {
 
             await db.gaeste.add(gast);
             console.log('Gast successfully added to database!');
+            
+            // WICHTIG: Backup nach Registrierung
+            await DataProtection.createBackup();
+            
             Utils.showToast('Account erfolgreich erstellt!', 'success');
             return gast;
         } catch (error) {
@@ -1651,6 +1786,16 @@ Router.register('admin-dashboard', async () => {
                     <h2 class="card-title">🔄 Daten-Management</h2>
                 </div>
                 <div class="card-body">
+                    <div style="padding: 16px; background: var(--color-success-light, #e8f5e9); border-radius: var(--radius-md); margin-bottom: 16px; border: 2px solid var(--color-success, #4caf50);">
+                        <h3 style="font-weight: 600; margin-bottom: 8px;">💾 Backup erstellen (WICHTIG!)</h3>
+                        <p style="color: var(--color-stone-dark); margin-bottom: 12px;">
+                            Daten als JSON-Datei herunterladen. Sicher aufbewahren!
+                        </p>
+                        <button class="btn btn-primary" onclick="handleManualBackup()" style="background: var(--color-success, #4caf50);">
+                            🔒 Backup jetzt herunterladen
+                        </button>
+                    </div>
+
                     <div style="padding: 16px; background: var(--color-stone-light); border-radius: var(--radius-md); margin-bottom: 16px;">
                         <h3 style="font-weight: 600; margin-bottom: 8px;">📤 Buchungen exportieren</h3>
                         <p style="color: var(--color-stone-dark); margin-bottom: 12px;">
@@ -1732,6 +1877,15 @@ window.searchArtikel = Utils.debounce(async (query) => {
     // Implement search functionality
     console.log('Searching for:', query);
 }, 300);
+
+// Manual Backup Handler
+window.handleManualBackup = async () => {
+    console.log('Manual backup requested');
+    const success = await DataProtection.manualExport();
+    if (success) {
+        console.log('✅ Backup download successful');
+    }
+};
 
 window.handleExportBuchungen = async () => {
     await ExportService.exportBuchungenCSV();
