@@ -99,16 +99,40 @@ const State = {
     warenkorb: [],
     selectedCategory: null,
     isAdmin: false,
+    currentPin: '',
+    inactivityTimer: null,
+    inactivityTimeout: 20000, // 20 Sekunden
 
     setUser(user) {
         this.currentUser = user;
         localStorage.setItem('current_user_id', user.gast_id);
+        this.resetInactivityTimer();
     },
 
     clearUser() {
         this.currentUser = null;
+        this.currentPin = '';
         localStorage.removeItem('current_user_id');
         localStorage.removeItem('remember_me');
+        this.clearInactivityTimer();
+    },
+
+    resetInactivityTimer() {
+        this.clearInactivityTimer();
+        if (this.currentUser && this.currentPage !== 'login' && this.currentPage !== 'register') {
+            this.inactivityTimer = setTimeout(() => {
+                console.log('Auto-Logout: 20 Sekunden Inaktivität');
+                Utils.showToast('Automatischer Logout nach Inaktivität', 'info');
+                Auth.logout();
+            }, this.inactivityTimeout);
+        }
+    },
+
+    clearInactivityTimer() {
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+            this.inactivityTimer = null;
+        }
     },
 
     addToWarenkorb(artikel, menge = 1) {
@@ -119,6 +143,7 @@ const State = {
             this.warenkorb.push({ ...artikel, menge });
         }
         this.updateWarenkorbUI();
+        this.resetInactivityTimer();
     },
 
     removeFromWarenkorb(artikel_id) {
@@ -132,7 +157,6 @@ const State = {
     },
 
     updateWarenkorbUI() {
-        // Will be implemented in UI section
         if (typeof UI !== 'undefined' && UI.renderWarenkorb) {
             UI.renderWarenkorb();
         }
@@ -143,36 +167,41 @@ const State = {
     }
 };
 
+// Inaktivitäts-Tracking auf allen Interaktionen
+['click', 'touchstart', 'touchmove', 'keydown', 'mousemove', 'scroll'].forEach(event => {
+    document.addEventListener(event, () => {
+        if (State.currentUser) {
+            State.resetInactivityTimer();
+        }
+    }, { passive: true });
+});
+
 /* ===== AUTH SERVICE ===== */
 const Auth = {
-    async register(nachname, vorname, zimmernummer, passwort) {
+    async register(vorname, pin) {
         try {
             // Validate
-            if (!nachname || !passwort) {
-                throw new Error('Nachname und Passwort sind erforderlich');
+            if (!vorname || !vorname.trim()) {
+                throw new Error('Vorname ist erforderlich');
             }
 
-            if (passwort.length < 6) {
-                throw new Error('Passwort muss mindestens 6 Zeichen lang sein');
+            if (!pin || pin.length < 1 || pin.length > 6) {
+                throw new Error('PIN muss 1-6 Ziffern lang sein');
             }
 
-            // Check if user exists
-            const existing = await db.gaeste
-                .where('nachname').equalsIgnoreCase(nachname)
-                .and(g => g.zimmernummer === zimmernummer)
-                .first();
-
-            if (existing) {
-                throw new Error('Ein Gast mit diesem Namen und Zimmer existiert bereits');
+            if (!/^\d+$/.test(pin)) {
+                throw new Error('PIN darf nur Ziffern enthalten');
             }
 
-            // Create user
+            const vornameClean = vorname.trim();
+
+            // Create user - doppelte Vornamen sind erlaubt
             const gast = {
                 gast_id: Utils.uuid(),
-                nachname: nachname.trim(),
-                vorname: vorname?.trim() || '',
-                zimmernummer: zimmernummer?.trim() || '',
-                passwort_hash: await Utils.hashPassword(passwort, nachname),
+                vorname: vornameClean,
+                nachname: '', // Leer lassen
+                zimmernummer: '', // Leer lassen
+                passwort_hash: await Utils.hashPassword(pin, vornameClean),
                 aktiv: true,
                 checked_out: false,
                 anreise_datum: Utils.formatDate(new Date()),
@@ -188,11 +217,9 @@ const Auth = {
         }
     },
 
-    async login(nachname, passwort, rememberMe = false) {
+    async login(gast_id, pin) {
         try {
-            const gast = await db.gaeste
-                .where('nachname').equalsIgnoreCase(nachname.trim())
-                .first();
+            const gast = await db.gaeste.get(gast_id);
 
             if (!gast) {
                 throw new Error('Gast nicht gefunden');
@@ -202,17 +229,13 @@ const Auth = {
                 throw new Error('Ihr Account wurde ausgecheckt. Bitte wenden Sie sich an die Rezeption.');
             }
 
-            const hash = await Utils.hashPassword(passwort, gast.nachname);
+            const hash = await Utils.hashPassword(pin, gast.vorname);
             if (hash !== gast.passwort_hash) {
-                throw new Error('Falsches Passwort');
+                throw new Error('Falsche PIN');
             }
 
             State.setUser(gast);
-            if (rememberMe) {
-                localStorage.setItem('remember_me', 'true');
-            }
-
-            Utils.showToast(`Willkommen zurück, ${gast.vorname || gast.nachname}!`, 'success');
+            Utils.showToast(`Willkommen zurück, ${gast.vorname}!`, 'success');
             return gast;
         } catch (error) {
             Utils.showToast(error.message, 'error');
@@ -220,18 +243,42 @@ const Auth = {
         }
     },
 
-    // ✅ FIX: Admin-Login wird in sessionStorage gemerkt
+    async getGaesteByLetter(letter) {
+        try {
+            const gaeste = await db.gaeste
+                .where('aktiv').equals(true)
+                .and(g => !g.checked_out && g.vorname.toUpperCase().startsWith(letter.toUpperCase()))
+                .toArray();
+
+            // Sortieren und Duplikate mit Nummerierung versehen
+            const sortedGaeste = gaeste.sort((a, b) => 
+                a.vorname.localeCompare(b.vorname) || 
+                new Date(a.erstellt_am) - new Date(b.erstellt_am)
+            );
+
+            // Zähle Duplikate
+            const nameCount = {};
+            const result = sortedGaeste.map(gast => {
+                const name = gast.vorname;
+                nameCount[name] = (nameCount[name] || 0) + 1;
+                const displayName = nameCount[name] > 1 ? `${name} (${nameCount[name]})` : name;
+                return { ...gast, displayName };
+            });
+
+            return result;
+        } catch (error) {
+            console.error('Fehler beim Laden der Gäste:', error);
+            return [];
+        }
+    },
+
     async adminLogin(passwort) {
         const settings = await db.settings.get('admin_password');
-        const storedHash = settings?.value || await Utils.hashPassword('admin123'); // Default password
+        const storedHash = settings?.value || await Utils.hashPassword('admin123');
 
         const hash = await Utils.hashPassword(passwort);
         if (hash === storedHash) {
             State.isAdmin = true;
-
-            // ✅ Admin-Status für diese Browser-Session merken
-            sessionStorage.setItem('is_admin', '1');
-
             Utils.showToast('Admin-Login erfolgreich', 'success');
             return true;
         } else {
@@ -240,14 +287,10 @@ const Auth = {
         }
     },
 
-    // ✅ FIX: Logout löscht Admin-Session
     logout() {
         State.clearUser();
         State.isAdmin = false;
-
-        // ✅ Admin-Session löschen
-        sessionStorage.removeItem('is_admin');
-
+        State.currentPin = '';
         Router.navigate('login');
         Utils.showToast('Erfolgreich abgemeldet', 'info');
     },
@@ -338,32 +381,38 @@ const Buchungen = {
             query = query.filter(b => b.exportiert === filter.exportiert);
         }
 
-        return await query.toArray();
+        if (filter.datum) {
+            query = query.filter(b => b.datum === filter.datum);
+        }
+
+        return await query.reverse().toArray();
     },
 
     async markAsExported(buchung_ids) {
-        try {
-            for (const id of buchung_ids) {
-                await db.buchungen.update(id, { exportiert: true, sync_status: 'exported' });
-            }
-        } catch (error) {
-            console.error('Fehler beim Markieren als exportiert:', error);
-            throw error;
-        }
+        await db.buchungen.bulkUpdate(
+            buchung_ids.map(id => ({ key: id, changes: { exportiert: true, exportiert_am: new Date().toISOString() } }))
+        );
     }
 };
 
 /* ===== ARTIKEL SERVICE ===== */
 const Artikel = {
-    async getAll() {
-        return await db.artikel.where('aktiv').equals(true).toArray();
+    async getAll(filter = {}) {
+        let query = db.artikel.toCollection();
+
+        if (filter.aktiv !== undefined) {
+            query = query.filter(a => a.aktiv === filter.aktiv);
+        }
+
+        if (filter.kategorie_id) {
+            query = query.filter(a => a.kategorie_id === filter.kategorie_id);
+        }
+
+        return await query.sortBy('sortierung');
     },
 
-    async getByKategorie(kategorie_id) {
-        return await db.artikel
-            .where('kategorie_id').equals(kategorie_id)
-            .and(a => a.aktiv === true)
-            .sortBy('sortierung');
+    async getById(artikel_id) {
+        return await db.artikel.get(artikel_id);
     },
 
     async importFromCSV(csvText) {
@@ -371,45 +420,52 @@ const Artikel = {
             const lines = csvText.trim().split('\n');
             const headers = lines[0].split(',').map(h => h.trim());
 
-            // Expect: artikel_id,kategorie_id,name,name_kurz,preis,steuer_prozent,kategorie_name,aktiv,sortierung,icon
-            const artikelList = [];
-
+            const artikel = [];
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                const row = {};
-                headers.forEach((h, idx) => row[h] = values[idx]);
+                const obj = {};
+                headers.forEach((header, index) => {
+                    obj[header] = values[index];
+                });
 
-                artikelList.push({
-                    artikel_id: parseInt(row.artikel_id, 10),
-                    kategorie_id: parseInt(row.kategorie_id, 10),
-                    name: row.name,
-                    name_kurz: row.name_kurz || row.name,
-                    preis: parseFloat(row.preis),
-                    steuer_prozent: parseInt(row.steuer_prozent || '10', 10),
-                    kategorie_name: row.kategorie_name || '',
-                    aktiv: row.aktiv === 'true' || row.aktiv === '1' || row.aktiv === true,
-                    sortierung: parseInt(row.sortierung || '0', 10),
-                    icon: row.icon || ''
+                artikel.push({
+                    artikel_id: parseInt(obj.artikel_id),
+                    name: obj.name,
+                    name_kurz: obj.name_kurz || obj.name,
+                    preis: parseFloat(obj.preis),
+                    steuer_prozent: parseFloat(obj.steuer_prozent || 10),
+                    kategorie_id: parseInt(obj.kategorie_id),
+                    kategorie_name: obj.kategorie_name,
+                    aktiv: obj.aktiv === '1' || obj.aktiv === 'true',
+                    sortierung: parseInt(obj.sortierung || 0),
+                    icon: obj.icon || '🍽️'
                 });
             }
 
+            // Clear and re-add
             await db.artikel.clear();
-            await db.artikel.bulkAdd(artikelList);
-            Utils.showToast(`${artikelList.length} Artikel importiert`, 'success');
+            await db.artikel.bulkAdd(artikel);
+
+            Utils.showToast(`${artikel.length} Artikel importiert`, 'success');
+            return artikel;
         } catch (error) {
-            Utils.showToast('Artikel-Import Fehler: ' + error.message, 'error');
+            Utils.showToast('Fehler beim Import: ' + error.message, 'error');
             throw error;
         }
     },
 
     async seed() {
-        // Default articles (kann später per CSV überschrieben werden)
+        // Seed some default articles for testing
         const defaultArtikel = [
-            { artikel_id: 1, kategorie_id: 1, name: 'Apfelsaftschorle', name_kurz: 'Apfelsaft-', preis: 1.60, steuer_prozent: 10, kategorie_name: 'Alkoholfreie Getränke', aktiv: true, sortierung: 10, icon: '🍎' },
-            { artikel_id: 2, kategorie_id: 1, name: 'Orangensaft 1,0 L', name_kurz: 'Orangen-', preis: 4.00, steuer_prozent: 10, kategorie_name: 'Alkoholfreie Getränke', aktiv: true, sortierung: 20, icon: '🍊' },
-            { artikel_id: 3, kategorie_id: 2, name: 'Pils 0,33 L', name_kurz: 'Pils', preis: 2.00, steuer_prozent: 20, kategorie_name: 'Biere', aktiv: true, sortierung: 10, icon: '🍺' },
-            { artikel_id: 4, kategorie_id: 6, name: 'Kaffee', name_kurz: 'Kaffee', preis: 3.20, steuer_prozent: 10, kategorie_name: 'Heiße Getränke', aktiv: true, sortierung: 10, icon: '☕' },
-            { artikel_id: 5, kategorie_id: 6, name: 'Tee', name_kurz: 'Tee', preis: 3.20, steuer_prozent: 10, kategorie_name: 'Heiße Getränke', aktiv: true, sortierung: 20, icon: '🍵' }
+            { artikel_id: 101, name: 'Almdudler 0.5l', name_kurz: 'Almdudler', preis: 3.50, steuer_prozent: 10, kategorie_id: 1, kategorie_name: 'Alkoholfreie Getränke', aktiv: true, sortierung: 10, icon: '🥤' },
+            { artikel_id: 102, name: 'Coca Cola 0.33l', name_kurz: 'Cola', preis: 3.00, steuer_prozent: 10, kategorie_id: 1, kategorie_name: 'Alkoholfreie Getränke', aktiv: true, sortierung: 20, icon: '🥤' },
+            { artikel_id: 201, name: 'Zipfer Märzen 0.5l', name_kurz: 'Zipfer', preis: 4.20, steuer_prozent: 10, kategorie_id: 2, kategorie_name: 'Biere', aktiv: true, sortierung: 10, icon: '🍺' },
+            { artikel_id: 202, name: 'Stiegl Goldbräu 0.5l', name_kurz: 'Stiegl', preis: 4.20, steuer_prozent: 10, kategorie_id: 2, kategorie_name: 'Biere', aktiv: true, sortierung: 20, icon: '🍺' },
+            { artikel_id: 301, name: 'Grüner Veltliner 0.25l', name_kurz: 'Grüner V.', preis: 4.80, steuer_prozent: 10, kategorie_id: 3, kategorie_name: 'Wein Weiß', aktiv: true, sortierung: 10, icon: '🍷' },
+            { artikel_id: 401, name: 'Zweigelt 0.25l', name_kurz: 'Zweigelt', preis: 5.20, steuer_prozent: 10, kategorie_id: 4, kategorie_name: 'Wein Rot', aktiv: true, sortierung: 10, icon: '🍷' },
+            { artikel_id: 501, name: 'Obstler 2cl', name_kurz: 'Obstler', preis: 3.50, steuer_prozent: 10, kategorie_id: 5, kategorie_name: 'Schnäpse', aktiv: true, sortierung: 10, icon: '🥃' },
+            { artikel_id: 601, name: 'Kaffee groß', name_kurz: 'Kaffee', preis: 3.50, steuer_prozent: 10, kategorie_id: 6, kategorie_name: 'Heiße Getränke', aktiv: true, sortierung: 10, icon: '☕' },
+            { artikel_id: 602, name: 'Tee', name_kurz: 'Tee', preis: 3.20, steuer_prozent: 10, kategorie_id: 6, kategorie_name: 'Heiße Getränke', aktiv: true, sortierung: 20, icon: '🍵' }
         ];
 
         const count = await db.artikel.count();
@@ -477,114 +533,863 @@ const ExportService = {
 
 /* ===== ROUTER ===== */
 const Router = {
-  routes: {},
+    routes: {},
 
-  init() {
-    window.addEventListener('hashchange', () => this.handleRoute());
-    this.handleRoute();
-  },
+    init() {
+        window.addEventListener('popstate', () => this.handleRoute());
+        this.handleRoute();
+    },
 
-  register(path, handler) {
-    this.routes[path] = handler;
-  },
+    register(path, handler) {
+        this.routes[path] = handler;
+    },
 
-  navigate(path) {
-    location.hash = `#${path}`;
-  },
+    navigate(path) {
+        history.pushState({}, '', `#${path}`);
+        this.handleRoute();
+    },
 
-  async handleRoute() {
-    const path = location.hash.slice(1) || 'login';
-    const handler = this.routes[path] || this.routes['login'];
-    State.currentPage = path;
-
-    try {
-      await handler();
-    } catch (err) {
-      console.error('Route error in', path, err);
-      Utils.showToast(`Fehler in "${path}": ${err?.message || err}`, 'error');
-      if (path !== 'login') location.hash = '#login';
+    handleRoute() {
+        const path = location.hash.slice(1) || 'login';
+        const handler = this.routes[path] || this.routes['login'];
+        State.currentPage = path;
+        if (handler) {
+            handler();
+        }
     }
-  }
 };
 
-
-/* ===== UI RENDERER ===== */
+/* ===== UI COMPONENTS ===== */
 const UI = {
     render(html) {
         document.getElementById('app').innerHTML = html;
+    },
+
+    renderPinPad(onComplete, onCancel = null, title = 'PIN eingeben') {
+        const pinDisplay = State.currentPin.split('').map(() => '●').join('');
+        const pinLength = State.currentPin.length;
+
+        return `
+            <div class="pin-pad-container">
+                <div class="pin-pad-title">${title}</div>
+                <div class="pin-display">
+                    <div class="pin-dots">${pinDisplay || '───'}</div>
+                    <div class="pin-length">${pinLength} / 6</div>
+                </div>
+                <div class="pin-buttons">
+                    ${[1,2,3,4,5,6,7,8,9].map(n => `
+                        <button class="pin-btn" onclick="handlePinInput('${n}')">${n}</button>
+                    `).join('')}
+                    <button class="pin-btn pin-btn-delete" onclick="handlePinDelete()">
+                        <span style="font-size: 1.5rem;">⌫</span>
+                    </button>
+                    <button class="pin-btn" onclick="handlePinInput('0')">0</button>
+                    <button class="pin-btn pin-btn-ok" onclick="${onComplete}">
+                        <span style="font-size: 1.2rem;">✓ OK</span>
+                    </button>
+                </div>
+                ${onCancel ? `
+                    <button class="btn btn-secondary btn-block mt-2" onclick="${onCancel}" style="max-width: 400px; margin: 16px auto 0;">
+                        Abbrechen
+                    </button>
+                ` : ''}
+            </div>
+        `;
+    },
+
+    renderAlphabet(onLetterClick) {
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        return `
+            <div class="alphabet-container">
+                <div class="alphabet-title">Wählen Sie den ersten Buchstaben:</div>
+                <div class="alphabet-grid">
+                    ${alphabet.map(letter => `
+                        <button class="alphabet-btn" onclick="${onLetterClick}('${letter}')">
+                            ${letter}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    },
+
+    renderNameList(gaeste, onSelectGast) {
+        if (!gaeste || gaeste.length === 0) {
+            return `
+                <div class="name-list-empty">
+                    <p>Keine Einträge gefunden</p>
+                    <button class="btn btn-secondary btn-block" onclick="Router.navigate('login')">
+                        Zurück
+                    </button>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="name-list-container">
+                <div class="name-list-title">Wählen Sie Ihren Namen:</div>
+                <div class="name-list">
+                    ${gaeste.map(gast => `
+                        <button class="name-list-item" onclick="${onSelectGast}('${gast.gast_id}')">
+                            <span class="name-text">${gast.displayName}</span>
+                            <span class="name-arrow">→</span>
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="btn btn-secondary btn-block mt-3" onclick="Router.navigate('login')">
+                    Zurück
+                </button>
+            </div>
+        `;
+    },
+
+    renderQuantityPad(artikel, onComplete, onCancel) {
+        return `
+            <div class="modal-container active" id="quantity-modal">
+                <div class="modal-backdrop" onclick="${onCancel}"></div>
+                <div class="modal-content" style="max-width: 400px;">
+                    <h2 style="margin-bottom: 1rem;">${artikel.name}</h2>
+                    <p style="margin-bottom: 1.5rem; color: var(--color-stone-dark);">
+                        Preis: ${Utils.formatCurrency(artikel.preis)}
+                    </p>
+                    
+                    <div class="quantity-display">
+                        <div class="quantity-value" id="quantity-value">1</div>
+                        <div class="quantity-label">Anzahl</div>
+                    </div>
+
+                    <div class="pin-buttons" style="margin-bottom: 1rem;">
+                        ${[1,2,3,4,5,6,7,8,9].map(n => `
+                            <button class="pin-btn" onclick="handleQuantityInput('${n}')">${n}</button>
+                        `).join('')}
+                        <button class="pin-btn pin-btn-delete" onclick="handleQuantityDelete()">
+                            <span style="font-size: 1.5rem;">⌫</span>
+                        </button>
+                        <button class="pin-btn" onclick="handleQuantityInput('0')">0</button>
+                        <button class="pin-btn" style="visibility: hidden;"></button>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="btn btn-secondary" style="flex: 1;" onclick="${onCancel}">
+                            Abbrechen
+                        </button>
+                        <button class="btn btn-primary" style="flex: 1;" onclick="${onComplete}">
+                            Hinzufügen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    renderWarenkorb() {
+        const container = document.querySelector('.warenkorb');
+        if (!container || State.warenkorb.length === 0) {
+            if (container) container.remove();
+            return;
+        }
+
+        const total = State.getWarenkorbTotal();
+        const itemsHTML = State.warenkorb.map(item => `
+            <div class="warenkorb-item">
+                <span>${item.name_kurz || item.name} × ${item.menge}</span>
+                <span>${Utils.formatCurrency(item.preis * item.menge)}</span>
+            </div>
+        `).join('');
+
+        container.innerHTML = `
+            <div class="warenkorb-header">
+                <div class="warenkorb-title">🛒 Warenkorb (${State.warenkorb.length})</div>
+                <button class="btn-icon" onclick="State.clearWarenkorb()">✕</button>
+            </div>
+            <div class="warenkorb-items">${itemsHTML}</div>
+            <div class="warenkorb-total">
+                <span>Gesamt:</span>
+                <span>${Utils.formatCurrency(total)}</span>
+            </div>
+            <button class="btn btn-primary btn-block" onclick="handleBuchen()">Jetzt buchen</button>
+        `;
     }
 };
 
-// ===== LOGIN PAGE =====
+/* ===== PAGE HANDLERS ===== */
+
+// Login Page
 Router.register('login', () => {
     UI.render(`
         <div class="main-content">
-            <div style="max-width: 420px; margin: 60px auto;">
-                <h1 class="page-title" style="text-align:center;">Seollerhaus Kassa</h1>
-                <p style="text-align:center; color: var(--color-slate); margin-bottom: 30px;">Self-Service Buchung</p>
+            <div style="text-align: center; margin-top: 40px;">
+                <div class="mountain-logo" style="margin: 0 auto 24px;">
+                    <svg viewBox="0 0 100 60" class="mountain-svg" style="width: 120px; height: 72px; color: var(--color-mountain-blue);">
+                        <path d="M0,60 L20,30 L35,45 L50,15 L65,40 L80,25 L100,60 Z" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h1 style="font-family: var(--font-display); font-size: var(--text-3xl); margin-bottom: 8px;">Seollerhaus Kassa</h1>
+                <p style="color: var(--color-stone-dark); margin-bottom: 40px;">Self-Service Buchung</p>
 
-                <form onsubmit="handleLogin(event)">
-                    <div class="form-group">
-                        <label class="form-label">Nachname</label>
-                        <input type="text" name="nachname" class="form-input" required autocomplete="family-name">
+                <div style="max-width: 600px; margin: 0 auto;">
+                    ${UI.renderAlphabet('handleLetterSelect')}
+
+                    <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--color-stone-medium);">
+                        <p style="color: var(--color-stone-dark); margin-bottom: 16px;">Noch kein Account?</p>
+                        <button class="btn btn-primary btn-block" style="max-width: 400px; margin: 0 auto;" onclick="Router.navigate('register')">
+                            Neu registrieren
+                        </button>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Passwort</label>
-                        <input type="password" name="passwort" class="form-input" required>
+
+                    <div style="margin-top: 24px;">
+                        <button class="btn btn-secondary" onclick="Router.navigate('admin-login')" style="font-size: 0.9rem;">
+                            Admin-Login
+                        </button>
                     </div>
-
-                    <div class="form-group" style="display:flex; align-items:center; gap:10px;">
-                        <input type="checkbox" id="remember" name="remember">
-                        <label for="remember" class="text-muted" style="margin:0;">Passwort merken</label>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
-
-                    <div style="height: 16px;"></div>
-                    <div style="text-align:center; color: #9aa4b2;">Noch kein Account?</div>
-                    <button type="button" class="btn btn-secondary btn-block mt-2" onclick="Router.navigate('register')">Jetzt registrieren</button>
-
-                    <div style="height: 10px;"></div>
-                    <button type="button" class="btn btn-secondary btn-block mt-2" onclick="Router.navigate('admin-login')">Admin-Login</button>
-                </form>
+                </div>
             </div>
         </div>
     `);
 });
 
-// ===== REGISTER PAGE =====
-Router.register('register', () => {
+// Name Selection Page
+Router.register('name-select', async () => {
+    if (!window.currentLetter) {
+        Router.navigate('login');
+        return;
+    }
+
+    const gaeste = await Auth.getGaesteByLetter(window.currentLetter);
+
     UI.render(`
         <div class="main-content">
-            <div style="max-width: 420px; margin: 40px auto;">
-                <h1 class="page-title">Registrieren</h1>
+            <div style="max-width: 600px; margin: 40px auto;">
+                <h1 class="page-title" style="text-align: center;">
+                    Buchstabe: ${window.currentLetter}
+                </h1>
+                ${UI.renderNameList(gaeste, 'handleNameSelect')}
+            </div>
+        </div>
+    `);
+});
 
-                <form onsubmit="handleRegister(event)">
+// PIN Entry Page
+Router.register('pin-entry', () => {
+    if (!window.selectedGastId) {
+        Router.navigate('login');
+        return;
+    }
+
+    UI.render(`
+        <div class="main-content">
+            <div style="max-width: 500px; margin: 60px auto;">
+                ${UI.renderPinPad('handlePinLogin', 'handlePinCancel', 'PIN eingeben')}
+            </div>
+        </div>
+    `);
+});
+
+// Register Page
+Router.register('register', () => {
+    State.currentPin = '';
+    UI.render(`
+        <div class="main-content">
+            <div style="max-width: 500px; margin: 40px auto;">
+                <h1 class="page-title" style="text-align: center;">Neu registrieren</h1>
+                
+                <form id="register-form" onsubmit="handleRegisterSubmit(event)">
                     <div class="form-group">
-                        <label class="form-label">Nachname *</label>
-                        <input type="text" name="nachname" class="form-input" required autocomplete="family-name">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Vorname</label>
-                        <input type="text" name="vorname" class="form-input" autocomplete="given-name">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Zimmernummer</label>
-                        <input type="text" name="zimmernummer" class="form-input" placeholder="z.B. 12">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Passwort *</label>
-                        <input type="password" name="passwort" class="form-input" minlength="6" required>
-                        <small class="text-muted">Mindestens 6 Zeichen</small>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Passwort wiederholen *</label>
-                        <input type="password" name="passwort2" class="form-input" minlength="6" required>
+                        <label class="form-label">Vorname *</label>
+                        <input type="text" 
+                               id="register-vorname" 
+                               name="vorname" 
+                               class="form-input" 
+                               placeholder="z.B. Maria" 
+                               required 
+                               autofocus
+                               style="font-size: 1.2rem; padding: 16px;">
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-block">Account erstellen</button>
-                    <button type="button" class="btn btn-secondary btn-block mt-2" onclick="Router.navigate('login')">Zurück zum Login</button>
+                    <div style="margin-top: 32px; padding: 24px; background: var(--color-stone-light); border-radius: var(--radius-lg);">
+                        ${UI.renderPinPad('handleRegisterPinComplete', null, 'PIN festlegen (1-6 Ziffern)')}
+                    </div>
                 </form>
+
+                <button class="btn btn-secondary btn-block mt-3" onclick="Router.navigate('login')">
+                    Zurück zum Login
+                </button>
+            </div>
+        </div>
+    `);
+});
+
+// Dashboard Page (Continued in next file due to length...)
+
+/* ===== GLOBAL EVENT HANDLERS ===== */
+
+// PIN Input Handlers
+window.handlePinInput = (digit) => {
+    if (State.currentPin.length < 6) {
+        State.currentPin += digit;
+        Router.handleRoute(); // Re-render to update display
+    }
+};
+
+window.handlePinDelete = () => {
+    State.currentPin = State.currentPin.slice(0, -1);
+    Router.handleRoute(); // Re-render to update display
+};
+
+window.handlePinCancel = () => {
+    State.currentPin = '';
+    window.selectedGastId = null;
+    Router.navigate('login');
+};
+
+// Alphabet / Name Selection Handlers
+window.handleLetterSelect = async (letter) => {
+    window.currentLetter = letter;
+    Router.navigate('name-select');
+};
+
+window.handleNameSelect = (gast_id) => {
+    window.selectedGastId = gast_id;
+    State.currentPin = '';
+    Router.navigate('pin-entry');
+};
+
+// Login Handler
+window.handlePinLogin = async () => {
+    if (State.currentPin.length < 1) {
+        Utils.showToast('Bitte PIN eingeben', 'warning');
+        return;
+    }
+
+    try {
+        await Auth.login(window.selectedGastId, State.currentPin);
+        State.currentPin = '';
+        window.selectedGastId = null;
+        window.currentLetter = null;
+        Router.navigate('dashboard');
+    } catch (error) {
+        State.currentPin = '';
+        Router.handleRoute(); // Re-render to clear PIN display
+    }
+};
+
+// Register Handlers
+window.handleRegisterSubmit = (event) => {
+    event.preventDefault();
+    // Validation happens in handleRegisterPinComplete
+};
+
+window.handleRegisterPinComplete = async () => {
+    const vorname = document.getElementById('register-vorname')?.value;
+
+    if (!vorname || !vorname.trim()) {
+        Utils.showToast('Bitte Vorname eingeben', 'warning');
+        return;
+    }
+
+    if (State.currentPin.length < 1 || State.currentPin.length > 6) {
+        Utils.showToast('PIN muss 1-6 Ziffern lang sein', 'warning');
+        return;
+    }
+
+    try {
+        await Auth.register(vorname, State.currentPin);
+        State.currentPin = '';
+        Router.navigate('login');
+    } catch (error) {
+        State.currentPin = '';
+        Router.handleRoute();
+    }
+};
+
+// Long-Press Handler for Artikel
+let longPressTimer = null;
+let longPressTriggered = false;
+let currentArtikelId = null;
+
+window.handleArtikelPointerDown = (event, artikel_id) => {
+    event.preventDefault();
+    longPressTriggered = false;
+    currentArtikelId = artikel_id;
+    
+    longPressTimer = setTimeout(async () => {
+        longPressTriggered = true;
+        const artikel = await Artikel.getById(artikel_id);
+        if (artikel) {
+            showQuantityModal(artikel);
+        }
+    }, 700); // 700ms für Long-Press
+};
+
+window.handleArtikelPointerUp = (event) => {
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+
+    // Nur normales Click verarbeiten wenn kein Long-Press
+    if (!longPressTriggered && currentArtikelId) {
+        addArtikel(currentArtikelId);
+    }
+
+    longPressTriggered = false;
+    currentArtikelId = null;
+};
+
+// Quantity Modal
+let currentQuantity = '1';
+
+function showQuantityModal(artikel) {
+    currentQuantity = '1';
+    const modalHTML = UI.renderQuantityPad(
+        artikel,
+        'handleQuantityComplete(' + artikel.artikel_id + ')',
+        'closeQuantityModal()'
+    );
+    
+    const container = document.createElement('div');
+    container.innerHTML = modalHTML;
+    document.body.appendChild(container.firstElementChild);
+}
+
+window.closeQuantityModal = () => {
+    const modal = document.getElementById('quantity-modal');
+    if (modal) modal.remove();
+    currentQuantity = '1';
+};
+
+window.handleQuantityInput = (digit) => {
+    if (currentQuantity === '1' && digit !== '0') {
+        currentQuantity = digit;
+    } else if (currentQuantity.length < 3) {
+        currentQuantity += digit;
+    }
+    document.getElementById('quantity-value').textContent = currentQuantity;
+};
+
+window.handleQuantityDelete = () => {
+    if (currentQuantity.length > 1) {
+        currentQuantity = currentQuantity.slice(0, -1);
+    } else {
+        currentQuantity = '1';
+    }
+    document.getElementById('quantity-value').textContent = currentQuantity;
+};
+
+window.handleQuantityComplete = async (artikel_id) => {
+    const menge = parseInt(currentQuantity);
+    if (menge < 1) {
+        Utils.showToast('Menge muss mindestens 1 sein', 'warning');
+        return;
+    }
+
+    const artikel = await Artikel.getById(artikel_id);
+    if (artikel) {
+        State.addToWarenkorb(artikel, menge);
+        Utils.showToast(`${menge}× ${artikel.name_kurz || artikel.name} zum Warenkorb hinzugefügt`, 'success');
+    }
+
+    closeQuantityModal();
+};
+
+// Original handlers (updated)
+window.addArtikel = async (artikel_id) => {
+    const artikel = await Artikel.getById(artikel_id);
+    State.addToWarenkorb(artikel, 1);
+    Utils.showToast(`${artikel.name_kurz || artikel.name} zum Warenkorb hinzugefügt`, 'success');
+};
+
+window.handleBuchen = async () => {
+    try {
+        await Buchungen.createFromWarenkorb();
+        Router.navigate('dashboard');
+    } catch (error) {
+        // Error handled in Buchungen
+    }
+};
+
+/* ===== APP INITIALIZATION ===== */
+(async function initApp() {
+    // Hide loading screen after short delay
+    setTimeout(() => {
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+    }, 1500);
+
+    // Seed default articles
+    await Artikel.seed();
+
+    // Try auto-login
+    const loggedIn = await Auth.autoLogin();
+    if (loggedIn) {
+        Router.navigate('dashboard');
+    } else {
+        Router.init();
+    }
+})();
+
+// ===== DASHBOARD PAGE =====
+Router.register('dashboard', async () => {
+    if (!State.currentUser) {
+        Router.navigate('login');
+        return;
+    }
+
+    const buchungen = await Buchungen.getByGast(State.currentUser.gast_id, 5);
+    const alleBuchungen = await Buchungen.getByGast(State.currentUser.gast_id);
+    
+    const heute = Utils.formatDate(new Date());
+    const heuteBuchungen = alleBuchungen.filter(b => b.datum === heute);
+    const heuteSum = heuteBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
+    
+    const wocheStart = new Date();
+    wocheStart.setDate(wocheStart.getDate() - 7);
+    const wocheBuchungen = alleBuchungen.filter(b => new Date(b.datum) >= wocheStart);
+    const wocheSum = wocheBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
+    
+    const gesamtSum = alleBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
+
+    const buchungenHTML = buchungen.map(b => `
+        <div class="list-item ${b.exportiert ? 'exportiert' : 'pending'}">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 500;">${b.artikel_name} × ${b.menge}</div>
+                    <small class="text-muted">Heute, ${b.uhrzeit.substring(0, 5)}</small>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-weight: 700; color: var(--color-mountain-blue);">${Utils.formatCurrency(b.preis * b.menge)}</div>
+                    ${b.exportiert ? '<small class="badge badge-success">✓ Gespeichert</small>' : '<small class="badge badge-warning">⏳ Ausstehend</small>'}
+                </div>
+            </div>
+        </div>
+    `).join('') || '<p class="text-muted text-center">Noch keine Buchungen vorhanden</p>';
+
+    UI.render(`
+        <div class="app-header">
+            <div class="header-left">
+                <button class="menu-btn" onclick="showMenu()">☰</button>
+                <div class="header-title">Seollerhaus</div>
+            </div>
+            <div class="header-right">
+                <div class="user-badge">👤 ${State.currentUser.vorname || State.currentUser.nachname}</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <h1 style="font-family: var(--font-display); font-size: var(--text-2xl); margin-bottom: 24px;">
+                Guten Tag, ${State.currentUser.vorname || State.currentUser.nachname}!
+            </h1>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">${heuteBuchungen.length}</div>
+                    <div class="stat-label">Artikel heute</div>
+                    <div style="margin-top: 8px; font-size: var(--text-lg); font-weight: 600;">${Utils.formatCurrency(heuteSum)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${wocheBuchungen.length}</div>
+                    <div class="stat-label">Diese Woche</div>
+                    <div style="margin-top: 8px; font-size: var(--text-lg); font-weight: 600;">${Utils.formatCurrency(wocheSum)}</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">💰 Gesamtsumme (offen)</h2>
+                </div>
+                <div style="text-align: center; padding: 24px;">
+                    <div style="font-family: var(--font-display); font-size: var(--text-4xl); font-weight: 700; color: var(--color-mountain-blue);">
+                        ${Utils.formatCurrency(gesamtSum)}
+                    </div>
+                    <small class="text-muted">seit ${State.currentUser.anreise_datum || 'Ankunft'}</small>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h2 class="card-title">📝 Letzte Buchungen</h2>
+                    <button class="btn btn-secondary" onclick="Router.navigate('historie')">Alle anzeigen</button>
+                </div>
+                <div class="card-body">
+                    ${buchungenHTML}
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item active" onclick="Router.navigate('dashboard')">
+                <div class="nav-icon">🏠</div>
+                <div>Start</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('buchen')">
+                <div class="nav-icon">🍺</div>
+                <div>Buchen</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('historie')">
+                <div class="nav-icon">📋</div>
+                <div>Liste</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('profil')">
+                <div class="nav-icon">👤</div>
+                <div>Profil</div>
+            </div>
+        </div>
+    `);
+});
+
+// ===== BUCHEN PAGE =====
+Router.register('buchen', async () => {
+    if (!State.currentUser) {
+        Router.navigate('login');
+        return;
+    }
+
+    const kategorien = await db.kategorien.toArray();
+    const artikel = await Artikel.getAll({ aktiv: true });
+
+    const kategorieTabs = `
+        <div class="category-tabs">
+            <div class="category-tab ${!State.selectedCategory ? 'active' : ''}" onclick="filterCategory(null)">Alle</div>
+            ${kategorien.map(k => `
+                <div class="category-tab ${State.selectedCategory === k.kategorie_id ? 'active' : ''}" 
+                     onclick="filterCategory(${k.kategorie_id})">
+                    ${k.name}
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    const filteredArtikel = State.selectedCategory 
+        ? artikel.filter(a => a.kategorie_id === State.selectedCategory)
+        : artikel;
+
+    const artikelGrid = `
+        <div class="artikel-grid">
+            ${filteredArtikel.map(a => {
+                const color = getCategoryColor(a.kategorie_id);
+                return `
+                    <div class="artikel-tile" 
+                         style="--tile-color: ${color}" 
+                         data-artikel-id="${a.artikel_id}"
+                         onpointerdown="handleArtikelPointerDown(event, ${a.artikel_id})"
+                         onpointerup="handleArtikelPointerUp(event)"
+                         onpointercancel="handleArtikelPointerUp(event)"
+                         onpointerleave="handleArtikelPointerUp(event)">
+                        <div class="artikel-icon">${a.icon}</div>
+                        <div class="artikel-name">${a.name_kurz || a.name}</div>
+                        <div class="artikel-price">${Utils.formatCurrency(a.preis)}</div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+
+    UI.render(`
+        <div class="app-header">
+            <div class="header-left">
+                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
+                <div class="header-title">Artikel buchen</div>
+            </div>
+            <div class="header-right">
+                <div class="user-badge">👤 ${State.currentUser.vorname}</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="form-group">
+                <input type="text" class="form-input" placeholder="🔍 Artikel suchen..." oninput="searchArtikel(this.value)">
+            </div>
+
+            ${kategorieTabs}
+            ${artikelGrid}
+        </div>
+
+        ${State.warenkorb.length > 0 ? '<div class="warenkorb"></div>' : ''}
+
+        <div class="bottom-nav">
+            <div class="nav-item" onclick="Router.navigate('dashboard')">
+                <div class="nav-icon">🏠</div>
+                <div>Start</div>
+            </div>
+            <div class="nav-item active" onclick="Router.navigate('buchen')">
+                <div class="nav-icon">🍺</div>
+                <div>Buchen</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('historie')">
+                <div class="nav-icon">📋</div>
+                <div>Liste</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('profil')">
+                <div class="nav-icon">👤</div>
+                <div>Profil</div>
+            </div>
+        </div>
+    `);
+
+    UI.renderWarenkorb();
+});
+
+// ===== HISTORIE PAGE =====
+Router.register('historie', async () => {
+    if (!State.currentUser) {
+        Router.navigate('login');
+        return;
+    }
+
+    const buchungen = await Buchungen.getByGast(State.currentUser.gast_id);
+    const total = buchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
+
+    // Group by date
+    const byDate = {};
+    buchungen.forEach(b => {
+        if (!byDate[b.datum]) byDate[b.datum] = [];
+        byDate[b.datum].push(b);
+    });
+
+    const buchungenHTML = Object.keys(byDate).sort().reverse().map(datum => {
+        const items = byDate[datum];
+        const dayTotal = items.reduce((sum, b) => sum + (b.preis * b.menge), 0);
+        
+        return `
+            <div style="margin-bottom: 32px;">
+                <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: 12px; color: var(--color-mountain-blue);">
+                    ${new Date(datum).toLocaleDateString('de-AT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </h3>
+                ${items.map(b => `
+                    <div class="list-item ${b.exportiert ? 'exportiert' : 'pending'}">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 500;">${b.artikel_name} × ${b.menge}</div>
+                                <small class="text-muted">${b.uhrzeit.substring(0, 5)} Uhr</small>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-weight: 700;">${Utils.formatCurrency(b.preis * b.menge)}</div>
+                                ${b.exportiert ? '<small class="badge badge-success">✓</small>' : '<small class="badge badge-warning">⏳</small>'}
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+                <div style="text-align: right; margin-top: 8px; font-weight: 600; color: var(--color-stone-dark);">
+                    Summe: ${Utils.formatCurrency(dayTotal)}
+                </div>
+            </div>
+        `;
+    }).join('') || '<p class="text-muted text-center">Noch keine Buchungen vorhanden</p>';
+
+    UI.render(`
+        <div class="app-header">
+            <div class="header-left">
+                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
+                <div class="header-title">Meine Buchungen</div>
+            </div>
+            <div class="header-right">
+                <div class="user-badge">👤 ${State.currentUser.vorname || State.currentUser.nachname}</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h2 class="card-title">💰 Gesamtsumme</h2>
+                </div>
+                <div style="text-align: center; padding: 16px;">
+                    <div style="font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 700; color: var(--color-mountain-blue);">
+                        ${Utils.formatCurrency(total)}
+                    </div>
+                    <small class="text-muted">${buchungen.length} Artikel insgesamt</small>
+                </div>
+            </div>
+
+            ${buchungenHTML}
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item" onclick="Router.navigate('dashboard')">
+                <div class="nav-icon">🏠</div>
+                <div>Start</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('buchen')">
+                <div class="nav-icon">🍺</div>
+                <div>Buchen</div>
+            </div>
+            <div class="nav-item active" onclick="Router.navigate('historie')">
+                <div class="nav-icon">📋</div>
+                <div>Liste</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('profil')">
+                <div class="nav-icon">👤</div>
+                <div>Profil</div>
+            </div>
+        </div>
+    `);
+});
+
+// ===== PROFIL PAGE =====
+Router.register('profil', () => {
+    if (!State.currentUser) {
+        Router.navigate('login');
+        return;
+    }
+
+    UI.render(`
+        <div class="app-header">
+            <div class="header-left">
+                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
+                <div class="header-title">Mein Profil</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h2 class="card-title">👤 Persönliche Daten</h2>
+                </div>
+                <div class="card-body">
+                    <div style="margin-bottom: 12px;">
+                        <strong>Nachname:</strong> ${State.currentUser.nachname}
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong>Vorname:</strong> ${State.currentUser.vorname || '-'}
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong>Zimmer:</strong> ${State.currentUser.zimmernummer || '-'}
+                    </div>
+                    <div>
+                        <strong>Anreise:</strong> ${State.currentUser.anreise_datum || '-'}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h2 class="card-title">ℹ️ Hilfe & Info</h2>
+                </div>
+                <div class="card-body">
+                    <p style="margin-bottom: 12px;">Bei Fragen wenden Sie sich bitte an die Rezeption.</p>
+                    <p style="margin-bottom: 12px;"><strong>Telefon:</strong> +43 XXX XXX XXX</p>
+                    <p><strong>Email:</strong> info@seollerhaus.at</p>
+                </div>
+            </div>
+
+            <button class="btn btn-danger btn-block" onclick="Auth.logout()">Abmelden</button>
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item" onclick="Router.navigate('dashboard')">
+                <div class="nav-icon">🏠</div>
+                <div>Start</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('buchen')">
+                <div class="nav-icon">🍺</div>
+                <div>Buchen</div>
+            </div>
+            <div class="nav-item" onclick="Router.navigate('historie')">
+                <div class="nav-icon">📋</div>
+                <div>Liste</div>
+            </div>
+            <div class="nav-item active" onclick="Router.navigate('profil')">
+                <div class="nav-icon">👤</div>
+                <div>Profil</div>
             </div>
         </div>
     `);
@@ -592,14 +1397,6 @@ Router.register('register', () => {
 
 // ===== ADMIN LOGIN =====
 Router.register('admin-login', () => {
-
-    // ✅ WICHTIG: Wenn bereits Admin → SOFORT ins Dashboard
-    if (State.isAdmin || sessionStorage.getItem('is_admin') === '1') {
-        State.isAdmin = true;
-        location.hash = '#admin-dashboard';
-        return;
-    }
-
     UI.render(`
         <div class="main-content">
             <div style="max-width: 400px; margin: 60px auto;">
@@ -611,46 +1408,33 @@ Router.register('admin-login', () => {
                         <small class="text-muted">Standard: admin123</small>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
-                    <button type="button" class="btn btn-secondary btn-block mt-2"
-                            onclick="Router.navigate('login')">Zurück</button>
+                    <button type="button" class="btn btn-secondary btn-block mt-2" onclick="Router.navigate('login')">Zurück</button>
                 </form>
             </div>
         </div>
     `);
 });
 
-
 window.handleAdminLogin = async (event) => {
-  event.preventDefault();
-  const formData = new FormData(event.target);
-  const success = await Auth.adminLogin(formData.get('passwort'));
-  if (success) {
-    location.hash = '#admin-dashboard';
-  }
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    const success = await Auth.adminLogin(formData.get('passwort'));
+    if (success) {
+        Router.navigate('admin-dashboard');
+    }
 };
-
 
 // ===== ADMIN DASHBOARD =====
 Router.register('admin-dashboard', async () => {
-
-  // ✅ Harter Restore: falls State verloren ging, aber Session-Flag da ist
-  if (!State.isAdmin && sessionStorage.getItem('is_admin') === '1') {
-    State.isAdmin = true;
-  }
-
-  // ✅ Wenn immer noch nicht Admin → zurück zum Admin-Login
-  if (!State.isAdmin) {
-    location.hash = '#admin-login';   // bewusst direkt, um Router-Doppelungen zu umgehen
-    return;
-  }
-
-  // ... ab hier dein Dashboard-Code
-
+    if (!State.isAdmin) {
+        Router.navigate('admin-login');
+        return;
+    }
 
     const gaeste = await db.gaeste.where('aktiv').equals(true).toArray();
     const buchungen = await Buchungen.getAll();
     const nichtExportiert = await Buchungen.getAll({ exportiert: false });
-
+    
     const heute = Utils.formatDate(new Date());
     const heuteBuchungen = buchungen.filter(b => b.datum === heute);
     const heuteUmsatz = heuteBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
@@ -685,377 +1469,92 @@ Router.register('admin-dashboard', async () => {
                 </div>
             </div>
 
-            <div class="card mt-3">
-                <div class="card-header"><h2 class="card-title">Export</h2></div>
-                <div class="card-body">
-                    <button class="btn btn-primary" onclick="handleExportBuchungen()">Buchungen exportieren (CSV)</button>
-                    <p class="text-muted mt-2">Exportiert alle neuen Buchungen und markiert sie danach als exportiert.</p>
-                </div>
-            </div>
-
-            <div class="card mt-3">
-                <div class="card-header"><h2 class="card-title">Artikel Import</h2></div>
-                <div class="card-body">
-                    <input type="file" accept=".csv" onchange="handleArtikelImport(event)">
-                    <p class="text-muted mt-2">CSV mit Artikel-IDs aus Access importieren.</p>
-                </div>
-            </div>
-
-            <div class="card mt-3">
-                <div class="card-header"><h2 class="card-title">Checkout Import</h2></div>
-                <div class="card-body">
-                    <input type="file" accept=".csv" onchange="handleCheckoutImport(event)">
-                    <p class="text-muted mt-2">CSV mit Gast-Web-UUIDs importieren und Gäste auschecken.</p>
-                </div>
-            </div>
-        </div>
-    `);
-});
-
-// ===== DASHBOARD PAGE =====
-Router.register('dashboard', async () => {
-    if (!State.currentUser) {
-        Router.navigate('login');
-        return;
-    }
-
-    const buchungen = await Buchungen.getByGast(State.currentUser.gast_id, 5);
-    const alleBuchungen = await Buchungen.getByGast(State.currentUser.gast_id);
-
-    const heute = Utils.formatDate(new Date());
-    const heuteBuchungen = alleBuchungen.filter(b => b.datum === heute);
-    const heuteSum = heuteBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
-
-    const wocheStart = new Date();
-    wocheStart.setDate(wocheStart.getDate() - 7);
-    const wocheBuchungen = alleBuchungen.filter(b => new Date(b.datum) >= wocheStart);
-    const wocheSum = wocheBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
-
-    const gesamtSum = alleBuchungen.reduce((sum, b) => sum + (b.preis * b.menge), 0);
-
-    const buchungenHTML = buchungen.map(b => `
-        <div class="list-item ${b.exportiert ? 'exportiert' : 'pending'}">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-weight: 500;">${b.artikel_name} × ${b.menge}</div>
-                    <small class="text-muted">Heute, ${b.uhrzeit.substring(0, 5)}</small>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-weight: 700; color: var(--color-mountain-blue);">${Utils.formatCurrency(b.preis * b.menge)}</div>
-                    ${b.exportiert ? `<small class="text-muted">exportiert</small>` : `<small class="text-muted">neu</small>`}
-                </div>
-            </div>
-        </div>
-    `).join('');
-
-    UI.render(`
-        <div class="app-header">
-            <div class="header-left">
-                <button class="menu-btn" onclick="showMenu()">☰</button>
-                <div class="header-title">Seollerhaus Kassa</div>
-            </div>
-            <div class="header-right">
-                <div class="user-badge">👤 ${State.currentUser.nachname}</div>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <h1 class="page-title">Übersicht</h1>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value">${Utils.formatCurrency(heuteSum)}</div>
-                    <div class="stat-label">Heute</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${Utils.formatCurrency(wocheSum)}</div>
-                    <div class="stat-label">Letzte 7 Tage</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${Utils.formatCurrency(gesamtSum)}</div>
-                    <div class="stat-label">Gesamt</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${alleBuchungen.length}</div>
-                    <div class="stat-label">Buchungen</div>
-                </div>
-            </div>
-
-            <div class="card mt-3">
+            <div class="card mb-3">
                 <div class="card-header">
-                    <h2 class="card-title">Letzte Buchungen</h2>
+                    <h2 class="card-title">🔄 Daten-Management</h2>
                 </div>
                 <div class="card-body">
-                    ${buchungenHTML || `<div class="empty-state">Noch keine Buchungen</div>`}
+                    <div style="padding: 16px; background: var(--color-stone-light); border-radius: var(--radius-md); margin-bottom: 16px;">
+                        <h3 style="font-weight: 600; margin-bottom: 8px;">📤 Buchungen exportieren</h3>
+                        <p style="color: var(--color-stone-dark); margin-bottom: 12px;">
+                            ${nichtExportiert.length} neue Buchungen zum Exportieren
+                        </p>
+                        <button class="btn btn-primary" onclick="handleExportBuchungen()">
+                            Export starten →
+                        </button>
+                    </div>
+
+                    <div style="padding: 16px; background: var(--color-stone-light); border-radius: var(--radius-md); margin-bottom: 16px;">
+                        <h3 style="font-weight: 600; margin-bottom: 8px;">📥 Artikel importieren</h3>
+                        <p style="color: var(--color-stone-dark); margin-bottom: 12px;">
+                            Preise & Sortiment aus Access aktualisieren
+                        </p>
+                        <input type="file" id="artikel-import" accept=".csv" style="display:none" onchange="handleArtikelImport(event)">
+                        <button class="btn btn-secondary" onclick="document.getElementById('artikel-import').click()">
+                            CSV hochladen →
+                        </button>
+                    </div>
+
+                    <div style="padding: 16px; background: var(--color-stone-light); border-radius: var(--radius-md);">
+                        <h3 style="font-weight: 600; margin-bottom: 8px;">🚪 Checkout-Liste importieren</h3>
+                        <p style="color: var(--color-stone-dark); margin-bottom: 12px;">
+                            Ausgecheckte Gäste deaktivieren
+                        </p>
+                        <input type="file" id="checkout-import" accept=".csv" style="display:none" onchange="handleCheckoutImport(event)">
+                        <button class="btn btn-secondary" onclick="document.getElementById('checkout-import').click()">
+                            CSV hochladen →
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <div class="bottom-nav">
-            <div class="nav-item active" onclick="Router.navigate('dashboard')">
-                <div class="nav-icon">🏠</div>
-                <div>Start</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('buchen')">
-                <div class="nav-icon">🍺</div>
-                <div>Buchen</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('historie')">
-                <div class="nav-icon">📋</div>
-                <div>Liste</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('profil')">
-                <div class="nav-icon">👤</div>
-                <div>Profil</div>
-            </div>
-        </div>
-    `);
-});
-
-// ===== BUCHEN PAGE =====
-Router.register('buchen', async () => {
-    if (!State.currentUser) {
-        Router.navigate('login');
-        return;
-    }
-
-    const kategorien = await db.kategorien.orderBy('sortierung').toArray();
-    const artikel = State.selectedCategory
-        ? await Artikel.getByKategorie(State.selectedCategory)
-        : await Artikel.getAll();
-
-    const catsHTML = kategorien.map(k => `
-        <button class="chip ${State.selectedCategory === k.kategorie_id ? 'active' : ''}"
-                onclick="State.selectedCategory=${k.kategorie_id}; Router.navigate('buchen')">
-            ${k.name}
-        </button>
-    `).join('');
-
-    const artikelHTML = artikel.map(a => `
-        <button class="artikel-card" onclick="State.addToWarenkorb(${JSON.stringify(a).replace(/"/g, '&quot;')}, 1)">
-            <div class="artikel-icon">${a.icon || '🧾'}</div>
-            <div class="artikel-name">${a.name}</div>
-            <div class="artikel-price">${Utils.formatCurrency(a.preis)}</div>
-        </button>
-    `).join('');
-
-    UI.render(`
-        <div class="app-header">
-            <div class="header-left">
-                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
-                <div class="header-title">Buchen</div>
-            </div>
-            <div class="header-right">
-                <div class="user-badge">👤 ${State.currentUser.nachname}</div>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <div class="chips-row">
-                <button class="chip ${!State.selectedCategory ? 'active' : ''}"
-                        onclick="State.selectedCategory=null; Router.navigate('buchen')">Alle</button>
-                ${catsHTML}
-            </div>
-
-            <div class="grid">
-                ${artikelHTML}
-            </div>
-
-            <div class="card mt-3">
-                <div class="card-header">
-                    <h2 class="card-title">Warenkorb</h2>
-                </div>
-                <div class="card-body" id="warenkorb-area">
-                    <div>Gesamt: <b>${Utils.formatCurrency(State.getWarenkorbTotal())}</b></div>
-                    <button class="btn btn-primary mt-2" onclick="handleBuchen()">Jetzt buchen</button>
-                    <button class="btn btn-secondary mt-2" onclick="State.clearWarenkorb()">Warenkorb leeren</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="bottom-nav">
-            <div class="nav-item" onclick="Router.navigate('dashboard')">
-                <div class="nav-icon">🏠</div>
-                <div>Start</div>
-            </div>
-            <div class="nav-item active" onclick="Router.navigate('buchen')">
-                <div class="nav-icon">🍺</div>
-                <div>Buchen</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('historie')">
-                <div class="nav-icon">📋</div>
-                <div>Liste</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('profil')">
-                <div class="nav-icon">👤</div>
-                <div>Profil</div>
-            </div>
-        </div>
-    `);
-});
-
-// ===== HISTORIE PAGE =====
-Router.register('historie', async () => {
-    if (!State.currentUser) {
-        Router.navigate('login');
-        return;
-    }
-
-    const alleBuchungen = await Buchungen.getByGast(State.currentUser.gast_id);
-
-    const rows = alleBuchungen.map(b => `
-        <div class="list-item ${b.exportiert ? 'exportiert' : 'pending'}">
-            <div style="display:flex; justify-content:space-between;">
-                <div>
-                    <div style="font-weight:500;">${b.artikel_name} × ${b.menge}</div>
-                    <small class="text-muted">${b.datum} ${b.uhrzeit.substring(0,5)}</small>
-                </div>
-                <div style="font-weight:700; color: var(--color-mountain-blue);">
-                    ${Utils.formatCurrency(b.preis * b.menge)}
-                </div>
-            </div>
-        </div>
-    `).join('');
-
-    UI.render(`
-        <div class="app-header">
-            <div class="header-left">
-                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
-                <div class="header-title">Liste</div>
-            </div>
-            <div class="header-right">
-                <div class="user-badge">👤 ${State.currentUser.nachname}</div>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <h1 class="page-title">Alle Buchungen</h1>
-            ${rows || `<div class="empty-state">Noch keine Buchungen</div>`}
-        </div>
-
-        <div class="bottom-nav">
-            <div class="nav-item" onclick="Router.navigate('dashboard')">
-                <div class="nav-icon">🏠</div>
-                <div>Start</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('buchen')">
-                <div class="nav-icon">🍺</div>
-                <div>Buchen</div>
-            </div>
-            <div class="nav-item active" onclick="Router.navigate('historie')">
-                <div class="nav-icon">📋</div>
-                <div>Liste</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('profil')">
-                <div class="nav-icon">👤</div>
-                <div>Profil</div>
-            </div>
-        </div>
-    `);
-});
-
-// ===== PROFIL PAGE =====
-Router.register('profil', async () => {
-    if (!State.currentUser) {
-        Router.navigate('login');
-        return;
-    }
-
-    UI.render(`
-        <div class="app-header">
-            <div class="header-left">
-                <button class="menu-btn" onclick="Router.navigate('dashboard')">←</button>
-                <div class="header-title">Profil</div>
-            </div>
-            <div class="header-right">
-                <div class="user-badge">👤 ${State.currentUser.nachname}</div>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <h1 class="page-title">Profil</h1>
 
             <div class="card">
-                <div class="card-body">
-                    <p><b>Nachname:</b> ${State.currentUser.nachname}</p>
-                    <p><b>Vorname:</b> ${State.currentUser.vorname || '-'}</p>
-                    <p><b>Zimmer:</b> ${State.currentUser.zimmernummer || '-'}</p>
-                    <button class="btn btn-secondary mt-2" onclick="Auth.logout()">Abmelden</button>
+                <div class="card-header">
+                    <h2 class="card-title">👥 Gäste-Übersicht</h2>
                 </div>
-            </div>
-        </div>
-
-        <div class="bottom-nav">
-            <div class="nav-item" onclick="Router.navigate('dashboard')">
-                <div class="nav-icon">🏠</div>
-                <div>Start</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('buchen')">
-                <div class="nav-icon">🍺</div>
-                <div>Buchen</div>
-            </div>
-            <div class="nav-item" onclick="Router.navigate('historie')">
-                <div class="nav-icon">📋</div>
-                <div>Liste</div>
-            </div>
-            <div class="nav-item active" onclick="Router.navigate('profil')">
-                <div class="nav-icon">👤</div>
-                <div>Profil</div>
+                <div class="card-body">
+                    ${gaeste.length > 0 ? gaeste.map(g => `
+                        <div class="list-item">
+                            <strong>${g.nachname}, ${g.vorname}</strong><br>
+                            <small class="text-muted">Zimmer: ${g.zimmernummer || '-'} | Anreise: ${g.anreise_datum || '-'}</small>
+                        </div>
+                    `).join('') : '<p class="text-muted">Keine Gäste vorhanden</p>'}
+                </div>
             </div>
         </div>
     `);
 });
 
-/* ===== GLOBAL EVENT HANDLERS ===== */
-window.handleLogin = async (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.target);
-
-    try {
-        await Auth.login(
-            formData.get('nachname'),
-            formData.get('passwort'),
-            formData.get('remember')
-        );
-        Router.navigate('dashboard');
-    } catch (error) {
-        // Error handled in Auth.login
-    }
+// ===== HELPER FUNCTIONS =====
+window.filterCategory = (kategorie_id) => {
+    State.selectedCategory = kategorie_id;
+    Router.navigate('buchen');
 };
 
-window.handleRegister = async (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.target);
-
-    const passwort = formData.get('passwort');
-    const passwort2 = formData.get('passwort2');
-
-    if (passwort !== passwort2) {
-        Utils.showToast('Passwörter stimmen nicht überein', 'error');
-        return;
-    }
-
-    try {
-        await Auth.register(
-            formData.get('nachname'),
-            formData.get('vorname'),
-            formData.get('zimmernummer'),
-            passwort
-        );
-        Router.navigate('login');
-    } catch (error) {
-        // Error handled in Auth.register
-    }
+window.addArtikel = async (artikel_id) => {
+    const artikel = await Artikel.getById(artikel_id);
+    State.addToWarenkorb(artikel);
+    Utils.showToast(`${artikel.name_kurz || artikel.name} zum Warenkorb hinzugefügt`, 'success');
 };
 
-window.handleBuchen = async () => {
-    try {
-        await Buchungen.createFromWarenkorb();
-        Router.navigate('dashboard');
-    } catch (error) {
-        // Error handled in Buchungen
-    }
+window.getCategoryColor = (kategorie_id) => {
+    const colors = {
+        1: '#FF6B6B', // Alkoholfrei
+        2: '#FFD93D', // Biere
+        3: '#95E1D3', // Wein Weiß
+        4: '#AA4465', // Wein Rot
+        5: '#F38181', // Schnäpse
+        6: '#6C5B7B', // Heiß
+        7: '#F8B500', // Süß
+        8: '#4A5859'  // Sonstiges
+    };
+    return colors[kategorie_id] || '#2C5F7C';
 };
+
+window.searchArtikel = Utils.debounce(async (query) => {
+    // Implement search functionality
+    console.log('Searching for:', query);
+}, 300);
 
 window.handleExportBuchungen = async () => {
     await ExportService.exportBuchungenCSV();
@@ -1078,6 +1577,7 @@ window.handleCheckoutImport = async (event) => {
     try {
         const text = await file.text();
         const lines = text.trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
 
         let count = 0;
         for (let i = 1; i < lines.length; i++) {
@@ -1121,37 +1621,3 @@ window.showMenu = () => {
         ]);
     }
 })();
-
-/* ===== APP INITIALIZATION ===== */
-(async function initApp() {
-    // ✅ Admin-Status aus Session wiederherstellen
-    State.isAdmin = sessionStorage.getItem('is_admin') === '1';
-
-    // Hide loading screen after short delay
-    setTimeout(() => {
-        document.getElementById('loading-screen').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-    }, 1500);
-
-    // Seed default articles
-    await Artikel.seed();
-
-    // ✅ Router IMMER initialisieren (damit #admin-dashboard stabil ist)
-    Router.init();
-
-    // Try auto-login (Gast)
-    const loggedIn = await Auth.autoLogin();
-    if (loggedIn) {
-        Router.navigate('dashboard');
-    }
-})();
-
-// ✅ WICHTIG: Global verfügbar machen (für onclick=...)
-// (weil app.js als type="module" geladen wird)
-window.Router = Router;
-window.State = State;
-window.Utils = Utils;
-window.Auth = Auth;
-window.Buchungen = Buchungen;
-window.Artikel = Artikel;
-window.ExportService = ExportService;
