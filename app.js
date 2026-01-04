@@ -648,18 +648,19 @@ const Artikel = {
         }
         
         // Category mapping based on Warengruppe values (1-6)
+        // 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiße, 6=Süßes/Sonstiges
         const katMap = {
-            0: 'Sonstiges',
+            0: 'Süßes, Salziges & Sonstiges',
             1: 'Alkoholfreie Getränke',
             2: 'Biere',
-            3: 'Wein',
-            4: 'Schnäpse',
+            3: 'Weine',
+            4: 'Schnäpse & Spirituosen',
             5: 'Heiße Getränke',
-            6: 'Sonstiges',
-            7: 'Sonstiges',
-            8: 'Sonstiges'
+            6: 'Süßes, Salziges & Sonstiges',
+            7: 'Süßes, Salziges & Sonstiges',
+            8: 'Süßes, Salziges & Sonstiges'
         };
-        const iconMap = {0:'🍽️',1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️',7:'🍽️',8:'🍽️'};
+        const iconMap = {0:'🍬',1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'🍬',8:'🍬'};
         
         let imp=0, upd=0, skip=0;
         
@@ -703,12 +704,15 @@ const Artikel = {
                 continue;
             }
             
-            // Get category from Warengruppe
-            let katId = 6; // Default: Sonstiges
+            // Get category from Warengruppe and map to new category structure
+            // CSV Warengruppe: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=Heiß, 6+=Sonstiges
+            // App Kategorien: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiß, 6=Süßes
+            const warengruppeMigration = {1:1, 2:2, 3:3, 4:4, 5:5, 6:6, 7:6, 8:6};
+            let csvWG = 6; // Default
             if (idx.kat >= 0 && v[idx.kat] !== undefined) {
-                katId = parseInt(v[idx.kat]?.replace(/"/g,'')) || 6;
-                if (katId < 0 || katId > 8) katId = 6;
+                csvWG = parseInt(v[idx.kat]?.replace(/"/g,'')) || 6;
             }
+            let katId = warengruppeMigration[csvWG] || 6;
             
             // Get sort order
             let sort = 0;
@@ -732,10 +736,10 @@ const Artikel = {
                 preis, 
                 steuer_prozent: steuer, 
                 kategorie_id: katId, 
-                kategorie_name: katMap[katId] || 'Sonstiges', 
+                kategorie_name: katMap[katId] || 'Süßes, Salziges & Sonstiges', 
                 aktiv: true,
                 sortierung: sort, 
-                icon: iconMap[katId] || '🍽️' 
+                icon: iconMap[katId] || '🍬' 
             };
             
             console.log(`Row ${i}: ID=${id}, Name="${name}", Preis=${preis}, Kat=${katId}`);
@@ -817,8 +821,8 @@ const ExportService = {
                 'Datum': b.datum || '',
                 'Uhrzeit': b.uhrzeit || '',
                 'Gastid': b.gast_id || 0,
-                'Gastname': b.gast_nachname || '',
-                'Gastvorname': b.gast_vorname || '',
+                'Gastname': b.gast_vorname || '',
+                'Gastvorname': '',
                 'Gastgruppe': b.gastgruppe || 'keiner Gruppe zugehörig',
                 'Gastgruppennr': 0,
                 'bezahlt': false,
@@ -1109,45 +1113,61 @@ Router.register('admin-dashboard', async () => {
     </div>`);
 });
 
-// Kategorien reparieren - 7 und 8 zu 6 (Sonstiges)
+// Kategorien reparieren
 window.repairCategories = async () => {
-    // Kategorien-Tabelle aktualisieren
+    // Kategorien-Tabelle komplett neu aufbauen - 6 Kategorien
     await db.kategorien.clear();
     await db.kategorien.bulkAdd([
-        {kategorie_id:1,name:'Alkoholfreie Getränke',sortierung:10},
-        {kategorie_id:2,name:'Biere',sortierung:20},
-        {kategorie_id:3,name:'Wein',sortierung:30},
-        {kategorie_id:4,name:'Schnäpse',sortierung:40},
-        {kategorie_id:5,name:'Heiße Getränke',sortierung:50},
-        {kategorie_id:6,name:'Sonstiges',sortierung:60}
+        {kategorie_id:1, name:'Alkoholfreie Getränke', sortierung:10},
+        {kategorie_id:2, name:'Biere', sortierung:20},
+        {kategorie_id:3, name:'Weine', sortierung:30},
+        {kategorie_id:4, name:'Schnäpse & Spirituosen', sortierung:40},
+        {kategorie_id:5, name:'Heiße Getränke', sortierung:50},
+        {kategorie_id:6, name:'Süßes, Salziges & Sonstiges', sortierung:60}
     ]);
     
-    // Artikel mit Kategorie 7 oder 8 auf 6 setzen
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️'};
-    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Schnäpse',5:'Heiße Getränke',6:'Sonstiges'};
+    // Alte Kategorie-IDs auf neue mappen:
+    // ALTE Struktur: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=Heiße, 6=Sonstiges, 7=Snacks, 8=Diverses
+    // NEUE Struktur: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiße, 6=Süßes/Sonstiges
+    const migrationMap = {
+        1: 1,  // Alkoholfrei bleibt
+        2: 2,  // Biere bleibt
+        3: 3,  // Wein -> Weine
+        4: 4,  // Spirituosen -> Schnäpse & Spirituosen
+        5: 5,  // Heiße Getränke bleibt
+        6: 6,  // Sonstiges -> Süßes, Salziges & Sonstiges
+        7: 6,  // Snacks -> Süßes, Salziges & Sonstiges
+        8: 6   // Diverses -> Süßes, Salziges & Sonstiges
+    };
+    
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬'};
+    const katMap = {
+        1:'Alkoholfreie Getränke',
+        2:'Biere',
+        3:'Weine',
+        4:'Schnäpse & Spirituosen',
+        5:'Heiße Getränke',
+        6:'Süßes, Salziges & Sonstiges'
+    };
     
     const arts = await db.artikel.toArray();
     let fixed = 0;
     for (const a of arts) {
-        if (a.kategorie_id === 7 || a.kategorie_id === 8) {
-            await db.artikel.update(a.artikel_id, { 
-                kategorie_id: 6, 
-                kategorie_name: 'Sonstiges',
-                icon: '🍽️'
-            });
-            fixed++;
-        } else if (a.kategorie_id >= 1 && a.kategorie_id <= 6) {
-            // Icon und Name aktualisieren
-            await db.artikel.update(a.artikel_id, {
-                kategorie_name: katMap[a.kategorie_id] || 'Sonstiges',
-                icon: a.bild ? a.icon : (iconMap[a.kategorie_id] || '🍽️')
-            });
-        }
+        const alteKat = a.kategorie_id;
+        const neueKat = migrationMap[alteKat] || 6;
+        
+        await db.artikel.update(a.artikel_id, { 
+            kategorie_id: neueKat, 
+            kategorie_name: katMap[neueKat],
+            icon: a.bild ? a.icon : (iconMap[neueKat] || '🍬')
+        });
+        
+        if (alteKat !== neueKat) fixed++;
     }
     
     await DataProtection.createBackup();
-    Utils.showToast(`Kategorien repariert! ${fixed} Artikel korrigiert.`, 'success');
-    Router.navigate('admin-dashboard');
+    Utils.showToast(`Kategorien repariert! ${fixed} Artikel migriert.`, 'success');
+    Router.navigate('admin-articles');
 };
 
 // Auffüllliste Route
@@ -1687,6 +1707,20 @@ Router.register('buchen', async () => {
     const sessionBuchungen = await Buchungen.getSessionBuchungen();
     const sessionTotal = sessionBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
     
+    // ALLE Buchungen des Gastes laden (nicht exportiert, nicht storniert)
+    const alleBuchungen = await db.buchungen.toArray();
+    const meineBuchungen = alleBuchungen.filter(b => 
+        b.gast_id === gastId && !b.storniert && !b.exportiert
+    ).sort((a,b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
+    const gesamtSumme = meineBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
+    
+    // Nach Datum gruppieren
+    const nachDatum = {};
+    meineBuchungen.forEach(b => {
+        if (!nachDatum[b.datum]) nachDatum[b.datum] = [];
+        nachDatum[b.datum].push(b);
+    });
+    
     // Fehlende Getränke laden
     const fehlendeOffen = await FehlendeGetraenke.getOffene();
     
@@ -1704,7 +1738,41 @@ Router.register('buchen', async () => {
         <div class="header-left"><div class="header-title">👤 ${name}</div></div>
         <div class="header-right"><button class="btn btn-secondary" onclick="handleGastAbmelden()">Abmelden</button></div>
     </div>
-    <div class="main-content" style="padding-bottom:20px;">
+    <div class="main-content" style="padding-bottom:${sessionBuchungen.length ? '180px' : '20px'};">
+        
+        ${meineBuchungen.length ? `
+        <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);border-radius:16px;margin-bottom:20px;overflow:hidden;">
+            <div onclick="toggleBuchungsDetails()" style="padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+                <div style="color:white;">
+                    <div style="font-weight:700;font-size:1.1rem;">📋 Meine Buchungen</div>
+                    <div style="font-size:0.9rem;opacity:0.9;">${meineBuchungen.length} Artikel • Gesamtsumme</div>
+                </div>
+                <div style="text-align:right;color:white;">
+                    <div style="font-size:1.5rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
+                    <div id="buchungen-arrow" style="font-size:1.2rem;">▼</div>
+                </div>
+            </div>
+            <div id="buchungen-details" style="display:none;background:white;padding:16px;max-height:300px;overflow-y:auto;">
+                ${Object.keys(nachDatum).map(datum => `
+                <div style="margin-bottom:16px;">
+                    <div style="font-weight:700;color:var(--color-alpine-green);margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--color-stone-light);">
+                        📅 ${datum}
+                    </div>
+                    ${nachDatum[datum].map(b => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--color-stone-light);border-radius:8px;margin-bottom:4px;">
+                        <div>
+                            <div style="font-weight:600;">${b.artikel_name}</div>
+                            <div style="font-size:0.8rem;color:var(--color-stone-dark);">🕐 ${b.uhrzeit?.substring(0,5) || ''} • ${b.menge}×</div>
+                        </div>
+                        <div style="font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(b.preis * b.menge)}</div>
+                    </div>
+                    `).join('')}
+                </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+        
         ${fehlendeOffen.length ? `
         <div class="fehlende-box" style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:20px;color:white;">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
@@ -1741,10 +1809,10 @@ Router.register('buchen', async () => {
     <div class="session-popup" style="position:fixed;bottom:20px;right:20px;left:20px;max-width:400px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2);border:2px solid var(--color-alpine-green);z-index:1000;">
         <div style="padding:16px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <strong style="font-size:1.1rem;">🛒 Meine Buchungen</strong>
+                <strong style="font-size:1.1rem;">🛒 Gerade gebucht</strong>
                 <span style="font-size:1.4rem;font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(sessionTotal)}</span>
             </div>
-            <div style="max-height:200px;overflow-y:auto;">
+            <div style="max-height:150px;overflow-y:auto;">
                 ${sessionBuchungen.map(b => `
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--color-stone-light);border-radius:8px;margin-bottom:6px;">
                     <div>
@@ -1765,6 +1833,19 @@ Router.register('buchen', async () => {
     </div>
     ` : ''}`);
 });
+
+// Buchungsdetails aufklappen/zuklappen
+window.toggleBuchungsDetails = () => {
+    const details = document.getElementById('buchungen-details');
+    const arrow = document.getElementById('buchungen-arrow');
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        arrow.textContent = '▲';
+    } else {
+        details.style.display = 'none';
+        arrow.textContent = '▼';
+    }
+};
 
 // Fehlende Getränke übernehmen
 window.uebernehmeFehlend = async (id) => {
@@ -1923,7 +2004,7 @@ window.showAddArticleModal = () => {
         <div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" placeholder="0.00" step="0.01" min="0"></div>
         <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" placeholder="1" min="1" value="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
     </div>
-    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Wein</option><option value="4">Schnäpse</option><option value="5">Heiße Getränke</option><option value="6">Sonstiges</option></select></div>
+    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Weine</option><option value="4">Schnäpse & Spirituosen</option><option value="5">Heiße Getränke</option><option value="6">Süßes, Salziges & Sonstiges</option></select></div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" checked><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveNewArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = null;
@@ -1949,7 +2030,7 @@ window.showEditArticleModal = async id => {
         <div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" value="${a.preis}" step="0.01" min="0"></div>
         <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" value="${a.sortierung||1}" min="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
     </div>
-    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Schnäpse',5:'Heiße Getränke',6:'Sonstiges'}[i]}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes, Salziges & Sonstiges'}[i]}</option>`).join('')}</select></div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = a.bild || null;
@@ -1974,8 +2055,8 @@ window.handleImagePreview = async (event) => {
 window.clearImagePreview = () => {
     window.currentArticleImage = null;
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️'};
-    document.getElementById('article-image-preview').innerHTML = iconMap[katId] || '🍽️';
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬'};
+    document.getElementById('article-image-preview').innerHTML = iconMap[katId] || '🍬';
     document.getElementById('article-image').value = '';
 };
 
@@ -1983,8 +2064,8 @@ window.saveNewArticle = async () => {
     const name = document.getElementById('article-name')?.value;
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
-    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Schnäpse',5:'Heiße Getränke',6:'Sonstiges'};
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️'};
+    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes, Salziges & Sonstiges'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬'};
     await Artikel.create({ 
         name: name.trim(), 
         name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
@@ -1992,10 +2073,10 @@ window.saveNewArticle = async () => {
         preis: parseFloat(document.getElementById('article-price')?.value) || 0, 
         steuer_prozent: 10, 
         kategorie_id: katId, 
-        kategorie_name: katMap[katId] || 'Sonstiges', 
+        kategorie_name: katMap[katId] || 'Süßes, Salziges & Sonstiges', 
         aktiv: document.getElementById('article-active')?.checked, 
         sortierung: parseInt(document.getElementById('article-sort')?.value) || 1, 
-        icon: iconMap[katId] || '🍽️',
+        icon: iconMap[katId] || '🍬',
         bild: window.currentArticleImage || null
     });
     closeArticleModal();
@@ -2008,8 +2089,8 @@ window.saveEditArticle = async () => {
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
     const newPos = parseInt(document.getElementById('article-sort')?.value) || 1;
-    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Wein',4:'Schnäpse',5:'Heiße Getränke',6:'Sonstiges'};
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍽️'};
+    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes, Salziges & Sonstiges'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬'};
     
     // Alten Artikel holen für Positions-Tausch
     const oldArticle = await Artikel.getById(id);
@@ -2054,8 +2135,12 @@ window.saveEditArticle = async () => {
     await Artikel.seed();
     if (await db.kategorien.count() === 0) {
         await db.kategorien.bulkAdd([
-            {kategorie_id:1,name:'Alkoholfreie Getränke',sortierung:10},{kategorie_id:2,name:'Biere',sortierung:20},{kategorie_id:3,name:'Wein',sortierung:30},
-            {kategorie_id:4,name:'Schnäpse',sortierung:40},{kategorie_id:5,name:'Heiße Getränke',sortierung:50},{kategorie_id:6,name:'Sonstiges',sortierung:60}
+            {kategorie_id:1, name:'Alkoholfreie Getränke', sortierung:10},
+            {kategorie_id:2, name:'Biere', sortierung:20},
+            {kategorie_id:3, name:'Weine', sortierung:30},
+            {kategorie_id:4, name:'Schnäpse & Spirituosen', sortierung:40},
+            {kategorie_id:5, name:'Heiße Getränke', sortierung:50},
+            {kategorie_id:6, name:'Süßes, Salziges & Sonstiges', sortierung:60}
         ]);
     }
     if (await Auth.autoLogin()) Router.navigate('dashboard');
