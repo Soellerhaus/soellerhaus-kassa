@@ -180,13 +180,15 @@ const State = {
 const Auth = {
     async register(vorname, pin) {
         try {
+            console.log('Auth.register called with vorname:', vorname, 'pin length:', pin?.length);
+            
             // Validate
             if (!vorname || !vorname.trim()) {
                 throw new Error('Vorname ist erforderlich');
             }
 
-            if (!pin || pin.length < 1 || pin.length > 6) {
-                throw new Error('PIN muss 1-6 Ziffern lang sein');
+            if (!pin || pin.length < 1 || pin.length > 4) {  // Max 4 Ziffern
+                throw new Error('PIN muss 1-4 Ziffern lang sein');
             }
 
             if (!/^\d+$/.test(pin)) {
@@ -208,10 +210,19 @@ const Auth = {
                 erstellt_am: new Date().toISOString()
             };
 
+            console.log('Creating gast:', {
+                gast_id: gast.gast_id,
+                vorname: gast.vorname,
+                aktiv: gast.aktiv,
+                erstellt_am: gast.erstellt_am
+            });
+
             await db.gaeste.add(gast);
+            console.log('Gast successfully added to database!');
             Utils.showToast('Account erfolgreich erstellt!', 'success');
             return gast;
         } catch (error) {
+            console.error('Auth.register error:', error);
             Utils.showToast(error.message, 'error');
             throw error;
         }
@@ -245,10 +256,26 @@ const Auth = {
 
     async getGaesteByLetter(letter) {
         try {
+            console.log('=== GET GAESTE BY LETTER ===');
+            console.log('Letter:', letter);
+            
+            // Alle Gäste abrufen (zum Debugging)
+            const allGaeste = await db.gaeste.toArray();
+            console.log('Total guests in database:', allGaeste.length);
+            console.log('All guests:', allGaeste.map(g => ({
+                vorname: g.vorname,
+                aktiv: g.aktiv,
+                checked_out: g.checked_out,
+                erstellt_am: g.erstellt_am
+            })));
+            
             const gaeste = await db.gaeste
                 .where('aktiv').equals(true)
                 .and(g => !g.checked_out && g.vorname.toUpperCase().startsWith(letter.toUpperCase()))
                 .toArray();
+
+            console.log('Filtered guests for letter', letter + ':', gaeste.length);
+            console.log('Filtered guests:', gaeste.map(g => g.vorname));
 
             // Sortieren und Duplikate mit Nummerierung versehen
             const sortedGaeste = gaeste.sort((a, b) => 
@@ -265,6 +292,7 @@ const Auth = {
                 return { ...gast, displayName };
             });
 
+            console.log('Result with display names:', result.map(g => g.displayName));
             return result;
         } catch (error) {
             console.error('Fehler beim Laden der Gäste:', error);
@@ -578,7 +606,7 @@ const UI = {
                 <div class="pin-pad-title">${title}</div>
                 <div class="pin-display">
                     <div class="pin-dots">${pinDisplay || '───'}</div>
-                    <div class="pin-length">${pinLength} / 6</div>
+                    <div class="pin-length">${pinLength} / 4</div>
                 </div>
                 <div class="pin-buttons">
                     ${[1,2,3,4,5,6,7,8,9].map(n => `
@@ -839,7 +867,7 @@ Router.register('register', () => {
                 </div>
 
                 <div style="margin-top: 32px; padding: 24px; background: var(--color-stone-light); border-radius: var(--radius-lg);">
-                    ${UI.renderPinPad('handleRegisterPinComplete', 'handleBackToLogin', 'PIN festlegen (1-6 Ziffern)')}
+                    ${UI.renderPinPad('handleRegisterPinComplete', 'handleBackToLogin', 'PIN festlegen (1-4 Ziffern)')}
                 </div>
 
                 <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">
@@ -863,7 +891,7 @@ Router.register('register', () => {
 // PIN Input Handlers (ohne komplettes Re-Rendering)
 window.handlePinInput = (digit) => {
     console.log('PIN input:', digit, 'Current length:', State.currentPin.length);
-    if (State.currentPin.length < 6) {
+    if (State.currentPin.length < 4) {  // Max 4 Ziffern
         State.currentPin += digit;
         updatePinDisplay();
     }
@@ -885,7 +913,7 @@ window.updatePinDisplay = () => {
     }
     
     if (lengthElement) {
-        lengthElement.textContent = `${State.currentPin.length} / 6`;
+        lengthElement.textContent = `${State.currentPin.length} / 4`;  // Max 4 Ziffern
     }
     
     console.log('PIN display updated:', State.currentPin.length, 'digits');
@@ -956,23 +984,23 @@ window.handleRegisterPinComplete = async () => {
         return;
     }
 
-    if (State.currentPin.length < 1 || State.currentPin.length > 6) {
+    if (State.currentPin.length < 1 || State.currentPin.length > 4) {  // Max 4 Ziffern
         console.log('ERROR: PIN-Länge ungültig:', State.currentPin.length);
-        Utils.showToast('PIN muss 1-6 Ziffern lang sein', 'warning');
+        Utils.showToast('PIN muss 1-4 Ziffern lang sein', 'warning');
         return;
     }
 
     console.log('Validation passed! Registering user:', vorname.trim(), 'PIN length:', State.currentPin.length);
 
     try {
-        await Auth.register(vorname.trim(), State.currentPin);
-        console.log('Registration successful!');
+        const newGast = await Auth.register(vorname.trim(), State.currentPin);
+        console.log('Registration successful! Gast:', newGast);
         State.currentPin = '';
         Utils.showToast('Registrierung erfolgreich! Bitte melden Sie sich an.', 'success');
         setTimeout(() => {
             console.log('Navigating to login...');
             Router.navigate('login');
-        }, 1000);
+        }, 1500);
     } catch (error) {
         console.error('Registration error:', error);
         State.currentPin = '';
