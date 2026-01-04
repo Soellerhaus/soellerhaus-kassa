@@ -106,6 +106,7 @@ const DataProtection = {
         Utils.showToast(`${articles.length} Artikel exportiert`, 'success');
     }
 };
+window.DataProtection = DataProtection;
 
 db.open().then(async () => {
     await DataProtection.requestPersistentStorage();
@@ -152,6 +153,7 @@ const Utils = {
         return r;
     }
 };
+window.Utils = Utils;
 
 const State = {
     currentUser: null, currentPage: 'login', warenkorb: [], selectedCategory: null,
@@ -166,6 +168,7 @@ const State = {
     updateWarenkorbUI() { if (UI?.renderWarenkorb) UI.renderWarenkorb(); },
     getWarenkorbTotal() { return this.warenkorb.reduce((s, i) => s + (i.preis * i.menge), 0); }
 };
+window.State = State;
 
 ['click','touchstart','keydown','mousemove'].forEach(e => document.addEventListener(e, () => { if(State.currentUser) State.resetInactivityTimer(); }, {passive:true}));
 
@@ -476,6 +479,7 @@ const Router = {
     navigate(p) { history.pushState({}, '', `#${p}`); this.handleRoute(); },
     handleRoute() { const p = location.hash.slice(1) || 'login'; State.currentPage = p; (this.routes[p] || this.routes['login'])?.(); }
 };
+window.Router = Router;
 
 const UI = {
     render(html) { document.getElementById('app').innerHTML = html; },
