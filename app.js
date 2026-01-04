@@ -1286,5 +1286,13 @@ window.showMenu = () => {
             { kategorie_id: 7, name: 'Süßes/Salziges', sortierung: 70 },
             { kategorie_id: 8, name: 'Sonstiges', sortierung: 80 }
         ]);
+        window.Router = Router;
+window.State = State;
+window.Utils = Utils;
+window.Auth = Auth;
+window.Buchungen = Buchungen;
+window.Artikel = Artikel;
+window.ExportService = ExportService;
+
     }
 })();
