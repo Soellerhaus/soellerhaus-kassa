@@ -597,38 +597,140 @@ const Artikel = {
 
     async importFromCSV(csvText) {
         try {
-            const lines = csvText.trim().split('\n');
-            const headers = lines[0].split(',').map(h => h.trim());
+            console.log('=== ARTIKEL IMPORT START ===');
+            
+            // Deutsche CSV: Semikolon-getrennt, UTF-8 BOM entfernen
+            const cleanText = csvText.replace(/^\uFEFF/, '').trim();
+            const lines = cleanText.split('\n');
+            
+            console.log('Total lines:', lines.length);
+            
+            // Header-Zeile mit Semikolon
+            const headers = lines[0].split(';').map(h => h.trim());
+            console.log('Headers:', headers);
+            
+            // Finde wichtige Spalten-Indices
+            const idIndex = headers.findIndex(h => h === 'ID');
+            const nameIndex = headers.findIndex(h => h === 'Artikelname');
+            const kurzIndex = headers.findIndex(h => h === 'Artikelkurz');
+            const preisIndex = headers.findIndex(h => h === 'Preis');
+            const gruppeIndex = headers.findIndex(h => h === 'Artikelgruppe');
+            const sortIndex = headers.findIndex(h => h === 'Artikelreihenfolge');
+            
+            console.log('Column indices:', { idIndex, nameIndex, kurzIndex, preisIndex, gruppeIndex, sortIndex });
 
             const artikel = [];
+            let imported = 0;
+            let skipped = 0;
+            
             for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                const obj = {};
-                headers.forEach((header, index) => {
-                    obj[header] = values[index];
-                });
-
+                const line = lines[i].trim();
+                if (!line) continue;
+                
+                const values = line.split(';').map(v => v.trim());
+                
+                // ID extrahieren
+                const id = values[idIndex];
+                if (!id || id === '') {
+                    console.log('Skip line', i, '- no ID');
+                    skipped++;
+                    continue;
+                }
+                
+                // Name extrahieren
+                const name = values[nameIndex];
+                if (!name || name === '') {
+                    console.log('Skip line', i, '- no name');
+                    skipped++;
+                    continue;
+                }
+                
+                // Preis extrahieren und parsen: "2,50 €" -> 2.50
+                let preis = 0;
+                if (preisIndex >= 0 && values[preisIndex]) {
+                    const preisStr = values[preisIndex]
+                        .replace('€', '')  // Euro-Zeichen entfernen
+                        .replace(',', '.')  // Komma zu Punkt
+                        .replace(' ', '')   // Leerzeichen entfernen
+                        .trim();
+                    preis = parseFloat(preisStr) || 0;
+                }
+                
+                // Kategorie-ID (Warengruppe)
+                let kategorie_id = 1;  // Default: Alkoholfreie Getränke
+                if (gruppeIndex >= 0 && values[gruppeIndex]) {
+                    const warengruppe = parseInt(values[gruppeIndex]);
+                    kategorie_id = warengruppe || 1;
+                }
+                
+                // Kategorie-Name basierend auf ID
+                const kategorieMap = {
+                    1: 'Alkoholfreie Getränke',
+                    2: 'Biere',
+                    3: 'Wein',
+                    4: 'Spirituosen',
+                    5: 'Heiße Getränke',
+                    6: 'Sonstiges',
+                    7: 'Snacks',
+                    8: 'Diverses'
+                };
+                const kategorie_name = kategorieMap[kategorie_id] || 'Sonstiges';
+                
+                // Sortierung
+                let sortierung = 0;
+                if (sortIndex >= 0 && values[sortIndex]) {
+                    sortierung = parseInt(values[sortIndex]) || 0;
+                }
+                
+                // Kurzname
+                const name_kurz = (kurzIndex >= 0 && values[kurzIndex]) ? values[kurzIndex] : name.substring(0, 10);
+                
+                // Icon basierend auf Kategorie
+                const iconMap = {
+                    1: '🥤',
+                    2: '🍺',
+                    3: '🍷',
+                    4: '🥃',
+                    5: '☕',
+                    6: '🍽️',
+                    7: '🍿',
+                    8: '📦'
+                };
+                const icon = iconMap[kategorie_id] || '🍽️';
+                
                 artikel.push({
-                    artikel_id: parseInt(obj.artikel_id),
-                    name: obj.name,
-                    name_kurz: obj.name_kurz || obj.name,
-                    preis: parseFloat(obj.preis),
-                    steuer_prozent: parseFloat(obj.steuer_prozent || 10),
-                    kategorie_id: parseInt(obj.kategorie_id),
-                    kategorie_name: obj.kategorie_name,
-                    aktiv: obj.aktiv === '1' || obj.aktiv === 'true',
-                    sortierung: parseInt(obj.sortierung || 0),
-                    icon: obj.icon || '🍽️'
+                    artikel_id: parseInt(id),
+                    name: name,
+                    name_kurz: name_kurz,
+                    preis: preis,
+                    steuer_prozent: 19,  // Standard MwSt
+                    kategorie_id: kategorie_id,
+                    kategorie_name: kategorie_name,
+                    aktiv: preis > 0,  // Nur aktiv wenn Preis > 0
+                    sortierung: sortierung,
+                    icon: icon
                 });
+                
+                imported++;
             }
 
-            // Clear and re-add
+            console.log('Parsed articles:', imported);
+            console.log('Skipped:', skipped);
+            console.log('Sample:', artikel.slice(0, 3));
+
+            // Datenbank leeren und neu befüllen
             await db.artikel.clear();
             await db.artikel.bulkAdd(artikel);
+            
+            // Backup nach Import
+            await DataProtection.createBackup();
 
-            Utils.showToast(`${artikel.length} Artikel importiert`, 'success');
+            console.log('✅ IMPORT ERFOLGREICH');
+            Utils.showToast(`${imported} Artikel importiert!`, 'success');
             return artikel;
         } catch (error) {
+            console.error('❌ IMPORT FEHLER:', error);
+            console.error('Error stack:', error.stack);
             Utils.showToast('Fehler beim Import: ' + error.message, 'error');
             throw error;
         }
