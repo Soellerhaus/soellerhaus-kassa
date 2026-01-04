@@ -259,30 +259,39 @@ const Auth = {
             console.log('=== GET GAESTE BY LETTER ===');
             console.log('Letter:', letter);
             
-            // Alle Gäste abrufen (zum Debugging)
+            // Alle Gäste direkt abrufen (ohne .where Index)
             const allGaeste = await db.gaeste.toArray();
             console.log('Total guests in database:', allGaeste.length);
             console.log('All guests:', allGaeste.map(g => ({
-                vorname: g.vorname,
+                gast_id: g.gast_id ? g.gast_id.substring(0, 8) : 'N/A',
+                vorname: g.vorname || 'FEHLT',
                 aktiv: g.aktiv,
                 checked_out: g.checked_out,
                 erstellt_am: g.erstellt_am
             })));
             
-            const gaeste = await db.gaeste
-                .where('aktiv').equals(true)
-                .and(g => {
-                    // Null-Check für vorname
-                    if (!g.vorname || typeof g.vorname !== 'string') {
-                        console.warn('Guest with invalid vorname:', g);
-                        return false;
-                    }
-                    return !g.checked_out && g.vorname.toUpperCase().startsWith(letter.toUpperCase());
-                })
-                .toArray();
+            // Manuell filtern statt .where() zu verwenden
+            const gaeste = allGaeste.filter(g => {
+                // Validierung
+                if (!g.vorname || typeof g.vorname !== 'string') {
+                    console.warn('Guest with invalid vorname:', g);
+                    return false;
+                }
+                
+                // Prüfe aktiv und nicht ausgecheckt
+                if (g.aktiv !== true || g.checked_out === true) {
+                    return false;
+                }
+                
+                // Prüfe Anfangsbuchstabe
+                return g.vorname.toUpperCase().startsWith(letter.toUpperCase());
+            });
 
             console.log('Filtered guests for letter', letter + ':', gaeste.length);
-            console.log('Filtered guests:', gaeste.map(g => g.vorname));
+            console.log('Filtered guests:', gaeste.map(g => ({
+                vorname: g.vorname,
+                gast_id: g.gast_id.substring(0, 8)
+            })));
 
             // Sortieren und Duplikate mit Nummerierung versehen
             const sortedGaeste = gaeste.sort((a, b) => 
