@@ -800,6 +800,7 @@ Router.register('name-select', async () => {
 // PIN Entry Page
 Router.register('pin-entry', () => {
     console.log('PIN-entry page, selected guest:', window.selectedGastId);
+    State.currentPin = '';  // Reset PIN
     
     if (!window.selectedGastId) {
         console.log('No guest selected, going back to login');
@@ -859,17 +860,35 @@ Router.register('register', () => {
 
 /* ===== GLOBAL EVENT HANDLERS ===== */
 
-// PIN Input Handlers
+// PIN Input Handlers (ohne komplettes Re-Rendering)
 window.handlePinInput = (digit) => {
+    console.log('PIN input:', digit, 'Current length:', State.currentPin.length);
     if (State.currentPin.length < 6) {
         State.currentPin += digit;
-        Router.handleRoute(); // Re-render to update display
+        updatePinDisplay();
     }
 };
 
 window.handlePinDelete = () => {
+    console.log('PIN delete, current:', State.currentPin);
     State.currentPin = State.currentPin.slice(0, -1);
-    Router.handleRoute(); // Re-render to update display
+    updatePinDisplay();
+};
+
+window.updatePinDisplay = () => {
+    const dotsElement = document.querySelector('.pin-dots');
+    const lengthElement = document.querySelector('.pin-length');
+    
+    if (dotsElement) {
+        const pinDisplay = State.currentPin.split('').map(() => '●').join('');
+        dotsElement.textContent = pinDisplay || '───';
+    }
+    
+    if (lengthElement) {
+        lengthElement.textContent = `${State.currentPin.length} / 6`;
+    }
+    
+    console.log('PIN display updated:', State.currentPin.length, 'digits');
 };
 
 window.handlePinCancel = () => {
