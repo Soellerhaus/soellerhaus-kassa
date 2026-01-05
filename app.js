@@ -583,46 +583,57 @@ const Buchungen = {
     async create(artikel, menge=1) {
         if (!State.currentUser) throw new Error('Nicht angemeldet');
         const userId = State.currentUser.id || State.currentUser.gast_id;
+        
+        console.log('📝 Buchung erstellen für User:', userId);
+        console.log('📝 CurrentUser:', State.currentUser);
+        
         const b = {
             buchung_id: Utils.uuid(),
             user_id: userId, // Für Supabase
-            gast_id: userId, // Legacy Kompatibilität
-            gast_vorname: State.currentUser.firstName || State.currentUser.vorname,
+            gast_id: String(userId), // Legacy Kompatibilität - als String
+            gast_vorname: State.currentUser.firstName || State.currentUser.first_name || State.currentUser.vorname || '',
             gast_nachname: State.currentUser.nachname || '',
             gastgruppe: State.currentUser.zimmernummer || '',
             artikel_id: artikel.artikel_id, 
             artikel_name: artikel.name, 
-            preis: artikel.preis,
+            preis: parseFloat(artikel.preis),
             steuer_prozent: artikel.steuer_prozent || 10, 
-            menge,
+            menge: parseInt(menge),
             datum: Utils.formatDate(new Date()), 
             uhrzeit: Utils.formatTime(new Date()),
             erstellt_am: new Date().toISOString(), 
             exportiert: false, 
             geraet_id: Utils.getDeviceId(), 
-            sync_status: isOnline ? 'synced' : 'pending',
             session_id: State.sessionId,
             storniert: false,
-            fix: false
+            fix: false,
+            aus_fehlend: false,
+            ist_umlage: false
         };
         
+        console.log('📝 Buchung Objekt:', b);
+        
         // Immer lokal speichern (Cache)
-        await db.buchungen.add(b);
+        await db.buchungen.add({...b, sync_status: isOnline ? 'synced' : 'pending'});
         
         // Online: Auch nach Supabase
         if (supabaseClient && isOnline) {
             try {
-                const { error } = await supabaseClient.from('buchungen').insert(b);
+                console.log('📤 Sende an Supabase...');
+                const { data, error } = await supabaseClient.from('buchungen').insert(b).select();
                 if (error) {
-                    console.error('Supabase insert error:', error);
+                    console.error('❌ Supabase insert error:', error);
                     await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
                 } else {
+                    console.log('✅ Supabase insert OK:', data);
                     await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
                 }
             } catch(e) {
-                console.error('Buchung sync error:', e);
+                console.error('❌ Buchung sync error:', e);
                 await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
             }
+        } else {
+            console.log('⚠️ Offline oder kein Supabase Client');
         }
         
         await DataProtection.createBackup();
