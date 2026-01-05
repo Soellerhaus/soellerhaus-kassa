@@ -1400,6 +1400,95 @@ const ExportService = {
         Utils.showToast(`${bs.length} Buchungen exportiert`, 'success');
     },
     
+    // NOTFALL: Alle Buchungen exportieren (auch bereits exportierte)
+    async exportAlleBuchungenExcel() {
+        // ALLE Buchungen laden - auch exportierte!
+        let bs = [];
+        if (supabaseClient && isOnline) {
+            const { data } = await supabaseClient
+                .from('buchungen')
+                .select('*')
+                .eq('storniert', false)
+                .order('erstellt_am', { ascending: false });
+            if (data) bs = data;
+        }
+        
+        // Fallback lokal
+        if (bs.length === 0) {
+            bs = await db.buchungen.toArray();
+            bs = bs.filter(b => !b.storniert);
+        }
+        
+        if (!bs.length) { 
+            Utils.showToast('Keine Buchungen gefunden', 'warning'); 
+            return; 
+        }
+        
+        console.log('📊 Exportiere ALLE Buchungen:', bs.length);
+        
+        // Artikel-Cache
+        const artikelCache = {};
+        const allArt = await db.artikel.toArray();
+        allArt.forEach(a => { artikelCache[a.artikel_id] = a; });
+        
+        let lastId = parseInt(localStorage.getItem('lastExportId') || '0');
+        
+        const rows = bs.map(b => {
+            lastId++;
+            const artikel = artikelCache[b.artikel_id];
+            return {
+                'ID': lastId,
+                'Artikelnr': b.artikel_id || 0,
+                'Artikel': b.artikel_name || '',
+                'Preis': b.preis || 0,
+                'Datum': b.datum || '',
+                'Uhrzeit': b.uhrzeit || '',
+                'Gastid': b.gast_id || 0,
+                'Gastname': b.gast_vorname || '',
+                'Gastvorname': '',
+                'Gastgruppe': b.gastgruppe || 'keiner Gruppe zugehörig',
+                'Gastgruppennr': 0,
+                'bezahlt': false,
+                'Steuer': b.steuer_prozent || 10,
+                'Anzahl': b.menge || 1,
+                'Rechdatum': '',
+                'Rechnummer': 0,
+                'ZNummer': 0,
+                'Warengruppe': artikel?.kategorie_id || 1,
+                'Bar': false,
+                'Unbar': false,
+                'Artikelreihenfolge': artikel?.sortierung || 0,
+                'Artikelgruppe2': 0,
+                'Artikelreihenfolge2': 0,
+                'Steuer1': 0,
+                'Anfang2': 0,
+                'Bestand2': 0,
+                'Basisbestand2': 0,
+                'Auffuellmenge2': 0,
+                'Fehlbestand2': 0,
+                'Warengruppe1': 0
+            };
+        });
+        
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [
+            {wch: 8}, {wch: 10}, {wch: 25}, {wch: 8}, {wch: 12}, {wch: 10},
+            {wch: 8}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 12}, {wch: 8},
+            {wch: 8}, {wch: 8}, {wch: 12}, {wch: 10}, {wch: 8}, {wch: 10},
+            {wch: 6}, {wch: 6}, {wch: 15}, {wch: 12}, {wch: 15}, {wch: 8},
+            {wch: 8}, {wch: 8}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}
+        ];
+        XLSX.utils.book_append_sheet(wb, ws, 'Buchenungsdetail');
+        
+        const heute = new Date();
+        const datumStr = `${heute.getDate().toString().padStart(2,'0')}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getFullYear()}`;
+        XLSX.writeFile(wb, `Buchenungsdetail_ALLE_${datumStr}.xlsx`);
+        
+        localStorage.setItem('lastExportId', lastId.toString());
+        Utils.showToast(`✅ ${bs.length} Buchungen exportiert (ALLE)`, 'success');
+    },
+    
     // Excel-Export im Buchenungsdetail-Format für Registrierkasse
     async exportBuchungenExcel() {
         const bs = await Buchungen.getAll({ exportiert: false });
@@ -1685,6 +1774,12 @@ Router.register('admin-dashboard', async () => {
             <small style="opacity:0.9;">(${bs.length} gesamt • bearbeiten/löschen)</small>
         </button>
         
+        <!-- NOTFALL EXPORT -->
+        <button class="btn btn-block" onclick="handleNotfallExport()" style="padding:16px;font-size:1rem;margin-bottom:24px;background:#e74c3c;color:white;border:none;">
+            🚨 NOTFALL: Alle Buchungen exportieren<br>
+            <small style="opacity:0.9;">(Auch bereits exportierte/aufgefüllte)</small>
+        </button>
+        
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
                 ⚠️ Fehlende Getränke<br><small>(${fehlendeOffen.length} offen)</small>
@@ -1815,12 +1910,19 @@ Router.register('admin-auffuellliste', async () => {
             <button class="btn btn-primary" onclick="printAuffuellliste()" style="padding:16px;font-size:1.1rem;">
                 🖨️ Für Thermodrucker drucken
             </button>
-            <button class="btn btn-warning" onclick="resetAuffuellliste()" style="padding:16px;font-size:1.1rem;background:#f39c12;">
-                🔄 Zurücksetzen (fragt nach Export)
+            <button class="btn btn-success" onclick="resetAuffuelllisteOhneExport()" style="padding:16px;font-size:1.1rem;background:#27ae60;">
+                ✅ Auffüllliste zurücksetzen<br>
+                <small style="opacity:0.9;">(Getränke wurden aufgefüllt)</small>
             </button>
-            <button class="btn btn-secondary" onclick="resetAuffuelllisteOhneExport()" style="padding:12px;">
-                Nur Auffüllliste zurücksetzen (ohne Export)
-            </button>
+        </div>
+        
+        <div class="card mb-3" style="background:#f8f9fa;border:2px dashed #ccc;">
+            <div style="padding:16px;">
+                <p style="margin:0;color:#666;font-size:0.9rem;">
+                    💡 <strong>Hinweis:</strong> Die Auffüllliste ist UNABHÄNGIG vom Registrierkasse-Export.<br>
+                    Export für Registrierkasse → Im Admin Dashboard
+                </p>
+            </div>
         </div>
         
         <div id="auffuellliste-print">
@@ -1919,35 +2021,16 @@ window.printAuffuellliste = async () => {
     printWindow.print();
 };
 
-// Auffüllliste zurücksetzen - GETRENNT vom Export!
-window.resetAuffuellliste = async () => {
-    const result = confirm(
-        '⚠️ ACHTUNG: Auffüllliste zurücksetzen?\n\n' +
-        'Dies markiert alle Buchungen als "aufgefüllt".\n\n' +
-        'Möchtest du vorher die Buchungen für die Registrierkasse exportieren?\n\n' +
-        'OK = Ja, erst exportieren\n' +
-        'Abbrechen = Nein, abbrechen'
-    );
-    
-    if (result) {
-        // Benutzer will erst exportieren
-        await ExportService.exportBuchungenExcel();
-        
-        // Dann fragen ob Reset
-        if (confirm('Export abgeschlossen.\n\nJetzt die Auffüllliste zurücksetzen?')) {
-            await Buchungen.markAsAufgefuellt();
-            Utils.showToast('Auffüllliste zurückgesetzt', 'success');
-            Router.navigate('admin-auffuellliste');
-        }
-    }
-};
-
-// Nur Auffüllliste zurücksetzen (ohne Export-Frage)
+// Nur Auffüllliste zurücksetzen (NICHT Export!)
 window.resetAuffuelllisteOhneExport = async () => {
-    if (confirm('Auffüllliste zurücksetzen OHNE Export?\n\nDie Buchungen bleiben für den späteren Export erhalten.')) {
+    if (!confirm('Auffüllliste zurücksetzen?\n\nDie Getränke wurden aufgefüllt und die Liste wird auf 0 gesetzt.\n\n(Dies hat keinen Einfluss auf den Registrierkasse-Export)')) return;
+    
+    try {
         await Buchungen.markAsAufgefuellt();
-        Utils.showToast('Auffüllliste zurückgesetzt', 'success');
+        Utils.showToast('✅ Auffüllliste zurückgesetzt', 'success');
         Router.navigate('admin-auffuellliste');
+    } catch(e) {
+        Utils.showToast('Fehler: ' + e.message, 'error');
     }
 };
 
