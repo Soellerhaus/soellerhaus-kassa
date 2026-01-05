@@ -1551,68 +1551,7 @@ const ExportService = {
         }
         
         console.log('📊 Exportiere ALLE Buchungen:', bs.length);
-        
-        // Artikel-Cache
-        const artikelCache = {};
-        const allArt = await db.artikel.toArray();
-        allArt.forEach(a => { artikelCache[a.artikel_id] = a; });
-        
-        let lastId = parseInt(localStorage.getItem('lastExportId') || '0');
-        
-        const rows = bs.map(b => {
-            lastId++;
-            const artikel = artikelCache[b.artikel_id];
-            return {
-                'ID': lastId,
-                'Artikelnr': b.artikel_id || 0,
-                'Artikel': b.artikel_name || '',
-                'Preis': b.preis || 0,
-                'Datum': b.datum || '',
-                'Uhrzeit': b.uhrzeit || '',
-                'Gastid': b.gast_id || 0,
-                'Gastname': b.gast_vorname || '',
-                'Gastvorname': '',
-                'Gastgruppe': b.group_name || b.gastgruppe || 'keine Gruppe',
-                'Gastgruppennr': 0,
-                'bezahlt': false,
-                'Steuer': b.steuer_prozent || 10,
-                'Anzahl': b.menge || 1,
-                'Rechdatum': '',
-                'Rechnummer': 0,
-                'ZNummer': 0,
-                'Warengruppe': artikel?.kategorie_id || 1,
-                'Bar': false,
-                'Unbar': false,
-                'Artikelreihenfolge': artikel?.sortierung || 0,
-                'Artikelgruppe2': 0,
-                'Artikelreihenfolge2': 0,
-                'Steuer1': 0,
-                'Anfang2': 0,
-                'Bestand2': 0,
-                'Basisbestand2': 0,
-                'Auffuellmenge2': 0,
-                'Fehlbestand2': 0,
-                'Warengruppe1': 0
-            };
-        });
-        
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(rows);
-        ws['!cols'] = [
-            {wch: 8}, {wch: 10}, {wch: 25}, {wch: 8}, {wch: 12}, {wch: 10},
-            {wch: 8}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 12}, {wch: 8},
-            {wch: 8}, {wch: 8}, {wch: 12}, {wch: 10}, {wch: 8}, {wch: 10},
-            {wch: 6}, {wch: 6}, {wch: 15}, {wch: 12}, {wch: 15}, {wch: 8},
-            {wch: 8}, {wch: 8}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}
-        ];
-        XLSX.utils.book_append_sheet(wb, ws, 'Buchenungsdetail');
-        
-        const heute = new Date();
-        const datumStr = `${heute.getDate().toString().padStart(2,'0')}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getFullYear()}`;
-        XLSX.writeFile(wb, `Buchenungsdetail_ALLE_${datumStr}.xlsx`);
-        
-        localStorage.setItem('lastExportId', lastId.toString());
-        Utils.showToast(`✅ ${bs.length} Buchungen exportiert (ALLE)`, 'success');
+        await this._exportToAccessFormat(bs, 'Buchenungsdetail_ALLE');
     },
     
     // Excel-Export im Buchenungsdetail-Format für Registrierkasse
@@ -1620,41 +1559,72 @@ const ExportService = {
         const bs = await Buchungen.getAll({ exportiert: false });
         if (!bs.length) { Utils.showToast('Keine neuen Buchungen', 'warning'); return; }
         
+        await this._exportToAccessFormat(bs, 'Buchenungsdetail');
+        
+        // Als exportiert markieren
+        await Buchungen.markAsExported(bs.map(b => b.buchung_id));
+    },
+    
+    // Gemeinsame Export-Funktion für Access-Format
+    async _exportToAccessFormat(bs, filenamePrefix) {
         // Artikel-Cache für Kategorie-IDs aufbauen
         const artikelCache = {};
         const allArt = await db.artikel.toArray();
         allArt.forEach(a => { artikelCache[a.artikel_id] = a; });
         
-        // Letzte ID aus den Buchungen für fortlaufende Nummerierung
-        let lastId = parseInt(localStorage.getItem('lastExportId') || '0');
+        // Letzte ID aus Access (Standard: 20037 basierend auf deiner Tabelle)
+        let lastId = parseInt(localStorage.getItem('lastExportId') || '20037');
         
-        // Daten im Format wie die Access-Tabelle vorbereiten
+        // Datum formatieren: DD.MM.YYYY -> YYYY-MM-DD für Access
+        const formatDatumForAccess = (datum) => {
+            if (!datum) return '';
+            // Wenn schon im ISO-Format (YYYY-MM-DD)
+            if (datum.match(/^\d{4}-\d{2}-\d{2}/)) {
+                return datum.substring(0, 10);
+            }
+            // Wenn im deutschen Format (DD.MM.YYYY)
+            const parts = datum.split('.');
+            if (parts.length === 3) {
+                return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+            }
+            return datum;
+        };
+        
+        // Daten im EXAKT gleichen Format wie Access-Tabelle
         const rows = bs.map(b => {
             lastId++;
             const artikel = artikelCache[b.artikel_id];
             
+            // Gastid als Nummer (nicht UUID)
+            let gastIdNum = 0;
+            if (b.gast_id) {
+                // Versuche Nummer zu extrahieren oder Hash zu erstellen
+                const numMatch = String(b.gast_id).match(/\d+/);
+                gastIdNum = numMatch ? parseInt(numMatch[0]) : Math.abs(String(b.gast_id).split('').reduce((a,c) => a + c.charCodeAt(0), 0));
+            }
+            
             return {
                 'ID': lastId,
-                'Artikelnr': b.artikel_id || 0,
+                'Artikelnr': parseInt(b.artikel_id) || 0,
                 'Artikel': b.artikel_name || '',
-                'Preis': b.preis || 0,
-                'Datum': b.datum || '',
+                'Preis': parseFloat(b.preis) || 0,
+                'Datum': formatDatumForAccess(b.datum),
                 'Uhrzeit': b.uhrzeit || '',
-                'Gastid': b.gast_id || 0,
+                'Gastid': gastIdNum,
                 'Gastname': b.gast_vorname || '',
                 'Gastvorname': '',
-                'Gastgruppe': b.group_name || b.gastgruppe || 'keine Gruppe',
+                'Gastgruppe': b.group_name || b.gastgruppe || 'keiner Gruppe zugehörig',
                 'Gastgruppennr': 0,
                 'bezahlt': false,
-                'Steuer': b.steuer_prozent || 10,
-                'Anzahl': b.menge || 1,
+                'Steuer': parseInt(b.steuer_prozent) || 10,
+                'Anzahl': parseInt(b.menge) || 1,
                 'Rechdatum': '',
                 'Rechnummer': 0,
                 'ZNummer': 0,
-                'Warengruppe': artikel?.kategorie_id || 1,
+                'Warengruppe': parseInt(artikel?.kategorie_id) || 1,
                 'Bar': false,
                 'Unbar': false,
-                'Artikelreihenfolge': artikel?.sortierung || 0,
+                'Artikelreihenfolge': parseInt(artikel?.sortierung) || 0,
                 'Artikelgruppe2': 0,
                 'Artikelreihenfolge2': 0,
                 'Steuer1': 0,
@@ -1685,14 +1655,22 @@ const ExportService = {
         // Datei herunterladen
         const heute = new Date();
         const datumStr = `${heute.getDate().toString().padStart(2,'0')}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getFullYear()}`;
-        XLSX.writeFile(wb, `Buchenungsdetail_${datumStr}.xlsx`);
+        XLSX.writeFile(wb, `${filenamePrefix}_${datumStr}.xlsx`);
         
         // ID speichern für nächsten Export
         localStorage.setItem('lastExportId', lastId.toString());
-        
-        // Als exportiert markieren
-        await Buchungen.markAsExported(bs.map(b => b.buchung_id));
-        Utils.showToast(`${bs.length} Buchungen als Excel exportiert`, 'success');
+        Utils.showToast(`${bs.length} Buchungen exportiert (letzte ID: ${lastId})`, 'success');
+    },
+    
+    // Letzte ID manuell setzen
+    setLastExportId(id) {
+        localStorage.setItem('lastExportId', id.toString());
+        console.log('Letzte Export-ID gesetzt auf:', id);
+    },
+    
+    // Letzte ID abrufen
+    getLastExportId() {
+        return parseInt(localStorage.getItem('lastExportId') || '20037');
     }
 };
 
@@ -2615,6 +2593,9 @@ Router.register('admin-notfall-export', async () => {
         alleDaten.sort().reverse();
     }
     
+    // Aktuelle letzte ID
+    const lastExportId = ExportService.getLastExportId();
+    
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🔧 Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
@@ -2624,8 +2605,25 @@ Router.register('admin-notfall-export', async () => {
             </div>
         </div>
         
+        <!-- LETZTE ID EINSTELLUNG -->
+        <div class="card mb-3" style="border:2px solid #e74c3c;">
+            <div class="card-header" style="background:#e74c3c;color:white;">
+                <h3 style="margin:0;">🔢 Letzte ID für Access</h3>
+            </div>
+            <div class="card-body">
+                <p style="font-size:0.9rem;color:#666;margin-bottom:12px;">
+                    Die ID wird fortlaufend hochgezählt. Stelle sicher, dass die ID mit Access übereinstimmt!
+                </p>
+                <div style="display:flex;gap:12px;align-items:center;">
+                    <input type="number" id="last-export-id" value="${lastExportId}" class="form-input" style="width:150px;font-size:1.2rem;font-weight:bold;">
+                    <button class="btn btn-danger" onclick="saveLastExportId()">💾 Speichern</button>
+                    <span style="color:#888;font-size:0.9rem;">Nächste Buchung: ID ${lastExportId + 1}</span>
+                </div>
+            </div>
+        </div>
+        
         <div class="card mb-3">
-            <div class="card-header"><h3 style="margin:0;">Zeitraum wählen</h3></div>
+            <div class="card-header"><h3 style="margin:0;">📅 Zeitraum wählen</h3></div>
             <div class="card-body">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
                     <div>
@@ -2649,16 +2647,20 @@ Router.register('admin-notfall-export', async () => {
                 </div>
                 
                 <button class="btn btn-secondary btn-block" onclick="handleNotfallExportMitDatum()" style="padding:12px;">
-                    📥 Ausgewählten Zeitraum exportieren (Excel)
+                    📥 Ausgewählten Zeitraum exportieren (Excel für Access)
                 </button>
             </div>
         </div>
         
         <div class="card" style="background:#f8f9fa;">
             <div style="padding:16px;">
-                <strong>Verfügbare Tage:</strong> ${alleDaten.length}<br>
-                <small style="color:#888;">Ältestes Datum: ${alleDaten[alleDaten.length-1] || '-'}<br>
-                Neuestes Datum: ${alleDaten[0] || '-'}</small>
+                <strong>ℹ️ Info:</strong><br>
+                <small style="color:#888;">
+                    • Verfügbare Tage: ${alleDaten.length}<br>
+                    • Ältestes Datum: ${alleDaten[alleDaten.length-1] || '-'}<br>
+                    • Neuestes Datum: ${alleDaten[0] || '-'}<br>
+                    • Export-Format: Exakt wie Access-Tabelle "Buchenungsdetail"
+                </small>
             </div>
         </div>
     </div>`);
@@ -2667,6 +2669,19 @@ Router.register('admin-notfall-export', async () => {
     document.getElementById('notfall-von')?.addEventListener('change', updateNotfallVorschau);
     document.getElementById('notfall-bis')?.addEventListener('change', updateNotfallVorschau);
 });
+
+// Letzte ID speichern
+window.saveLastExportId = () => {
+    const input = document.getElementById('last-export-id');
+    const newId = parseInt(input?.value);
+    if (isNaN(newId) || newId < 0) {
+        Utils.showToast('Ungültige ID', 'error');
+        return;
+    }
+    ExportService.setLastExportId(newId);
+    Utils.showToast(`Letzte ID auf ${newId} gesetzt`, 'success');
+    Router.navigate('admin-notfall-export'); // Seite neu laden
+};
 
 // Vorschau aktualisieren
 window.updateNotfallVorschau = async () => {
@@ -2740,44 +2755,82 @@ window.handleNotfallExportMitDatum = async () => {
         return;
     }
     
-    // Excel erstellen
+    // Excel erstellen mit Access-kompatiblem Format
     const artikelCache = {};
     const allArt = await db.artikel.toArray();
     allArt.forEach(a => { artikelCache[a.artikel_id] = a; });
     
-    let lastId = parseInt(localStorage.getItem('lastExportId') || '0');
+    let lastId = parseInt(localStorage.getItem('lastExportId') || '20037');
+    
+    // Datum formatieren für Access
+    const formatDatumForAccess = (datum) => {
+        if (!datum) return '';
+        if (datum.match(/^\d{4}-\d{2}-\d{2}/)) return datum.substring(0, 10);
+        const parts = datum.split('.');
+        if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+        return datum;
+    };
     
     const rows = bs.map(b => {
         lastId++;
         const artikel = artikelCache[b.artikel_id];
+        
+        let gastIdNum = 0;
+        if (b.gast_id) {
+            const numMatch = String(b.gast_id).match(/\d+/);
+            gastIdNum = numMatch ? parseInt(numMatch[0]) : Math.abs(String(b.gast_id).split('').reduce((a,c) => a + c.charCodeAt(0), 0));
+        }
+        
         return {
             'ID': lastId,
-            'Artikelnr': b.artikel_id || 0,
+            'Artikelnr': parseInt(b.artikel_id) || 0,
             'Artikel': b.artikel_name || '',
-            'Preis': b.preis || 0,
-            'Datum': b.datum || '',
+            'Preis': parseFloat(b.preis) || 0,
+            'Datum': formatDatumForAccess(b.datum),
             'Uhrzeit': b.uhrzeit || '',
-            'Gastid': b.gast_id || 0,
+            'Gastid': gastIdNum,
             'Gastname': b.gast_vorname || '',
             'Gastvorname': '',
-            'Gastgruppe': b.group_name || b.gastgruppe || 'keine Gruppe',
+            'Gastgruppe': b.group_name || b.gastgruppe || 'keiner Gruppe zugehörig',
             'Gastgruppennr': 0,
             'bezahlt': false,
-            'Steuer': b.steuer_prozent || 10,
-            'Anzahl': b.menge || 1,
-            'Warengruppe': artikel?.kategorie_id || 1
+            'Steuer': parseInt(b.steuer_prozent) || 10,
+            'Anzahl': parseInt(b.menge) || 1,
+            'Rechdatum': '',
+            'Rechnummer': 0,
+            'ZNummer': 0,
+            'Warengruppe': parseInt(artikel?.kategorie_id) || 1,
+            'Bar': false,
+            'Unbar': false,
+            'Artikelreihenfolge': parseInt(artikel?.sortierung) || 0,
+            'Artikelgruppe2': 0,
+            'Artikelreihenfolge2': 0,
+            'Steuer1': 0,
+            'Anfang2': 0,
+            'Bestand2': 0,
+            'Basisbestand2': 0,
+            'Auffuellmenge2': 0,
+            'Fehlbestand2': 0,
+            'Warengruppe1': 0
         };
     });
     
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, 'Notfall_Export');
+    ws['!cols'] = [
+        {wch: 8}, {wch: 10}, {wch: 25}, {wch: 8}, {wch: 12}, {wch: 10},
+        {wch: 8}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 12}, {wch: 8},
+        {wch: 8}, {wch: 8}, {wch: 12}, {wch: 10}, {wch: 8}, {wch: 10},
+        {wch: 6}, {wch: 6}, {wch: 15}, {wch: 12}, {wch: 15}, {wch: 8},
+        {wch: 8}, {wch: 8}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, 'Buchenungsdetail');
     
-    const filename = `Notfall_${von}_bis_${bis}.xlsx`;
+    const filename = `Buchenungsdetail_${von}_bis_${bis}.xlsx`;
     XLSX.writeFile(wb, filename);
     
     localStorage.setItem('lastExportId', lastId.toString());
-    Utils.showToast(`${bs.length} Buchungen exportiert`, 'success');
+    Utils.showToast(`${bs.length} Buchungen exportiert (letzte ID: ${lastId})`, 'success');
 };
 
 // ============ GRUPPENVERWALTUNG ============
