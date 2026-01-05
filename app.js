@@ -1620,16 +1620,25 @@ Router.register('admin-dashboard', async () => {
             <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(heuteB.reduce((s,b) => s+b.preis*b.menge, 0))}</div><div class="stat-label">Umsatz heute</div></div>
         </div>
         
-        <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:20px;font-size:1.2rem;margin-bottom:16px;">
-            🍺 Auffüllliste (${nichtExp.length} Buchungen)
+        <!-- AUFFÜLLLISTE -->
+        <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;">
+            🍺 Auffüllliste drucken<br>
+            <small style="opacity:0.9;">(${nichtExp.length} Getränke zum Auffüllen)</small>
         </button>
         
+        <!-- EXCEL EXPORT FÜR REGISTRIERKASSE -->
         ${nichtExp.length ? `
-        <button class="btn btn-block" onclick="handleExportExcel()" style="padding:20px;font-size:1.2rem;margin-bottom:16px;background:linear-gradient(135deg, #217346, #1e6b3d);color:white;border:none;">
-            📥 EXCEL EXPORT (${nichtExp.length} Buchungen)<br>
-            <small style="opacity:0.9;">Für Registrierkasse herunterladen</small>
+        <button class="btn btn-block" onclick="handleExportExcel()" style="padding:20px;font-size:1.2rem;margin-bottom:12px;background:linear-gradient(135deg, #217346, #1e6b3d);color:white;border:none;">
+            📊 EXCEL für Registrierkasse<br>
+            <small style="opacity:0.9;">(${nichtExp.length} Buchungen exportieren)</small>
         </button>
         ` : ''}
+        
+        <!-- ALLE BUCHUNGEN ANSEHEN -->
+        <button class="btn btn-block" onclick="Router.navigate('admin-alle-buchungen')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;background:#6c5ce7;color:white;border:none;">
+            📋 Alle Buchungen ansehen<br>
+            <small style="opacity:0.9;">(${bs.length} gesamt • bearbeiten/löschen)</small>
+        </button>
         
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
@@ -1826,6 +1835,89 @@ window.resetAuffuellliste = async () => {
     if (confirm('Alle Buchungen als "aufgefüllt" markieren?\\n\\nDies setzt die Auffüllliste auf 0 zurück.')) {
         await Buchungen.resetAuffuellliste();
         Router.navigate('admin-auffuellliste');
+    }
+};
+
+// ============ ALLE BUCHUNGEN ROUTE (Admin) ============
+Router.register('admin-alle-buchungen', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    
+    // Alle Buchungen laden (inkl. stornierte zur Anzeige)
+    const bs = await Buchungen.getAll({ includeStorniert: true });
+    
+    // Nach Datum gruppieren
+    const byDatum = {};
+    bs.forEach(b => {
+        if (!byDatum[b.datum]) byDatum[b.datum] = [];
+        byDatum[b.datum].push(b);
+    });
+    
+    // Sortiert nach Datum (neueste zuerst)
+    const sortedDates = Object.keys(byDatum).sort().reverse();
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📋 Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
+            <div style="padding:16px;text-align:center;">
+                <div style="font-size:1.5rem;font-weight:700;">${bs.length} Buchungen</div>
+                <div>Nach Datum sortiert (neueste zuerst)</div>
+            </div>
+        </div>
+        
+        ${sortedDates.length ? sortedDates.map(datum => {
+            const buchungen = byDatum[datum].sort((a,b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
+            const tagesUmsatz = buchungen.filter(b => !b.storniert).reduce((s,b) => s + b.preis * b.menge, 0);
+            return `
+            <div class="card mb-3">
+                <div class="card-header" style="background:var(--color-stone-light);display:flex;justify-content:space-between;align-items:center;">
+                    <h3 style="font-weight:700;margin:0;">📅 ${datum}</h3>
+                    <span style="font-weight:600;color:var(--color-alpine-green);">${buchungen.length} Buchungen • ${Utils.formatCurrency(tagesUmsatz)}</span>
+                </div>
+                <div class="card-body" style="padding:0;max-height:400px;overflow-y:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+                        <thead style="background:var(--color-stone-light);position:sticky;top:0;">
+                            <tr>
+                                <th style="padding:10px;text-align:left;">Zeit</th>
+                                <th style="padding:10px;text-align:left;">Gast</th>
+                                <th style="padding:10px;text-align:left;">Artikel</th>
+                                <th style="padding:10px;text-align:right;">Menge</th>
+                                <th style="padding:10px;text-align:right;">Preis</th>
+                                <th style="padding:10px;text-align:center;">Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${buchungen.map(b => `
+                                <tr style="border-bottom:1px solid var(--color-stone-medium);${b.storniert ? 'opacity:0.5;text-decoration:line-through;' : ''}">
+                                    <td style="padding:10px;">${b.uhrzeit || '-'}</td>
+                                    <td style="padding:10px;font-weight:500;">${b.gast_vorname || 'Unbekannt'}</td>
+                                    <td style="padding:10px;">${b.artikel_name}</td>
+                                    <td style="padding:10px;text-align:right;">${b.menge}×</td>
+                                    <td style="padding:10px;text-align:right;font-weight:600;">${Utils.formatCurrency(b.preis * b.menge)}</td>
+                                    <td style="padding:10px;text-align:center;">
+                                        ${b.storniert 
+                                            ? '<span style="color:#e74c3c;font-size:0.8rem;">Storniert</span>'
+                                            : `<button class="btn btn-danger" style="padding:4px 12px;font-size:0.8rem;" onclick="handleAdminDeleteBuchung('${b.buchung_id}')">🗑️</button>`
+                                        }
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `}).join('') : '<p class="text-muted text-center" style="padding:40px;">Keine Buchungen vorhanden</p>'}
+    </div>`);
+});
+
+// Admin Buchung löschen (stornieren)
+window.handleAdminDeleteBuchung = async (buchungId) => {
+    if (!confirm('Diese Buchung wirklich stornieren?')) return;
+    try {
+        await Buchungen.storno(buchungId);
+        Utils.showToast('Buchung storniert', 'success');
+        Router.navigate('admin-alle-buchungen');
+    } catch (e) {
+        Utils.showToast('Fehler: ' + e.message, 'error');
     }
 };
 
