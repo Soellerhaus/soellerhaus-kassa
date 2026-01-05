@@ -1010,27 +1010,37 @@ const Artikel = {
                 .select('*')
                 .order('sortierung');
             
-            if (!error && data) {
-                // Cache in Dexie
+            if (!error && data && data.length > 0) {
+                // Nur updaten wenn Supabase Daten hat
                 await db.artikel.clear();
                 await db.artikel.bulkAdd(data);
                 artikelCache = data;
                 artikelCacheTime = Date.now();
+                console.log('✅ Artikel von Supabase geladen:', data.length);
                 return true;
+            } else {
+                console.log('Supabase hat keine Artikel, nutze lokale Daten');
             }
         } catch(e) { console.error('loadFromSupabase error:', e); }
         return false;
     },
     
     async getAll(f={}) {
-        // Cache prüfen
-        if (!artikelCache || Date.now() - artikelCacheTime > ARTIKEL_CACHE_TTL) {
-            if (supabaseClient && isOnline) {
-                await this.loadFromSupabase();
-            }
+        // Erst lokale Daten prüfen
+        let r = await db.artikel.toArray();
+        
+        // Wenn lokal leer und online, von Supabase laden
+        if (r.length === 0 && supabaseClient && isOnline) {
+            await this.loadFromSupabase();
+            r = await db.artikel.toArray();
         }
         
-        let r = artikelCache || await db.artikel.toArray();
+        // Cache aktualisieren
+        if (r.length > 0) {
+            artikelCache = r;
+            artikelCacheTime = Date.now();
+        }
+        
         if (f.aktiv !== undefined) r = r.filter(a => a.aktiv === f.aktiv);
         if (f.kategorie_id) r = r.filter(a => a.kategorie_id === f.kategorie_id);
         if (f.search) { const q = f.search.toLowerCase(); r = r.filter(a => a.name.toLowerCase().includes(q) || a.sku?.toLowerCase().includes(q)); }
@@ -1239,7 +1249,7 @@ const Artikel = {
             console.log(`Row ${i}: ID=${id}, Name="${name}", Preis=${preis}, Kat=${katId}`);
             
             // Check if article exists by ID
-            const existing = await this.getById(id);
+            const existing = await db.artikel.get(id);
             if (existing) { 
                 await db.artikel.update(id, data); 
                 upd++; 
@@ -1252,6 +1262,30 @@ const Artikel = {
                     console.error('Import error for ID', id, e);
                     skip++;
                 }
+            }
+        }
+        
+        // Cache invalidieren
+        artikelCache = null;
+        
+        // Nach Supabase hochladen (als Admin)
+        if (supabaseClient && isOnline) {
+            try {
+                const allArtikel = await db.artikel.toArray();
+                console.log('Uploading', allArtikel.length, 'articles to Supabase...');
+                
+                // Batch upsert
+                const { error } = await supabaseClient
+                    .from('artikel')
+                    .upsert(allArtikel, { onConflict: 'artikel_id' });
+                
+                if (error) {
+                    console.error('Supabase upsert error:', error);
+                } else {
+                    console.log('✅ Artikel nach Supabase synchronisiert');
+                }
+            } catch(e) {
+                console.error('Supabase sync error:', e);
             }
         }
         
