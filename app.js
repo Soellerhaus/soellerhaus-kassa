@@ -1968,12 +1968,6 @@ Router.register('admin-dashboard', async () => {
             <small style="opacity:0.9;">(${bs.length} gesamt • bearbeiten/löschen)</small>
         </button>
         
-        <!-- NOTFALL EXPORT -->
-        <button class="btn btn-block" onclick="handleNotfallExport()" style="padding:16px;font-size:1rem;margin-bottom:24px;background:#e74c3c;color:white;border:none;">
-            🚨 NOTFALL: Alle Buchungen exportieren<br>
-            <small style="opacity:0.9;">(Auch bereits exportierte/aufgefüllte)</small>
-        </button>
-        
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
                 ⚠️ Fehlende Getränke<br><small>(${fehlendeOffen.length} offen)</small>
@@ -2015,6 +2009,13 @@ Router.register('admin-dashboard', async () => {
                     </div>
                 </div>
             </div>
+        </div>
+        
+        <!-- NOTFALL - klein und unauffällig -->
+        <div style="text-align:center;margin-top:24px;padding-top:16px;border-top:1px dashed #ccc;">
+            <a href="#" onclick="Router.navigate('admin-notfall-export');return false;" style="color:#888;font-size:0.85rem;text-decoration:none;">
+                🔧 Notfall: Buchungen nach Datum exportieren
+            </a>
         </div>
     </div>`);
 });
@@ -2583,6 +2584,200 @@ window.bucheUmlageFuerAlle = async () => {
     await DataProtection.createBackup();
     Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${totalGuests} Gäste verteilt`, 'success');
     Router.navigate('admin-dashboard');
+};
+
+// ============ NOTFALL EXPORT (mit Datumsauswahl) ============
+Router.register('admin-notfall-export', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    
+    // Alle verfügbaren Datums-Werte laden
+    let alleDaten = [];
+    if (supabaseClient && isOnline) {
+        try {
+            const { data } = await supabaseClient
+                .from('buchungen')
+                .select('datum')
+                .eq('storniert', false)
+                .order('datum', { ascending: false });
+            if (data) {
+                // Unique Datums-Werte
+                alleDaten = [...new Set(data.map(b => b.datum))].filter(d => d);
+            }
+        } catch(e) {
+            console.error('Datums laden Fehler:', e);
+        }
+    }
+    
+    // Fallback lokal
+    if (alleDaten.length === 0) {
+        const bs = await db.buchungen.toArray();
+        alleDaten = [...new Set(bs.filter(b => !b.storniert).map(b => b.datum))].filter(d => d);
+        alleDaten.sort().reverse();
+    }
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🔧 Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3" style="background:#95a5a6;color:white;">
+            <div style="padding:16px;">
+                <div style="font-weight:700;">⚠️ Nur im Notfall verwenden</div>
+                <div style="font-size:0.9rem;opacity:0.9;">Exportiert Buchungen nach Datum (auch bereits exportierte)</div>
+            </div>
+        </div>
+        
+        <div class="card mb-3">
+            <div class="card-header"><h3 style="margin:0;">Zeitraum wählen</h3></div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                    <div>
+                        <label style="font-weight:600;display:block;margin-bottom:8px;">Von Datum:</label>
+                        <select id="notfall-von" class="form-input" style="width:100%;">
+                            <option value="">-- Wählen --</option>
+                            ${alleDaten.map(d => `<option value="${d}">${d}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-weight:600;display:block;margin-bottom:8px;">Bis Datum:</label>
+                        <select id="notfall-bis" class="form-input" style="width:100%;">
+                            <option value="">-- Wählen --</option>
+                            ${alleDaten.map(d => `<option value="${d}">${d}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;">
+                    <div id="notfall-vorschau" style="color:#666;">Bitte Zeitraum wählen...</div>
+                </div>
+                
+                <button class="btn btn-secondary btn-block" onclick="handleNotfallExportMitDatum()" style="padding:12px;">
+                    📥 Ausgewählten Zeitraum exportieren (Excel)
+                </button>
+            </div>
+        </div>
+        
+        <div class="card" style="background:#f8f9fa;">
+            <div style="padding:16px;">
+                <strong>Verfügbare Tage:</strong> ${alleDaten.length}<br>
+                <small style="color:#888;">Ältestes Datum: ${alleDaten[alleDaten.length-1] || '-'}<br>
+                Neuestes Datum: ${alleDaten[0] || '-'}</small>
+            </div>
+        </div>
+    </div>`);
+    
+    // Event Listener für Vorschau
+    document.getElementById('notfall-von')?.addEventListener('change', updateNotfallVorschau);
+    document.getElementById('notfall-bis')?.addEventListener('change', updateNotfallVorschau);
+});
+
+// Vorschau aktualisieren
+window.updateNotfallVorschau = async () => {
+    const von = document.getElementById('notfall-von')?.value;
+    const bis = document.getElementById('notfall-bis')?.value;
+    const vorschauEl = document.getElementById('notfall-vorschau');
+    
+    if (!von || !bis) {
+        vorschauEl.innerHTML = 'Bitte Zeitraum wählen...';
+        return;
+    }
+    
+    // Buchungen zählen
+    let count = 0;
+    let summe = 0;
+    
+    if (supabaseClient && isOnline) {
+        const { data } = await supabaseClient
+            .from('buchungen')
+            .select('preis, menge')
+            .eq('storniert', false)
+            .gte('datum', von)
+            .lte('datum', bis);
+        if (data) {
+            count = data.length;
+            summe = data.reduce((s, b) => s + (b.preis * b.menge), 0);
+        }
+    } else {
+        const bs = await db.buchungen.toArray();
+        const filtered = bs.filter(b => !b.storniert && b.datum >= von && b.datum <= bis);
+        count = filtered.length;
+        summe = filtered.reduce((s, b) => s + (b.preis * b.menge), 0);
+    }
+    
+    vorschauEl.innerHTML = `<strong>${count} Buchungen</strong> im Zeitraum ${von} bis ${bis}<br>Gesamtsumme: <strong>${Utils.formatCurrency(summe)}</strong>`;
+};
+
+// Notfall Export mit Datum
+window.handleNotfallExportMitDatum = async () => {
+    const von = document.getElementById('notfall-von')?.value;
+    const bis = document.getElementById('notfall-bis')?.value;
+    
+    if (!von || !bis) {
+        Utils.showToast('Bitte Von und Bis Datum wählen', 'warning');
+        return;
+    }
+    
+    if (von > bis) {
+        Utils.showToast('Von-Datum muss vor Bis-Datum liegen', 'warning');
+        return;
+    }
+    
+    // Buchungen laden
+    let bs = [];
+    if (supabaseClient && isOnline) {
+        const { data } = await supabaseClient
+            .from('buchungen')
+            .select('*')
+            .eq('storniert', false)
+            .gte('datum', von)
+            .lte('datum', bis)
+            .order('datum', { ascending: true });
+        if (data) bs = data;
+    } else {
+        const all = await db.buchungen.toArray();
+        bs = all.filter(b => !b.storniert && b.datum >= von && b.datum <= bis);
+    }
+    
+    if (bs.length === 0) {
+        Utils.showToast('Keine Buchungen im gewählten Zeitraum', 'warning');
+        return;
+    }
+    
+    // Excel erstellen
+    const artikelCache = {};
+    const allArt = await db.artikel.toArray();
+    allArt.forEach(a => { artikelCache[a.artikel_id] = a; });
+    
+    let lastId = parseInt(localStorage.getItem('lastExportId') || '0');
+    
+    const rows = bs.map(b => {
+        lastId++;
+        const artikel = artikelCache[b.artikel_id];
+        return {
+            'ID': lastId,
+            'Artikelnr': b.artikel_id || 0,
+            'Artikel': b.artikel_name || '',
+            'Preis': b.preis || 0,
+            'Datum': b.datum || '',
+            'Uhrzeit': b.uhrzeit || '',
+            'Gastid': b.gast_id || 0,
+            'Gastname': b.gast_vorname || '',
+            'Gastvorname': '',
+            'Gastgruppe': b.group_name || b.gastgruppe || 'keine Gruppe',
+            'Gastgruppennr': 0,
+            'bezahlt': false,
+            'Steuer': b.steuer_prozent || 10,
+            'Anzahl': b.menge || 1,
+            'Warengruppe': artikel?.kategorie_id || 1
+        };
+    });
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Notfall_Export');
+    
+    const filename = `Notfall_${von}_bis_${bis}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    
+    localStorage.setItem('lastExportId', lastId.toString());
+    Utils.showToast(`${bs.length} Buchungen exportiert`, 'success');
 };
 
 // ============ GRUPPENVERWALTUNG ============
