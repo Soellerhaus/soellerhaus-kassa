@@ -1,8 +1,59 @@
 // ================================
-// SEOLLERHAUS KASSA - MAIN APP v2.0
-// Persistente Gästeregistrierung & Artikelverwaltung
+// SEOLLERHAUS KASSA - MAIN APP v3.0
+// Supabase Multi-Device Version
 // ================================
 
+// ================================
+// SUPABASE KONFIGURATION
+// ================================
+const SUPABASE_URL = 'https://lslpyelpzakqrmrjznsc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzbHB5ZWxwemFrcXJtcmp6bnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1ODQ3MjIsImV4cCI6MjA4MzE2MDcyMn0.ITXPK3CAXGO9p-hJqjOKqdQOh-TbH-WDMaYamxDgeqc';
+
+// Supabase Client (wird beim Laden der Seite initialisiert)
+let supabaseClient = null;
+let isOnline = navigator.onLine;
+
+// Online/Offline Status
+window.addEventListener('online', () => { isOnline = true; syncPendingData(); });
+window.addEventListener('offline', () => { isOnline = false; });
+
+// Supabase initialisieren
+function initSupabase() {
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true,
+                detectSessionInUrl: false
+            }
+        });
+        console.log('✅ Supabase Client initialisiert');
+        return true;
+    }
+    console.warn('⚠️ Supabase nicht verfügbar - Offline-Modus');
+    return false;
+}
+
+// Pending Data sync (falls offline Buchungen gemacht wurden)
+async function syncPendingData() {
+    if (!supabaseClient || !isOnline) return;
+    try {
+        const pending = await db.buchungen.where('sync_status').equals('pending').toArray();
+        for (const b of pending) {
+            try {
+                const { error } = await supabaseClient.from('buchungen').upsert(b, { onConflict: 'buchung_id' });
+                if (!error) {
+                    await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
+                }
+            } catch (e) { console.error('Sync error:', e); }
+        }
+        if (pending.length > 0) console.log(`✅ ${pending.length} Buchungen synchronisiert`);
+    } catch (e) { console.error('syncPendingData error:', e); }
+}
+
+// ================================
+// DEXIE (Lokaler Cache)
+// ================================
 const db = new Dexie('SeollerhausKassa');
 
 db.version(1).stores({
@@ -229,60 +280,196 @@ window.State = State;
 ['click','touchstart','keydown','mousemove'].forEach(e => document.addEventListener(e, () => { if(State.currentUser) State.resetInactivityTimer(); }, {passive:true}));
 
 const RegisteredGuests = {
+    // Supabase Auth + Profile
     async register(firstName, password) {
         if (!firstName?.trim()) throw new Error('Vorname erforderlich');
-        if (!password) throw new Error('Passwort erforderlich');
-        const salt = Utils.generateSalt();
-        const guest = { firstName: firstName.trim(), passwordHash: await Utils.hashPassword(password, salt), salt, createdAt: new Date().toISOString(), lastLoginAt: null, geloescht: false };
-        guest.id = await db.registeredGuests.add(guest);
-        await DataProtection.createBackup();
-        Utils.showToast('Registrierung erfolgreich!', 'success');
-        return guest;
+        if (!password || password.length < 4) throw new Error('PIN muss mind. 4 Zeichen haben');
+        
+        // Generiere pseudo-Email für Supabase Auth
+        const uniqueId = Utils.uuid().substring(0, 8);
+        const email = `${firstName.toLowerCase().replace(/[^a-z]/g, '')}.${uniqueId}@kassa.local`;
+        
+        if (supabaseClient && isOnline) {
+            // Supabase SignUp
+            const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+                email: email,
+                password: password,
+                options: { data: { first_name: firstName.trim() } }
+            });
+            
+            if (authError) throw new Error('Registrierung fehlgeschlagen: ' + authError.message);
+            
+            // Warte kurz auf Trigger (Profile wird automatisch erstellt)
+            await new Promise(r => setTimeout(r, 500));
+            
+            // Profile laden
+            const { data: profile } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('id', authData.user.id)
+                .single();
+            
+            // Lokalen Cache aktualisieren
+            const localGuest = { 
+                id: authData.user.id, 
+                firstName: firstName.trim(), 
+                email: email,
+                createdAt: new Date().toISOString(),
+                geloescht: false 
+            };
+            try { await db.registeredGuests.add(localGuest); } catch(e) {}
+            
+            Utils.showToast('Registrierung erfolgreich!', 'success');
+            State.setUser({ ...authData.user, ...profile, firstName: firstName.trim() });
+            return localGuest;
+        } else {
+            // Offline-Modus: Nur lokal speichern
+            const salt = Utils.generateSalt();
+            const guest = { firstName: firstName.trim(), passwordHash: await Utils.hashPassword(password, salt), salt, createdAt: new Date().toISOString(), geloescht: false, pendingSync: true };
+            guest.id = await db.registeredGuests.add(guest);
+            Utils.showToast('Offline-Registrierung', 'info');
+            return guest;
+        }
     },
+    
     async login(id, password) {
-        const g = await db.registeredGuests.get(id);
-        if (!g) throw new Error('Gast nicht gefunden');
-        if (g.geloescht) throw new Error('Account deaktiviert');
-        if (await Utils.hashPassword(password, g.salt) !== g.passwordHash) throw new Error('Falsches Passwort');
-        await db.registeredGuests.update(id, { lastLoginAt: new Date().toISOString() });
-        State.setUser(g);
-        Utils.showToast(`Willkommen, ${g.firstName}!`, 'success');
-        return g;
+        if (supabaseClient && isOnline) {
+            // Supabase Login - Profile laden um Email zu bekommen
+            const { data: profile } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('id', id)
+                .single();
+            
+            if (!profile) throw new Error('Gast nicht gefunden');
+            if (profile.geloescht) throw new Error('Account deaktiviert');
+            
+            // Login mit Email
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: profile.email,
+                password: password
+            });
+            
+            if (error) throw new Error('Falsches Passwort');
+            
+            // Last login updaten
+            await supabaseClient.from('profiles').update({ last_login_at: new Date().toISOString() }).eq('id', id);
+            
+            const user = { ...data.user, ...profile, firstName: profile.first_name };
+            State.setUser(user);
+            Utils.showToast(`Willkommen, ${profile.first_name}!`, 'success');
+            return user;
+        } else {
+            // Offline: Lokaler Login
+            const g = await db.registeredGuests.get(id);
+            if (!g) throw new Error('Gast nicht gefunden');
+            if (g.geloescht) throw new Error('Account deaktiviert');
+            if (await Utils.hashPassword(password, g.salt) !== g.passwordHash) throw new Error('Falsches Passwort');
+            await db.registeredGuests.update(id, { lastLoginAt: new Date().toISOString() });
+            State.setUser(g);
+            Utils.showToast(`Willkommen, ${g.firstName}! (Offline)`, 'success');
+            return g;
+        }
     },
+    
     async getByFirstLetter(letter) {
-        const all = await db.registeredGuests.toArray();
-        const filtered = all.filter(g => !g.geloescht && g.firstName?.toUpperCase().startsWith(letter.toUpperCase())).sort((a,b) => a.firstName.localeCompare(b.firstName));
-        const cnt = {};
-        return filtered.map(g => { cnt[g.firstName] = (cnt[g.firstName]||0)+1; return {...g, displayName: cnt[g.firstName] > 1 ? `${g.firstName} (${cnt[g.firstName]})` : g.firstName}; });
+        if (supabaseClient && isOnline) {
+            const { data, error } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('geloescht', false)
+                .ilike('first_name', `${letter}%`)
+                .order('first_name');
+            
+            if (error || !data) {
+                // Fallback auf lokale Daten
+                const all = await db.registeredGuests.toArray();
+                const filtered = all.filter(g => !g.geloescht && g.firstName?.toUpperCase().startsWith(letter.toUpperCase()));
+                return filtered.sort((a,b) => a.firstName.localeCompare(b.firstName));
+            }
+            
+            // Cache aktualisieren
+            for (const p of data) {
+                try { 
+                    await db.registeredGuests.put({ id: p.id, firstName: p.first_name, email: p.email, geloescht: p.geloescht });
+                } catch(e) {}
+            }
+            
+            const cnt = {};
+            return data.map(g => {
+                const name = g.first_name;
+                cnt[name] = (cnt[name] || 0) + 1;
+                return { ...g, id: g.id, firstName: name, displayName: cnt[name] > 1 ? `${name} (${cnt[name]})` : name };
+            });
+        } else {
+            const all = await db.registeredGuests.toArray();
+            const filtered = all.filter(g => !g.geloescht && g.firstName?.toUpperCase().startsWith(letter.toUpperCase())).sort((a,b) => a.firstName.localeCompare(b.firstName));
+            const cnt = {};
+            return filtered.map(g => { cnt[g.firstName] = (cnt[g.firstName]||0)+1; return {...g, displayName: cnt[g.firstName] > 1 ? `${g.firstName} (${cnt[g.firstName]})` : g.firstName}; });
+        }
     },
+    
     async getAll() { 
+        if (supabaseClient && isOnline) {
+            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false).order('first_name');
+            return (data || []).map(g => ({ ...g, firstName: g.first_name }));
+        }
         const all = await db.registeredGuests.toArray();
         return all.filter(g => !g.geloescht);
     },
+    
     async getGeloeschte() {
+        if (supabaseClient && isOnline) {
+            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', true);
+            return (data || []).map(g => ({ ...g, firstName: g.first_name }));
+        }
         const all = await db.registeredGuests.toArray();
         return all.filter(g => g.geloescht);
     },
+    
     async softDelete(id) { 
-        await db.registeredGuests.update(id, { geloescht: true, geloeschtAm: new Date().toISOString() }); 
-        await DataProtection.createBackup(); 
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('profiles').update({ geloescht: true, geloescht_am: new Date().toISOString() }).eq('id', id);
+        }
+        try { await db.registeredGuests.update(id, { geloescht: true, geloeschtAm: new Date().toISOString() }); } catch(e) {}
         Utils.showToast('Gast in Papierkorb verschoben', 'success'); 
     },
+    
     async restore(id) {
-        await db.registeredGuests.update(id, { geloescht: false, geloeschtAm: null });
-        await DataProtection.createBackup();
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('profiles').update({ geloescht: false, geloescht_am: null }).eq('id', id);
+        }
+        try { await db.registeredGuests.update(id, { geloescht: false, geloeschtAm: null }); } catch(e) {}
         Utils.showToast('Gast wiederhergestellt', 'success');
     },
+    
     async deletePermanent(id) { 
-        await db.registeredGuests.delete(id); 
-        await DataProtection.createBackup(); 
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('profiles').delete().eq('id', id);
+        }
+        try { await db.registeredGuests.delete(id); } catch(e) {}
         Utils.showToast('Gast endgültig gelöscht', 'success'); 
     }
 };
 
 const Auth = {
     async login(id, pin) {
-        if (typeof id === 'number') return RegisteredGuests.login(id, pin);
+        // ID kann UUID (Supabase) oder String (Legacy) sein
+        if (typeof id === 'string' && id.includes('-')) {
+            // UUID - Supabase User
+            return RegisteredGuests.login(id, pin);
+        }
+        if (typeof id === 'number') {
+            // Legacy ID aus lokaler DB - muss zu Supabase migrieren
+            // Versuche zuerst lokalen Login
+            const local = await db.registeredGuests.get(id);
+            if (local?.email && supabaseClient && isOnline) {
+                // Hat Email -> kann Supabase Login nutzen
+                return RegisteredGuests.login(local.id, pin);
+            }
+            return RegisteredGuests.login(id, pin);
+        }
+        // Legacy Gast
         const g = await db.gaeste.get(id);
         if (!g) throw new Error('Nicht gefunden');
         if (g.checked_out) throw new Error('Ausgecheckt');
@@ -297,17 +484,32 @@ const Auth = {
         return [...reg, ...legacy].sort((a,b) => (a.firstName||a.vorname).localeCompare(b.firstName||b.vorname));
     },
     async adminLogin(pw) {
-        const s = await db.settings.get('admin_password');
-        const stored = s?.value || await Utils.hashPassword('admin123');
-        if (await Utils.hashPassword(pw) === stored) { State.isAdmin = true; Utils.showToast('Admin-Login OK', 'success'); return true; }
-        Utils.showToast('Falsches Passwort', 'error'); return false;
+        if (supabaseClient && isOnline) {
+            const { data } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
+            const stored = data?.value || await Utils.hashPassword('admin123');
+            if (await Utils.hashPassword(pw) === stored) { 
+                State.isAdmin = true; 
+                Utils.showToast('Admin-Login OK', 'success'); 
+                return true; 
+            }
+        } else {
+            const s = await db.settings.get('admin_password');
+            const stored = s?.value || await Utils.hashPassword('admin123');
+            if (await Utils.hashPassword(pw) === stored) { State.isAdmin = true; Utils.showToast('Admin-Login OK', 'success'); return true; }
+        }
+        Utils.showToast('Falsches Passwort', 'error'); 
+        return false;
     },
     async logout() { 
-        // Buchungen der Session als fix markieren (nicht mehr stornierbar durch Gast)
+        // Buchungen der Session als fix markieren
         try {
             await Buchungen.fixSessionBuchungen();
         } catch (e) {
             console.error('fixSessionBuchungen error:', e);
+        }
+        // Supabase Logout
+        if (supabaseClient) {
+            try { await supabaseClient.auth.signOut(); } catch(e) {}
         }
         State.clearUser(); 
         State.isAdmin = false; 
@@ -315,6 +517,20 @@ const Auth = {
         Utils.showToast('Abgemeldet', 'info'); 
     },
     async autoLogin() {
+        // Zuerst Supabase Session prüfen
+        if (supabaseClient && isOnline) {
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session?.user) {
+                    const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', session.user.id).single();
+                    if (profile && !profile.geloescht) {
+                        State.setUser({ ...session.user, ...profile, firstName: profile.first_name });
+                        return true;
+                    }
+                }
+            } catch(e) { console.error('autoLogin supabase error:', e); }
+        }
+        // Fallback: Lokale Session
         const id = localStorage.getItem('current_user_id');
         const type = localStorage.getItem('current_user_type');
         if (id && localStorage.getItem('remember_me')) {
@@ -328,56 +544,140 @@ const Auth = {
 const Buchungen = {
     async create(artikel, menge=1) {
         if (!State.currentUser) throw new Error('Nicht angemeldet');
+        const userId = State.currentUser.id || State.currentUser.gast_id;
         const b = {
             buchung_id: Utils.uuid(),
-            gast_id: State.currentUser.id || State.currentUser.gast_id,
+            user_id: userId, // Für Supabase
+            gast_id: userId, // Legacy Kompatibilität
             gast_vorname: State.currentUser.firstName || State.currentUser.vorname,
             gast_nachname: State.currentUser.nachname || '',
             gastgruppe: State.currentUser.zimmernummer || '',
-            artikel_id: artikel.artikel_id, artikel_name: artikel.name, preis: artikel.preis,
-            steuer_prozent: artikel.steuer_prozent || 10, menge,
-            datum: Utils.formatDate(new Date()), uhrzeit: Utils.formatTime(new Date()),
-            erstellt_am: new Date().toISOString(), exportiert: false, geraet_id: Utils.getDeviceId(), sync_status: 'pending',
+            artikel_id: artikel.artikel_id, 
+            artikel_name: artikel.name, 
+            preis: artikel.preis,
+            steuer_prozent: artikel.steuer_prozent || 10, 
+            menge,
+            datum: Utils.formatDate(new Date()), 
+            uhrzeit: Utils.formatTime(new Date()),
+            erstellt_am: new Date().toISOString(), 
+            exportiert: false, 
+            geraet_id: Utils.getDeviceId(), 
+            sync_status: isOnline ? 'synced' : 'pending',
             session_id: State.sessionId,
             storniert: false,
-            fix: false  // wird true wenn Gast sich abmeldet
+            fix: false
         };
+        
+        // Immer lokal speichern (Cache)
         await db.buchungen.add(b);
+        
+        // Online: Auch nach Supabase
+        if (supabaseClient && isOnline) {
+            try {
+                const { error } = await supabaseClient.from('buchungen').insert(b);
+                if (error) {
+                    console.error('Supabase insert error:', error);
+                    await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
+                } else {
+                    await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
+                }
+            } catch(e) {
+                console.error('Buchung sync error:', e);
+                await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
+            }
+        }
+        
         await DataProtection.createBackup();
         return b;
     },
+    
     async storno(buchung_id) {
+        // Lokal laden
         const allBs = await db.buchungen.toArray();
-        const b = allBs.find(x => x.buchung_id === buchung_id);
+        let b = allBs.find(x => x.buchung_id === buchung_id);
+        
+        // Falls nicht lokal, von Supabase laden
+        if (!b && supabaseClient && isOnline) {
+            const { data } = await supabaseClient.from('buchungen').select('*').eq('buchung_id', buchung_id).single();
+            b = data;
+        }
+        
         if (!b) throw new Error('Buchung nicht gefunden');
-        // Gast kann nur eigene, nicht-fixe Buchungen stornieren
         if (!State.isAdmin && b.fix) throw new Error('Buchung bereits abgeschlossen');
-        await db.buchungen.update(b.buchung_id, { storniert: true, storniert_am: new Date().toISOString() });
+        
+        const update = { storniert: true, storniert_am: new Date().toISOString() };
+        
+        // Lokal updaten
+        try { await db.buchungen.update(buchung_id, update); } catch(e) {}
+        
+        // Supabase updaten
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('buchungen').update(update).eq('buchung_id', buchung_id);
+        }
+        
         await DataProtection.createBackup();
         Utils.showToast('Buchung storniert', 'success');
     },
+    
     async fixSessionBuchungen() {
-        // Alle Buchungen der aktuellen Session als fix markieren
         if (!State.sessionId) return;
+        const userId = State.currentUser?.id || State.currentUser?.gast_id;
+        
         try {
+            // Supabase: RPC Funktion nutzen
+            if (supabaseClient && isOnline && userId) {
+                await supabaseClient.rpc('fix_session_buchungen', {
+                    p_session_id: State.sessionId,
+                    p_user_id: userId
+                });
+            }
+            
+            // Lokal auch updaten
             const allBs = await db.buchungen.toArray();
             const bs = allBs.filter(b => b.session_id === State.sessionId);
             for (const b of bs) {
                 if (!b.storniert) await db.buchungen.update(b.buchung_id, { fix: true });
             }
+            
             await DataProtection.createBackup();
         } catch (e) {
             console.error('fixSessionBuchungen error:', e);
         }
     },
+    
     async getByGast(id, limit=null) {
+        // Supabase bevorzugen wenn online
+        if (supabaseClient && isOnline) {
+            let query = supabaseClient
+                .from('buchungen')
+                .select('*')
+                .eq('user_id', id)
+                .eq('storniert', false)
+                .order('erstellt_am', { ascending: false });
+            
+            if (limit) query = query.limit(limit);
+            const { data } = await query;
+            
+            if (data) {
+                // Cache updaten
+                for (const b of data) {
+                    try { await db.buchungen.put({ ...b, gast_id: b.user_id }); } catch(e) {}
+                }
+                return data.map(b => ({ ...b, gast_id: b.user_id }));
+            }
+        }
+        
+        // Fallback: Lokal
         let r = await db.buchungen.where('gast_id').equals(id).reverse().toArray();
-        r = r.filter(b => !b.storniert); // Stornierte ausblenden
+        r = r.filter(b => !b.storniert);
         return limit ? r.slice(0, limit) : r;
     },
+    
     async getSessionBuchungen() {
         if (!State.sessionId) return [];
+        
         try {
+            // Session-Buchungen immer lokal (sind gerade erst erstellt)
             const allBs = await db.buchungen.toArray();
             const r = allBs.filter(b => b.session_id === State.sessionId && !b.storniert);
             return r.reverse();
@@ -386,19 +686,46 @@ const Buchungen = {
             return [];
         }
     },
+    
     async getAll(filter={}) {
+        // Für Admin: Alle Buchungen von Supabase
+        if (supabaseClient && isOnline && State.isAdmin) {
+            let query = supabaseClient.from('buchungen').select('*');
+            
+            if (filter.exportiert !== undefined) {
+                query = query.eq('exportiert', filter.exportiert);
+            }
+            if (filter.datum) {
+                query = query.eq('datum', filter.datum);
+            }
+            if (filter.includeStorniert !== true) {
+                query = query.eq('storniert', false);
+            }
+            
+            query = query.order('erstellt_am', { ascending: false });
+            
+            const { data } = await query;
+            if (data) {
+                // Cache aktualisieren
+                for (const b of data) {
+                    try { await db.buchungen.put({ ...b, gast_id: b.user_id }); } catch(e) {}
+                }
+                return data.map(b => ({ ...b, gast_id: b.user_id }));
+            }
+        }
+        
+        // Fallback: Lokal
         let r = await db.buchungen.toArray();
         if (filter.exportiert !== undefined) r = r.filter(b => b.exportiert === filter.exportiert);
         if (filter.datum) r = r.filter(b => b.datum === filter.datum);
         if (filter.includeStorniert !== true) r = r.filter(b => !b.storniert);
         return r.reverse();
     },
+    
     async getAuffuellliste() {
-        // Alle nicht-exportierten, nicht-stornierten Buchungen gruppiert nach Kategorie und Artikel
-        const bs = await db.buchungen.toArray();
+        const bs = await this.getAll({ exportiert: false });
         const aktiv = bs.filter(b => !b.storniert && !b.exportiert);
         
-        // Gruppieren nach Artikel
         const byArtikel = {};
         for (const b of aktiv) {
             const key = b.artikel_id;
@@ -415,26 +742,40 @@ const Buchungen = {
             byArtikel[key].menge += b.menge;
         }
         
-        // Nach Kategorie gruppieren und sortieren
         const liste = Object.values(byArtikel);
         liste.sort((a, b) => {
             if (a.kategorie_id !== b.kategorie_id) return a.kategorie_id - b.kategorie_id;
-            return b.menge - a.menge; // Innerhalb Kategorie nach Menge absteigend
+            return b.menge - a.menge;
         });
         
         return liste;
     },
+    
     async resetAuffuellliste() {
-        // Alle nicht-exportierten Buchungen als exportiert markieren
-        const bs = await db.buchungen.toArray();
+        const bs = await this.getAll({ exportiert: false });
         const ids = bs.filter(b => !b.exportiert && !b.storniert).map(b => b.buchung_id);
+        
         for (const id of ids) {
-            await db.buchungen.update(id, { exportiert: true, exportiert_am: new Date().toISOString() });
+            const update = { exportiert: true, exportiert_am: new Date().toISOString() };
+            await db.buchungen.update(id, update);
+            if (supabaseClient && isOnline) {
+                await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
+            }
         }
+        
         await DataProtection.createBackup();
         Utils.showToast(`${ids.length} Buchungen zurückgesetzt`, 'success');
     },
-    async markAsExported(ids) { for (const id of ids) await db.buchungen.update(id, { exportiert: true, exportiert_am: new Date().toISOString() }); }
+    
+    async markAsExported(ids) { 
+        for (const id of ids) {
+            const update = { exportiert: true, exportiert_am: new Date().toISOString() };
+            await db.buchungen.update(id, update);
+            if (supabaseClient && isOnline) {
+                await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
+            }
+        }
+    }
 };
 
 // Fehlende Getränke Management
@@ -443,13 +784,13 @@ const FehlendeGetraenke = {
         const artikel = await Artikel.getById(artikel_id);
         if (!artikel) throw new Error('Artikel nicht gefunden');
         
-        // Datum vom Vortag
         const gestern = new Date();
         gestern.setDate(gestern.getDate() - 1);
         const datumVortag = Utils.formatDate(gestern);
         
+        const items = [];
         for (let i = 0; i < menge; i++) {
-            await db.fehlendeGetraenke.add({
+            items.push({
                 artikel_id: artikel.artikel_id,
                 artikel_name: artikel.name,
                 artikel_preis: artikel.preis,
@@ -457,34 +798,78 @@ const FehlendeGetraenke = {
                 icon: artikel.icon || '📦',
                 datum: datumVortag,
                 erstellt_am: new Date().toISOString(),
-                uebernommen: false,
-                uebernommen_von: null,
-                uebernommen_am: null
+                uebernommen: false
             });
         }
+        
+        // Lokal speichern
+        for (const item of items) {
+            await db.fehlendeGetraenke.add(item);
+        }
+        
+        // Supabase
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('fehlende_getraenke').insert(items);
+        }
+        
         await DataProtection.createBackup();
         Utils.showToast(`${menge}× ${artikel.name} als fehlend markiert`, 'success');
     },
+    
     async getOffene() {
+        if (supabaseClient && isOnline) {
+            const { data } = await supabaseClient
+                .from('fehlende_getraenke')
+                .select('*')
+                .eq('uebernommen', false)
+                .order('id', { ascending: false });
+            
+            if (data) {
+                // Cache aktualisieren
+                for (const f of data) {
+                    try { await db.fehlendeGetraenke.put(f); } catch(e) {}
+                }
+                return data;
+            }
+        }
         const alle = await db.fehlendeGetraenke.toArray();
         return alle.filter(f => !f.uebernommen).sort((a, b) => b.id - a.id);
     },
+    
     async uebernehmen(id, gastId, gastName) {
-        const fehlend = await db.fehlendeGetraenke.get(id);
+        let fehlend;
+        
+        if (supabaseClient && isOnline) {
+            const { data } = await supabaseClient
+                .from('fehlende_getraenke')
+                .select('*')
+                .eq('id', id)
+                .single();
+            fehlend = data;
+        } else {
+            fehlend = await db.fehlendeGetraenke.get(id);
+        }
+        
         if (!fehlend || fehlend.uebernommen) throw new Error('Nicht verfügbar');
         
-        // Als übernommen markieren
-        await db.fehlendeGetraenke.update(id, {
+        const updateData = {
             uebernommen: true,
             uebernommen_von: gastId,
             uebernommen_von_name: gastName,
             uebernommen_am: new Date().toISOString()
-        });
+        };
         
-        // Buchung für den Gast erstellen
+        // Lokal und Supabase updaten
+        try { await db.fehlendeGetraenke.update(id, updateData); } catch(e) {}
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('fehlende_getraenke').update(updateData).eq('id', id);
+        }
+        
+        // Buchung erstellen
         const artikel = await Artikel.getById(fehlend.artikel_id);
         const b = {
             buchung_id: Utils.uuid(),
+            user_id: gastId,
             gast_id: gastId,
             gast_vorname: gastName,
             gast_nachname: '',
@@ -494,24 +879,33 @@ const FehlendeGetraenke = {
             preis: fehlend.artikel_preis,
             steuer_prozent: artikel?.steuer_prozent || 10,
             menge: 1,
-            datum: fehlend.datum, // Datum vom Vortag übernehmen
+            datum: fehlend.datum,
             uhrzeit: Utils.formatTime(new Date()),
             erstellt_am: new Date().toISOString(),
             exportiert: false,
             geraet_id: Utils.getDeviceId(),
-            sync_status: 'pending',
+            sync_status: isOnline ? 'synced' : 'pending',
             session_id: State.sessionId,
             storniert: false,
-            fix: true, // Direkt fix, da vom Vortag
+            fix: true,
             aus_fehlend: true
         };
+        
         await db.buchungen.add(b);
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('buchungen').insert(b);
+        }
+        
         await DataProtection.createBackup();
         Utils.showToast(`${fehlend.artikel_name} übernommen!`, 'success');
         return b;
     },
+    
     async loeschen(id) {
-        await db.fehlendeGetraenke.delete(id);
+        try { await db.fehlendeGetraenke.delete(id); } catch(e) {}
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('fehlende_getraenke').delete().eq('id', id);
+        }
         await DataProtection.createBackup();
         Utils.showToast('Gelöscht', 'success');
     }
@@ -573,23 +967,74 @@ const Umlage = {
     }
 };
 
+// Artikel Cache
+let artikelCache = null;
+let artikelCacheTime = 0;
+const ARTIKEL_CACHE_TTL = 60000; // 1 Minute
+
 const Artikel = {
+    async loadFromSupabase() {
+        if (!supabaseClient || !isOnline) return false;
+        try {
+            const { data, error } = await supabaseClient
+                .from('artikel')
+                .select('*')
+                .order('sortierung');
+            
+            if (!error && data) {
+                // Cache in Dexie
+                await db.artikel.clear();
+                await db.artikel.bulkAdd(data);
+                artikelCache = data;
+                artikelCacheTime = Date.now();
+                return true;
+            }
+        } catch(e) { console.error('loadFromSupabase error:', e); }
+        return false;
+    },
+    
     async getAll(f={}) {
-        let r = await db.artikel.toArray();
+        // Cache prüfen
+        if (!artikelCache || Date.now() - artikelCacheTime > ARTIKEL_CACHE_TTL) {
+            if (supabaseClient && isOnline) {
+                await this.loadFromSupabase();
+            }
+        }
+        
+        let r = artikelCache || await db.artikel.toArray();
         if (f.aktiv !== undefined) r = r.filter(a => a.aktiv === f.aktiv);
         if (f.kategorie_id) r = r.filter(a => a.kategorie_id === f.kategorie_id);
         if (f.search) { const q = f.search.toLowerCase(); r = r.filter(a => a.name.toLowerCase().includes(q) || a.sku?.toLowerCase().includes(q)); }
         return r.sort((a,b) => (a.sortierung||0) - (b.sortierung||0));
     },
-    async getById(id) { return db.artikel.get(id); },
+    
+    async getById(id) { 
+        if (artikelCache) {
+            return artikelCache.find(a => a.artikel_id === id);
+        }
+        return db.artikel.get(id); 
+    },
+    
     async getBySku(sku) { return db.artikel.where('sku').equals(sku).first(); },
+    
     async create(data) {
-        if (!data.artikel_id) { const m = await db.artikel.orderBy('artikel_id').last(); data.artikel_id = (m?.artikel_id||0)+1; }
+        if (!data.artikel_id) { 
+            const m = await db.artikel.orderBy('artikel_id').last(); 
+            data.artikel_id = (m?.artikel_id||0)+1; 
+        }
+        
         await db.artikel.add(data);
+        artikelCache = null; // Cache invalidieren
+        
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('artikel').insert(data);
+        }
+        
         await DataProtection.createBackup();
         Utils.showToast('Artikel erstellt', 'success');
         return data;
     },
+    
     async update(id, changes) { 
         // Platztausch wenn Position geändert wird
         if (changes.sortierung !== undefined) {
@@ -599,21 +1044,41 @@ const Artikel = {
                 const newPos = changes.sortierung;
                 const oldPos = artikel.sortierung || 0;
                 
-                // Finde Artikel der aktuell auf der neuen Position ist
                 const allArtikel = await db.artikel.where('kategorie_id').equals(katId).toArray();
                 const conflicting = allArtikel.find(a => a.artikel_id !== id && a.sortierung === newPos);
                 
-                // Platztausch: Der andere Artikel bekommt die alte Position
                 if (conflicting) {
                     await db.artikel.update(conflicting.artikel_id, { sortierung: oldPos });
+                    if (supabaseClient && isOnline) {
+                        await supabaseClient.from('artikel').update({ sortierung: oldPos }).eq('artikel_id', conflicting.artikel_id);
+                    }
                 }
             }
         }
-        await db.artikel.update(id, changes); 
+        
+        await db.artikel.update(id, changes);
+        artikelCache = null; // Cache invalidieren
+        
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('artikel').update(changes).eq('artikel_id', id);
+        }
+        
         await DataProtection.createBackup(); 
         Utils.showToast('Artikel aktualisiert', 'success'); 
     },
-    async delete(id) { await db.artikel.delete(id); await DataProtection.createBackup(); Utils.showToast('Artikel gelöscht', 'success'); },
+    
+    async delete(id) { 
+        await db.artikel.delete(id);
+        artikelCache = null;
+        
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('artikel').delete().eq('artikel_id', id);
+        }
+        
+        await DataProtection.createBackup(); 
+        Utils.showToast('Artikel gelöscht', 'success'); 
+    },
+    
     async importFromCSV(text) {
         // Clean up text - handle Windows line endings and BOM
         text = text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
@@ -647,20 +1112,20 @@ const Artikel = {
             throw new Error('CSV fehlt: ID, Artikelname oder Preis Spalte');
         }
         
-        // Category mapping based on Warengruppe values (1-6)
-        // 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiße, 6=Süßes/Sonstiges
+        // Category mapping based on Warengruppe values (1-7)
+        // 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiße, 6=Süßes, 7=Sonstiges
         const katMap = {
-            0: 'Süßes, Salziges & Sonstiges',
+            0: 'Sonstiges',
             1: 'Alkoholfreie Getränke',
             2: 'Biere',
             3: 'Weine',
             4: 'Schnäpse & Spirituosen',
             5: 'Heiße Getränke',
-            6: 'Süßes, Salziges & Sonstiges',
-            7: 'Süßes, Salziges & Sonstiges',
-            8: 'Süßes, Salziges & Sonstiges'
+            6: 'Süßes & Salziges',
+            7: 'Sonstiges',
+            8: 'Sonstiges'
         };
-        const iconMap = {0:'🍬',1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'🍬',8:'🍬'};
+        const iconMap = {0:'📦',1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦',8:'📦'};
         
         let imp=0, upd=0, skip=0;
         
@@ -706,13 +1171,13 @@ const Artikel = {
             
             // Get category from Warengruppe and map to new category structure
             // CSV Warengruppe: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=Heiß, 6+=Sonstiges
-            // App Kategorien: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiß, 6=Süßes
-            const warengruppeMigration = {1:1, 2:2, 3:3, 4:4, 5:5, 6:6, 7:6, 8:6};
-            let csvWG = 6; // Default
+            // App Kategorien: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiß, 6=Süßes, 7=Sonstiges
+            const warengruppeMigration = {1:1, 2:2, 3:3, 4:4, 5:5, 6:6, 7:6, 8:7};
+            let csvWG = 7; // Default: Sonstiges
             if (idx.kat >= 0 && v[idx.kat] !== undefined) {
-                csvWG = parseInt(v[idx.kat]?.replace(/"/g,'')) || 6;
+                csvWG = parseInt(v[idx.kat]?.replace(/"/g,'')) || 7;
             }
-            let katId = warengruppeMigration[csvWG] || 6;
+            let katId = warengruppeMigration[csvWG] || 7;
             
             // Get sort order
             let sort = 0;
@@ -736,10 +1201,10 @@ const Artikel = {
                 preis, 
                 steuer_prozent: steuer, 
                 kategorie_id: katId, 
-                kategorie_name: katMap[katId] || 'Süßes, Salziges & Sonstiges', 
+                kategorie_name: katMap[katId] || 'Sonstiges', 
                 aktiv: true,
                 sortierung: sort, 
-                icon: iconMap[katId] || '🍬' 
+                icon: iconMap[katId] || '📦' 
             };
             
             console.log(`Row ${i}: ID=${id}, Name="${name}", Preis=${preis}, Kat=${katId}`);
@@ -1115,7 +1580,7 @@ Router.register('admin-dashboard', async () => {
 
 // Kategorien reparieren
 window.repairCategories = async () => {
-    // Kategorien-Tabelle komplett neu aufbauen - 6 Kategorien
+    // Kategorien-Tabelle komplett neu aufbauen - 7 Kategorien
     await db.kategorien.clear();
     await db.kategorien.bulkAdd([
         {kategorie_id:1, name:'Alkoholfreie Getränke', sortierung:10},
@@ -1123,43 +1588,45 @@ window.repairCategories = async () => {
         {kategorie_id:3, name:'Weine', sortierung:30},
         {kategorie_id:4, name:'Schnäpse & Spirituosen', sortierung:40},
         {kategorie_id:5, name:'Heiße Getränke', sortierung:50},
-        {kategorie_id:6, name:'Süßes, Salziges & Sonstiges', sortierung:60}
+        {kategorie_id:6, name:'Süßes & Salziges', sortierung:60},
+        {kategorie_id:7, name:'Sonstiges', sortierung:70}
     ]);
     
     // Alte Kategorie-IDs auf neue mappen:
     // ALTE Struktur: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=Heiße, 6=Sonstiges, 7=Snacks, 8=Diverses
-    // NEUE Struktur: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiße, 6=Süßes/Sonstiges
+    // NEUE Struktur: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiße, 6=Süßes, 7=Sonstiges
     const migrationMap = {
         1: 1,  // Alkoholfrei bleibt
         2: 2,  // Biere bleibt
         3: 3,  // Wein -> Weine
         4: 4,  // Spirituosen -> Schnäpse & Spirituosen
         5: 5,  // Heiße Getränke bleibt
-        6: 6,  // Sonstiges -> Süßes, Salziges & Sonstiges
-        7: 6,  // Snacks -> Süßes, Salziges & Sonstiges
-        8: 6   // Diverses -> Süßes, Salziges & Sonstiges
+        6: 6,  // Sonstiges -> Süßes & Salziges
+        7: 6,  // Snacks -> Süßes & Salziges
+        8: 7   // Diverses -> Sonstiges
     };
     
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
     const katMap = {
         1:'Alkoholfreie Getränke',
         2:'Biere',
         3:'Weine',
         4:'Schnäpse & Spirituosen',
         5:'Heiße Getränke',
-        6:'Süßes, Salziges & Sonstiges'
+        6:'Süßes & Salziges',
+        7:'Sonstiges'
     };
     
     const arts = await db.artikel.toArray();
     let fixed = 0;
     for (const a of arts) {
         const alteKat = a.kategorie_id;
-        const neueKat = migrationMap[alteKat] || 6;
+        const neueKat = migrationMap[alteKat] || 7;
         
         await db.artikel.update(a.artikel_id, { 
             kategorie_id: neueKat, 
             kategorie_name: katMap[neueKat],
-            icon: a.bild ? a.icon : (iconMap[neueKat] || '🍬')
+            icon: a.bild ? a.icon : (iconMap[neueKat] || '📦')
         });
         
         if (alteKat !== neueKat) fixed++;
@@ -1731,7 +2198,7 @@ Router.register('buchen', async () => {
         return `<div class="artikel-icon">${a.icon||'📦'}</div>`;
     };
     
-    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B'})[id] || '#2C5F7C';
+    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#4A5859'})[id] || '#2C5F7C';
     
     UI.render(`
     <div class="app-header">
@@ -1974,11 +2441,11 @@ window.handleDeleteArticle = async id => { if(confirm('Artikel löschen?')) { aw
 window.filterGuestList = q => { document.querySelectorAll('.guest-item').forEach(i => { i.style.display = i.dataset.name.includes(q.toLowerCase()) ? '' : 'none'; }); };
 window.filterArticleList = q => { const ql = q.toLowerCase(); document.querySelectorAll('.article-item').forEach(i => { i.style.display = (i.dataset.name.includes(ql) || i.dataset.sku.includes(ql)) ? '' : 'none'; }); };
 window.filterCategory = id => { State.selectedCategory = id; Router.navigate('buchen'); };
-window.getCategoryColor = id => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B'})[id] || '#2C5F7C';
+window.getCategoryColor = id => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#4A5859'})[id] || '#2C5F7C';
 window.searchArtikel = Utils.debounce(async q => {
     const arts = await Artikel.getAll({ aktiv: true, search: q });
     const grid = document.querySelector('.artikel-grid');
-    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B'})[id] || '#2C5F7C';
+    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#4A5859'})[id] || '#2C5F7C';
     const renderTile = (a) => {
         const content = (a.bild && a.bild.startsWith('data:')) 
             ? `<img src="${a.bild}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">`
@@ -2004,7 +2471,7 @@ window.showAddArticleModal = () => {
         <div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" placeholder="0.00" step="0.01" min="0"></div>
         <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" placeholder="1" min="1" value="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
     </div>
-    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Weine</option><option value="4">Schnäpse & Spirituosen</option><option value="5">Heiße Getränke</option><option value="6">Süßes, Salziges & Sonstiges</option></select></div>
+    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Weine</option><option value="4">Schnäpse & Spirituosen</option><option value="5">Heiße Getränke</option><option value="6">Süßes & Salziges</option><option value="7">Sonstiges</option></select></div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" checked><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveNewArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = null;
@@ -2030,7 +2497,7 @@ window.showEditArticleModal = async id => {
         <div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" value="${a.preis}" step="0.01" min="0"></div>
         <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" value="${a.sortierung||1}" min="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
     </div>
-    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes, Salziges & Sonstiges'}[i]}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'}[i]}</option>`).join('')}</select></div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = a.bild || null;
@@ -2055,8 +2522,8 @@ window.handleImagePreview = async (event) => {
 window.clearImagePreview = () => {
     window.currentArticleImage = null;
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬'};
-    document.getElementById('article-image-preview').innerHTML = iconMap[katId] || '🍬';
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
+    document.getElementById('article-image-preview').innerHTML = iconMap[katId] || '📦';
     document.getElementById('article-image').value = '';
 };
 
@@ -2064,8 +2531,8 @@ window.saveNewArticle = async () => {
     const name = document.getElementById('article-name')?.value;
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
-    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes, Salziges & Sonstiges'};
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬'};
+    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
     await Artikel.create({ 
         name: name.trim(), 
         name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
@@ -2073,10 +2540,10 @@ window.saveNewArticle = async () => {
         preis: parseFloat(document.getElementById('article-price')?.value) || 0, 
         steuer_prozent: 10, 
         kategorie_id: katId, 
-        kategorie_name: katMap[katId] || 'Süßes, Salziges & Sonstiges', 
+        kategorie_name: katMap[katId] || 'Sonstiges', 
         aktiv: document.getElementById('article-active')?.checked, 
         sortierung: parseInt(document.getElementById('article-sort')?.value) || 1, 
-        icon: iconMap[katId] || '🍬',
+        icon: iconMap[katId] || '📦',
         bild: window.currentArticleImage || null
     });
     closeArticleModal();
@@ -2089,8 +2556,8 @@ window.saveEditArticle = async () => {
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
     const newPos = parseInt(document.getElementById('article-sort')?.value) || 1;
-    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes, Salziges & Sonstiges'};
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬'};
+    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
     
     // Alten Artikel holen für Positions-Tausch
     const oldArticle = await Artikel.getById(id);
@@ -2131,8 +2598,30 @@ window.saveEditArticle = async () => {
 
 // Init
 (async function initApp() {
-    setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; document.getElementById('app').style.display = 'block'; }, 1500);
+    console.log('🚀 Seollerhaus Kassa v3.0 (Supabase) startet...');
+    
+    // Supabase initialisieren
+    const supabaseReady = initSupabase();
+    if (supabaseReady) {
+        console.log('✅ Supabase bereit - Multi-Device Modus');
+        // Artikel von Supabase laden
+        await Artikel.loadFromSupabase();
+        // Pending Buchungen synchronisieren
+        syncPendingData();
+    } else {
+        console.log('⚠️ Offline-Modus - Lokale Daten');
+    }
+    
+    // Loading Screen ausblenden
+    setTimeout(() => { 
+        document.getElementById('loading-screen').style.display = 'none'; 
+        document.getElementById('app').style.display = 'block'; 
+    }, 1500);
+    
+    // Seed Artikel falls nötig
     await Artikel.seed();
+    
+    // Kategorien initialisieren (lokal)
     if (await db.kategorien.count() === 0) {
         await db.kategorien.bulkAdd([
             {kategorie_id:1, name:'Alkoholfreie Getränke', sortierung:10},
@@ -2140,9 +2629,20 @@ window.saveEditArticle = async () => {
             {kategorie_id:3, name:'Weine', sortierung:30},
             {kategorie_id:4, name:'Schnäpse & Spirituosen', sortierung:40},
             {kategorie_id:5, name:'Heiße Getränke', sortierung:50},
-            {kategorie_id:6, name:'Süßes, Salziges & Sonstiges', sortierung:60}
+            {kategorie_id:6, name:'Süßes & Salziges', sortierung:60},
+            {kategorie_id:7, name:'Sonstiges', sortierung:70}
         ]);
     }
-    if (await Auth.autoLogin()) Router.navigate('dashboard');
-    else Router.init();
+    
+    // Auto-Login prüfen
+    if (await Auth.autoLogin()) {
+        Router.navigate('dashboard');
+    } else {
+        Router.init();
+    }
+    
+    // Online-Status anzeigen
+    if (!isOnline) {
+        Utils.showToast('Offline-Modus aktiv', 'info');
+    }
 })();
