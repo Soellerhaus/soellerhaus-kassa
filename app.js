@@ -289,15 +289,21 @@ const RegisteredGuests = {
         const uniqueId = Utils.uuid().substring(0, 8);
         const email = `${firstName.toLowerCase().replace(/[^a-z]/g, '')}.${uniqueId}@kassa.local`;
         
+        // Supabase erfordert min. 6 Zeichen - PIN mit Prefix erweitern
+        const supabasePassword = 'PIN_' + password + '_KASSA';
+        
         if (supabaseClient && isOnline) {
             // Supabase SignUp
             const { data: authData, error: authError } = await supabaseClient.auth.signUp({
                 email: email,
-                password: password,
+                password: supabasePassword,
                 options: { data: { first_name: firstName.trim() } }
             });
             
-            if (authError) throw new Error('Registrierung fehlgeschlagen: ' + authError.message);
+            if (authError) {
+                console.error('Supabase SignUp Error:', authError);
+                throw new Error('Registrierung fehlgeschlagen: ' + authError.message);
+            }
             
             // Warte kurz auf Trigger (Profile wird automatisch erstellt)
             await new Promise(r => setTimeout(r, 500));
@@ -333,6 +339,9 @@ const RegisteredGuests = {
     },
     
     async login(id, password) {
+        // Supabase Passwort-Format: PIN mit Prefix erweitern
+        const supabasePassword = 'PIN_' + password + '_KASSA';
+        
         if (supabaseClient && isOnline) {
             // Supabase Login - Profile laden um Email zu bekommen
             const { data: profile } = await supabaseClient
@@ -344,13 +353,16 @@ const RegisteredGuests = {
             if (!profile) throw new Error('Gast nicht gefunden');
             if (profile.geloescht) throw new Error('Account deaktiviert');
             
-            // Login mit Email
+            // Login mit Email und erweitertem Passwort
             const { data, error } = await supabaseClient.auth.signInWithPassword({
                 email: profile.email,
-                password: password
+                password: supabasePassword
             });
             
-            if (error) throw new Error('Falsches Passwort');
+            if (error) {
+                console.error('Login Error:', error);
+                throw new Error('Falsches Passwort');
+            }
             
             // Last login updaten
             await supabaseClient.from('profiles').update({ last_login_at: new Date().toISOString() }).eq('id', id);
@@ -2408,7 +2420,14 @@ window.handleRegisterSubmit = async () => {
     const p = window.registerPin;
     if (!v?.trim()) { Utils.showToast('Vorname eingeben', 'warning'); return; }
     if (!p || p.length !== 4) { Utils.showToast('4-stelligen PIN eingeben', 'warning'); return; }
-    try { await RegisteredGuests.register(v.trim(), p); setTimeout(() => Router.navigate('login'), 1500); } catch(e) {}
+    try { 
+        console.log('Registrierung startet...', v.trim(), p.length);
+        await RegisteredGuests.register(v.trim(), p); 
+        setTimeout(() => Router.navigate('login'), 1500); 
+    } catch(e) {
+        console.error('Registrierung Fehler:', e);
+        Utils.showToast('Fehler: ' + e.message, 'error');
+    }
 };
 window.handleAdminLogin = async () => {
     const pw = document.getElementById('admin-password')?.value;
