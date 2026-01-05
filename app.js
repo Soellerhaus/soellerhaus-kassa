@@ -496,19 +496,36 @@ const Auth = {
         return [...reg, ...legacy].sort((a,b) => (a.firstName||a.vorname).localeCompare(b.firstName||b.vorname));
     },
     async adminLogin(pw) {
+        // Standard Admin-Passwort Hash für 'admin123'
+        const defaultHash = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+        let stored = defaultHash;
+        
         if (supabaseClient && isOnline) {
-            const { data } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
-            const stored = data?.value || await Utils.hashPassword('admin123');
-            if (await Utils.hashPassword(pw) === stored) { 
-                State.isAdmin = true; 
-                Utils.showToast('Admin-Login OK', 'success'); 
-                return true; 
+            try {
+                const { data, error } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
+                if (!error && data?.value) {
+                    stored = data.value;
+                }
+            } catch(e) {
+                console.log('Settings nicht lesbar, nutze Default');
             }
         } else {
-            const s = await db.settings.get('admin_password');
-            const stored = s?.value || await Utils.hashPassword('admin123');
-            if (await Utils.hashPassword(pw) === stored) { State.isAdmin = true; Utils.showToast('Admin-Login OK', 'success'); return true; }
+            try {
+                const s = await db.settings.get('admin_password');
+                if (s?.value) stored = s.value;
+            } catch(e) {}
         }
+        
+        const inputHash = await Utils.hashPassword(pw);
+        console.log('Admin Login - Input Hash:', inputHash);
+        console.log('Admin Login - Stored Hash:', stored);
+        
+        if (inputHash === stored) { 
+            State.isAdmin = true; 
+            Utils.showToast('Admin-Login OK', 'success'); 
+            return true; 
+        }
+        
         Utils.showToast('Falsches Passwort', 'error'); 
         return false;
     },
