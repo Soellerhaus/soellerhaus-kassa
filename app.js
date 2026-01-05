@@ -96,6 +96,19 @@ db.version(4).stores({
     fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen'
 });
 
+// Version 5: Gruppen hinzufügen
+db.version(5).stores({
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
+    artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
+    kategorien: 'kategorie_id, name, sortierung',
+    settings: 'key',
+    exports: '++id, timestamp, anzahl_buchungen',
+    registeredGuests: '++id, firstName, passwordHash, createdAt, lastLoginAt, group_name',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
+    gruppen: '++id, name, aktiv'
+});
+
 const DataProtection = {
     async createBackup() {
         try {
@@ -257,9 +270,11 @@ const State = {
     currentUser: null, currentPage: 'login', selectedCategory: null,
     isAdmin: false, currentPin: '', inactivityTimer: null, inactivityTimeout: 20000,
     sessionId: null,
+    selectedGroup: null, // NEU: Ausgewählte Gruppe für aktuelle Session
     setUser(u) { 
         this.currentUser = u; 
         this.sessionId = Utils.uuid(); // Neue Session starten
+        this.selectedGroup = u.group_name || null; // Gruppe aus User übernehmen
         localStorage.setItem('current_user_id', u.id || u.gast_id); 
         localStorage.setItem('current_user_type', u.id ? 'registered' : 'legacy'); 
         this.resetInactivityTimer(); 
@@ -268,6 +283,7 @@ const State = {
         this.currentUser = null; 
         this.currentPin = ''; 
         this.sessionId = null;
+        this.selectedGroup = null;
         localStorage.removeItem('current_user_id'); 
         localStorage.removeItem('current_user_type'); 
         this.clearInactivityTimer(); 
@@ -594,6 +610,7 @@ const Buchungen = {
             gast_vorname: State.currentUser.firstName || State.currentUser.first_name || State.currentUser.vorname || '',
             gast_nachname: State.currentUser.nachname || '',
             gastgruppe: State.currentUser.zimmernummer || '',
+            group_name: State.selectedGroup || State.currentUser.group_name || '', // NEU: Gruppe
             artikel_id: artikel.artikel_id, 
             artikel_name: artikel.name, 
             preis: parseFloat(artikel.preis),
@@ -1014,6 +1031,115 @@ const FehlendeGetraenke = {
         }
         await DataProtection.createBackup();
         Utils.showToast('Gelöscht', 'success');
+    }
+};
+
+// ============ GRUPPEN-VERWALTUNG ============
+const Gruppen = {
+    // Einstellung: Gruppenabfrage aktiv?
+    async isAbfrageAktiv() {
+        const setting = await db.settings.get('gruppenAbfrageAktiv');
+        return setting?.value === true;
+    },
+    
+    async setAbfrageAktiv(aktiv) {
+        await db.settings.put({ key: 'gruppenAbfrageAktiv', value: aktiv });
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('settings').upsert({ 
+                key: 'gruppenAbfrageAktiv', 
+                value: aktiv 
+            });
+        }
+    },
+    
+    // Alle Gruppen laden
+    async getAll() {
+        if (supabaseClient && isOnline) {
+            try {
+                const { data } = await supabaseClient
+                    .from('gruppen')
+                    .select('*')
+                    .eq('aktiv', true)
+                    .order('id');
+                if (data && data.length > 0) {
+                    // Lokal cachen
+                    for (const g of data) {
+                        try { await db.gruppen.put(g); } catch(e) {}
+                    }
+                    return data;
+                }
+            } catch(e) {
+                console.error('Gruppen laden Fehler:', e);
+            }
+        }
+        // Fallback: Lokal
+        return await db.gruppen.where('aktiv').equals(1).toArray();
+    },
+    
+    // Gruppe hinzufügen (max 3)
+    async add(name) {
+        const alle = await this.getAll();
+        if (alle.length >= 3) {
+            throw new Error('Maximal 3 Gruppen erlaubt');
+        }
+        if (!name || name.trim() === '') {
+            throw new Error('Gruppenname erforderlich');
+        }
+        
+        const gruppe = {
+            name: name.trim(),
+            aktiv: true,
+            erstellt_am: new Date().toISOString()
+        };
+        
+        // Lokal speichern
+        const id = await db.gruppen.add(gruppe);
+        gruppe.id = id;
+        
+        // Supabase
+        if (supabaseClient && isOnline) {
+            try {
+                await supabaseClient.from('gruppen').insert(gruppe);
+            } catch(e) {
+                console.error('Gruppe sync error:', e);
+            }
+        }
+        
+        return gruppe;
+    },
+    
+    // Gruppe bearbeiten
+    async update(id, name) {
+        if (!name || name.trim() === '') {
+            throw new Error('Gruppenname erforderlich');
+        }
+        
+        await db.gruppen.update(id, { name: name.trim() });
+        
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('gruppen').update({ name: name.trim() }).eq('id', id);
+        }
+    },
+    
+    // Gruppe löschen (soft delete)
+    async delete(id) {
+        await db.gruppen.update(id, { aktiv: false });
+        
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('gruppen').update({ aktiv: false }).eq('id', id);
+        }
+    },
+    
+    // Prüfen ob mindestens eine Gruppe existiert (wenn Abfrage aktiv)
+    async validateSettings() {
+        const aktiv = await this.isAbfrageAktiv();
+        if (aktiv) {
+            const gruppen = await this.getAll();
+            if (gruppen.length === 0) {
+                return { valid: false, error: 'Gruppenabfrage ist aktiv, aber keine Gruppen hinterlegt!' };
+            }
+        }
+        return { valid: true };
     }
 };
 
@@ -1446,7 +1572,7 @@ const ExportService = {
                 'Gastid': b.gast_id || 0,
                 'Gastname': b.gast_vorname || '',
                 'Gastvorname': '',
-                'Gastgruppe': b.gastgruppe || 'keiner Gruppe zugehörig',
+                'Gastgruppe': b.group_name || b.gastgruppe || 'keine Gruppe',
                 'Gastgruppennr': 0,
                 'bezahlt': false,
                 'Steuer': b.steuer_prozent || 10,
@@ -1517,7 +1643,7 @@ const ExportService = {
                 'Gastid': b.gast_id || 0,
                 'Gastname': b.gast_vorname || '',
                 'Gastvorname': '',
-                'Gastgruppe': b.gastgruppe || 'keiner Gruppe zugehörig',
+                'Gastgruppe': b.group_name || b.gastgruppe || 'keine Gruppe',
                 'Gastgruppennr': 0,
                 'bezahlt': false,
                 'Steuer': b.steuer_prozent || 10,
@@ -1720,12 +1846,80 @@ window.handlePinLogin = async () => {
     }
     try {
         await Auth.login(window.selectedGastId, window.loginPin);
-        Router.navigate('buchen');
+        await navigateAfterLogin(); // Prüft ob Gruppe gewählt werden muss
     } catch (e) {
         Utils.showToast(e.message, 'error');
         window.loginPin = '';
         updateLoginPinDisplay();
     }
+};
+
+// Navigation nach Login - prüft ob Gruppenauswahl nötig
+window.navigateAfterLogin = async () => {
+    const gruppenAktiv = await Gruppen.isAbfrageAktiv();
+    
+    if (gruppenAktiv && !State.selectedGroup) {
+        // Gruppenauswahl erforderlich
+        Router.navigate('gruppe-waehlen');
+    } else {
+        // Direkt zum Buchen
+        Router.navigate('buchen');
+    }
+};
+
+// Route: Gruppe wählen
+Router.register('gruppe-waehlen', async () => {
+    if (!State.currentUser) { Router.navigate('login'); return; }
+    
+    const gruppen = await Gruppen.getAll();
+    const name = State.currentUser.firstName || State.currentUser.vorname;
+    
+    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">🏫 Gruppe wählen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Auth.logout()">Abbrechen</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
+            <div style="padding:20px;text-align:center;">
+                <div style="font-size:1.2rem;">Hallo <strong>${name}</strong>!</div>
+                <div style="margin-top:8px;opacity:0.9;">Bitte wähle deine Gruppe:</div>
+            </div>
+        </div>
+        
+        <div style="display:flex;flex-direction:column;gap:16px;">
+            ${gruppen.map(g => `
+                <button class="btn btn-primary" onclick="selectGruppe(${g.id}, '${g.name}')" style="padding:24px;font-size:1.3rem;">
+                    🏫 ${g.name}
+                </button>
+            `).join('')}
+        </div>
+        
+        <p style="text-align:center;margin-top:24px;color:#888;font-size:0.9rem;">
+            Die Gruppe wird für alle deine Buchungen gespeichert.
+        </p>
+    </div>`);
+});
+
+// Gruppe auswählen
+window.selectGruppe = async (gruppeId, gruppeName) => {
+    State.selectedGroup = gruppeName;
+    
+    // Gruppe auch im User speichern
+    if (State.currentUser) {
+        State.currentUser.group_name = gruppeName;
+        
+        // In DB aktualisieren
+        if (State.currentUser.id) {
+            try {
+                await db.registeredGuests.update(State.currentUser.id, { group_name: gruppeName });
+                if (supabaseClient && isOnline) {
+                    await supabaseClient.from('profiles').update({ group_name: gruppeName }).eq('id', State.currentUser.id);
+                }
+            } catch(e) {
+                console.error('Gruppe speichern Fehler:', e);
+            }
+        }
+    }
+    
+    Utils.showToast(`Gruppe: ${gruppeName}`, 'success');
+    Router.navigate('buchen');
 };
 
 Router.register('admin-login', () => {
@@ -1792,6 +1986,7 @@ Router.register('admin-dashboard', async () => {
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
             <button class="btn btn-primary" onclick="Router.navigate('admin-guests')" style="padding:24px;">👥 Gästeverwaltung</button>
             <button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:24px;">📦 Artikelverwaltung</button>
+            <button class="btn btn-primary" onclick="Router.navigate('admin-gruppen')" style="padding:24px;">🏫 Gruppenverwaltung</button>
         </div>
         
         <div class="card">
@@ -2089,6 +2284,7 @@ Router.register('admin-alle-buchungen', async () => {
                             <tr>
                                 <th style="padding:10px;text-align:left;">Zeit</th>
                                 <th style="padding:10px;text-align:left;">Gast</th>
+                                <th style="padding:10px;text-align:left;">Gruppe</th>
                                 <th style="padding:10px;text-align:left;">Artikel</th>
                                 <th style="padding:10px;text-align:right;">Menge</th>
                                 <th style="padding:10px;text-align:right;">Preis</th>
@@ -2100,6 +2296,7 @@ Router.register('admin-alle-buchungen', async () => {
                                 <tr style="border-bottom:1px solid var(--color-stone-medium);${b.storniert ? 'opacity:0.5;text-decoration:line-through;' : ''}">
                                     <td style="padding:10px;">${b.uhrzeit || '-'}</td>
                                     <td style="padding:10px;font-weight:500;">${b.gast_vorname || 'Unbekannt'}</td>
+                                    <td style="padding:10px;font-size:0.85rem;color:#666;">${b.group_name || '-'}</td>
                                     <td style="padding:10px;">${b.artikel_name}</td>
                                     <td style="padding:10px;text-align:right;">${b.menge}×</td>
                                     <td style="padding:10px;text-align:right;font-weight:600;">${Utils.formatCurrency(b.preis * b.menge)}</td>
@@ -2388,6 +2585,153 @@ window.bucheUmlageFuerAlle = async () => {
     Router.navigate('admin-dashboard');
 };
 
+// ============ GRUPPENVERWALTUNG ============
+Router.register('admin-gruppen', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    
+    const gruppen = await Gruppen.getAll();
+    const isAktiv = await Gruppen.isAbfrageAktiv();
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <!-- TOGGLE: Gruppenabfrage aktiv -->
+        <div class="card mb-3" style="background:${isAktiv ? 'var(--color-alpine-green)' : '#95a5a6'};color:white;">
+            <div style="padding:20px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-weight:700;font-size:1.2rem;">Gruppe bei Anmeldung abfragen</div>
+                    <div style="font-size:0.9rem;opacity:0.9;">
+                        ${isAktiv ? 'Gäste müssen nach Login eine Gruppe wählen' : 'Keine Gruppenabfrage beim Login'}
+                    </div>
+                </div>
+                <label class="switch" style="position:relative;display:inline-block;width:60px;height:34px;">
+                    <input type="checkbox" id="gruppenToggle" ${isAktiv ? 'checked' : ''} onchange="toggleGruppenAbfrage(this.checked)">
+                    <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:34px;"></span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- GRUPPEN LISTE -->
+        <div class="card mb-3">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <h2 class="card-title" style="margin:0;">Gruppen (${gruppen.length}/3)</h2>
+                ${gruppen.length < 3 ? `<button class="btn btn-primary" onclick="showAddGruppeModal()">+ Gruppe</button>` : ''}
+            </div>
+            <div class="card-body" style="padding:0;">
+                ${gruppen.length > 0 ? `
+                    <table style="width:100%;border-collapse:collapse;">
+                        ${gruppen.map(g => `
+                            <tr style="border-bottom:1px solid var(--color-stone-medium);">
+                                <td style="padding:16px;font-weight:600;font-size:1.1rem;">🏫 ${g.name}</td>
+                                <td style="padding:16px;text-align:right;">
+                                    <button class="btn btn-secondary" onclick="showEditGruppeModal(${g.id}, '${g.name}')" style="margin-right:8px;">✏️</button>
+                                    <button class="btn btn-danger" onclick="deleteGruppe(${g.id})">🗑️</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                ` : `
+                    <div style="padding:40px;text-align:center;color:#888;">
+                        <div style="font-size:3rem;margin-bottom:16px;">🏫</div>
+                        <div>Keine Gruppen vorhanden</div>
+                        <div style="font-size:0.9rem;margin-top:8px;">Füge bis zu 3 Gruppen hinzu (z.B. Unis)</div>
+                    </div>
+                `}
+            </div>
+        </div>
+        
+        ${isAktiv && gruppen.length === 0 ? `
+            <div class="card" style="background:#e74c3c;color:white;">
+                <div style="padding:16px;">
+                    ⚠️ <strong>Achtung:</strong> Gruppenabfrage ist aktiv, aber keine Gruppen hinterlegt!
+                    <br>Gäste können sich nicht anmelden, bis mindestens eine Gruppe existiert.
+                </div>
+            </div>
+        ` : ''}
+        
+        <div class="card mt-3" style="background:var(--color-stone-light);">
+            <div style="padding:16px;">
+                <strong>💡 Hinweis:</strong><br>
+                • Wenn aktiv, müssen Gäste nach dem Login eine Gruppe wählen<br>
+                • Die Gruppe wird bei jeder Buchung gespeichert<br>
+                • Max. 3 Gruppen möglich (z.B. verschiedene Unis)
+            </div>
+        </div>
+    </div>`);
+    
+    // CSS für Toggle
+    const style = document.createElement('style');
+    style.textContent = `
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch span:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        .switch input:checked + span { background-color: #27ae60; }
+        .switch input:checked + span:before { transform: translateX(26px); }
+    `;
+    document.head.appendChild(style);
+});
+
+// Toggle Gruppenabfrage
+window.toggleGruppenAbfrage = async (aktiv) => {
+    if (aktiv) {
+        const gruppen = await Gruppen.getAll();
+        if (gruppen.length === 0) {
+            Utils.showToast('Bitte erst mindestens eine Gruppe anlegen!', 'warning');
+            document.getElementById('gruppenToggle').checked = false;
+            return;
+        }
+    }
+    await Gruppen.setAbfrageAktiv(aktiv);
+    Utils.showToast(aktiv ? 'Gruppenabfrage aktiviert' : 'Gruppenabfrage deaktiviert', 'success');
+    Router.navigate('admin-gruppen');
+};
+
+// Gruppe hinzufügen Modal
+window.showAddGruppeModal = () => {
+    const name = prompt('Gruppenname eingeben (z.B. "Uni Innsbruck"):');
+    if (name && name.trim()) {
+        addGruppe(name.trim());
+    }
+};
+
+window.addGruppe = async (name) => {
+    try {
+        await Gruppen.add(name);
+        Utils.showToast(`Gruppe "${name}" hinzugefügt`, 'success');
+        Router.navigate('admin-gruppen');
+    } catch (e) {
+        Utils.showToast(e.message, 'error');
+    }
+};
+
+// Gruppe bearbeiten
+window.showEditGruppeModal = (id, currentName) => {
+    const name = prompt('Neuer Gruppenname:', currentName);
+    if (name && name.trim() && name.trim() !== currentName) {
+        editGruppe(id, name.trim());
+    }
+};
+
+window.editGruppe = async (id, name) => {
+    try {
+        await Gruppen.update(id, name);
+        Utils.showToast(`Gruppe aktualisiert`, 'success');
+        Router.navigate('admin-gruppen');
+    } catch (e) {
+        Utils.showToast(e.message, 'error');
+    }
+};
+
+// Gruppe löschen
+window.deleteGruppe = async (id) => {
+    if (!confirm('Diese Gruppe wirklich löschen?\n\nBereits gespeicherte Buchungen behalten ihre Gruppenzuordnung.')) return;
+    try {
+        await Gruppen.delete(id);
+        Utils.showToast('Gruppe gelöscht', 'success');
+        Router.navigate('admin-gruppen');
+    } catch (e) {
+        Utils.showToast(e.message, 'error');
+    }
+};
+
 Router.register('admin-guests', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     const alleInDb = await db.registeredGuests.toArray();
@@ -2583,12 +2927,26 @@ if (!document.getElementById('table-styles')) {
 
 Router.register('dashboard', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
+    // Prüfen ob Gruppenauswahl nötig
+    const gruppenAktiv = await Gruppen.isAbfrageAktiv();
+    if (gruppenAktiv && !State.selectedGroup) {
+        Router.navigate('gruppe-waehlen');
+        return;
+    }
     // Direkt zur Buchen-Seite weiterleiten
     Router.navigate('buchen');
 });
 
 Router.register('buchen', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
+    
+    // Prüfen ob Gruppenauswahl nötig
+    const gruppenAktiv = await Gruppen.isAbfrageAktiv();
+    if (gruppenAktiv && !State.selectedGroup) {
+        Router.navigate('gruppe-waehlen');
+        return;
+    }
+    
     const kats = await db.kategorien.toArray();
     const arts = await Artikel.getAll({ aktiv: true });
     const name = State.currentUser.firstName || State.currentUser.vorname;
@@ -2634,6 +2992,9 @@ Router.register('buchen', async () => {
     // Fehlende Getränke laden
     const fehlendeOffen = await FehlendeGetraenke.getOffene();
     
+    // Aktuelle Gruppe
+    const currentGroup = State.selectedGroup || '';
+    
     const renderTileContent = (a) => {
         if (a.bild && a.bild.startsWith('data:')) {
             return `<img src="${a.bild}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">`;
@@ -2645,7 +3006,10 @@ Router.register('buchen', async () => {
     
     UI.render(`
     <div class="app-header">
-        <div class="header-left"><div class="header-title">👤 ${name}</div></div>
+        <div class="header-left">
+            <div class="header-title">👤 ${name}</div>
+            ${currentGroup ? `<div style="font-size:0.8rem;opacity:0.8;">🏫 ${currentGroup}</div>` : ''}
+        </div>
         <div class="header-right"><button class="btn btn-secondary" onclick="handleGastAbmelden()">Abmelden</button></div>
     </div>
     <div class="main-content" style="padding-bottom:${sessionBuchungen.length ? '180px' : '20px'};">
@@ -2854,8 +3218,8 @@ window.handleRegisterSubmit = async () => {
     try { 
         console.log('Registrierung startet...', v.trim(), p.length);
         await RegisteredGuests.register(v.trim(), p); 
-        // Direkt zum Dashboard (Artikelmenü) navigieren
-        setTimeout(() => Router.navigate('dashboard'), 500); 
+        // Nach Registrierung prüfen ob Gruppe gewählt werden muss
+        setTimeout(async () => await navigateAfterLogin(), 500); 
     } catch(e) {
         console.error('Registrierung Fehler:', e);
         Utils.showToast('Fehler: ' + e.message, 'error');
