@@ -602,7 +602,8 @@ const Buchungen = {
             datum: Utils.formatDate(new Date()), 
             uhrzeit: Utils.formatTime(new Date()),
             erstellt_am: new Date().toISOString(), 
-            exportiert: false, 
+            exportiert: false,
+            aufgefuellt: false, // NEU: Für Auffüllliste (unabhängig von Export!)
             geraet_id: Utils.getDeviceId(), 
             session_id: State.sessionId,
             storniert: false,
@@ -781,11 +782,31 @@ const Buchungen = {
     },
     
     async getAuffuellliste() {
-        const bs = await this.getAll({ exportiert: false });
-        const aktiv = bs.filter(b => !b.storniert && !b.exportiert);
+        // Auffüllliste: Nur Buchungen die NICHT aufgefüllt sind (unabhängig von Export!)
+        let bs = [];
+        
+        if (supabaseClient && isOnline) {
+            try {
+                const { data } = await supabaseClient
+                    .from('buchungen')
+                    .select('*')
+                    .eq('storniert', false)
+                    .or('aufgefuellt.is.null,aufgefuellt.eq.false')
+                    .order('erstellt_am', { ascending: false });
+                if (data) bs = data;
+            } catch(e) {
+                console.error('getAuffuellliste error:', e);
+            }
+        }
+        
+        // Fallback: Lokal
+        if (bs.length === 0) {
+            const all = await db.buchungen.toArray();
+            bs = all.filter(b => !b.storniert && !b.aufgefuellt);
+        }
         
         const byArtikel = {};
-        for (const b of aktiv) {
+        for (const b of bs) {
             const key = b.artikel_id;
             if (!byArtikel[key]) {
                 const artikel = await Artikel.getById(b.artikel_id);
@@ -809,20 +830,42 @@ const Buchungen = {
         return liste;
     },
     
-    async resetAuffuellliste() {
-        const bs = await this.getAll({ exportiert: false });
-        const ids = bs.filter(b => !b.exportiert && !b.storniert).map(b => b.buchung_id);
+    // Nur Auffüllliste zurücksetzen (NICHT Export!)
+    async markAsAufgefuellt() {
+        let bs = [];
+        
+        if (supabaseClient && isOnline) {
+            const { data } = await supabaseClient
+                .from('buchungen')
+                .select('buchung_id')
+                .eq('storniert', false)
+                .or('aufgefuellt.is.null,aufgefuellt.eq.false');
+            if (data) bs = data;
+        } else {
+            const all = await db.buchungen.toArray();
+            bs = all.filter(b => !b.storniert && !b.aufgefuellt);
+        }
+        
+        const ids = bs.map(b => b.buchung_id);
+        const update = { aufgefuellt: true, aufgefuellt_am: new Date().toISOString() };
         
         for (const id of ids) {
-            const update = { exportiert: true, exportiert_am: new Date().toISOString() };
-            await db.buchungen.update(id, update);
-            if (supabaseClient && isOnline) {
+            try { await db.buchungen.update(id, update); } catch(e) {}
+        }
+        
+        if (supabaseClient && isOnline) {
+            for (const id of ids) {
                 await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
             }
         }
         
         await DataProtection.createBackup();
-        Utils.showToast(`${ids.length} Buchungen zurückgesetzt`, 'success');
+        console.log(`${ids.length} Buchungen als aufgefüllt markiert`);
+    },
+    
+    // Legacy - nicht mehr benutzen
+    async resetAuffuellliste() {
+        await this.markAsAufgefuellt();
     },
     
     async markAsExported(ids) { 
@@ -1609,6 +1652,8 @@ Router.register('admin-dashboard', async () => {
     const heute = Utils.formatDate(new Date());
     const heuteB = bs.filter(b => b.datum === heute);
     const nichtExp = bs.filter(b => !b.exportiert);
+    const auffuellListe = await Buchungen.getAuffuellliste();
+    const auffuellAnzahl = auffuellListe.reduce((s, i) => s + i.menge, 0);
     const fehlendeOffen = await FehlendeGetraenke.getOffene();
     
     UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">🔧 Admin Dashboard</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
@@ -1623,7 +1668,7 @@ Router.register('admin-dashboard', async () => {
         <!-- AUFFÜLLLISTE -->
         <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;">
             🍺 Auffüllliste drucken<br>
-            <small style="opacity:0.9;">(${nichtExp.length} Getränke zum Auffüllen)</small>
+            <small style="opacity:0.9;">(${auffuellAnzahl} Getränke zum Auffüllen)</small>
         </button>
         
         <!-- EXCEL EXPORT FÜR REGISTRIERKASSE -->
@@ -1766,9 +1811,16 @@ Router.register('admin-auffuellliste', async () => {
             </div>
         </div>
         
-        <div style="display:flex;gap:12px;margin-bottom:24px;">
-            <button class="btn btn-primary" onclick="printAuffuellliste()" style="flex:1;">🖨️ Drucken</button>
-            <button class="btn btn-danger" onclick="resetAuffuellliste()" style="flex:1;">🔄 Zurücksetzen</button>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
+            <button class="btn btn-primary" onclick="printAuffuellliste()" style="padding:16px;font-size:1.1rem;">
+                🖨️ Für Thermodrucker drucken
+            </button>
+            <button class="btn btn-warning" onclick="resetAuffuellliste()" style="padding:16px;font-size:1.1rem;background:#f39c12;">
+                🔄 Zurücksetzen (fragt nach Export)
+            </button>
+            <button class="btn btn-secondary" onclick="resetAuffuelllisteOhneExport()" style="padding:12px;">
+                Nur Auffüllliste zurücksetzen (ohne Export)
+            </button>
         </div>
         
         <div id="auffuellliste-print">
@@ -1782,6 +1834,7 @@ Router.register('admin-auffuellliste', async () => {
                             ${byKat[kat].map(item => `
                                 <tr style="border-bottom:1px solid var(--color-stone-medium);">
                                     <td style="padding:12px;font-weight:500;">${item.name}</td>
+                                    <td style="padding:12px;text-align:center;color:#888;">__:__</td>
                                     <td style="padding:12px;text-align:right;font-size:1.3rem;font-weight:700;color:var(--color-alpine-green);">${item.menge}×</td>
                                 </tr>
                             `).join('')}
@@ -1793,36 +1846,72 @@ Router.register('admin-auffuellliste', async () => {
     </div>`);
 });
 
-// Auffüllliste drucken
-window.printAuffuellliste = () => {
-    const content = document.getElementById('auffuellliste-print');
-    if (!content) return;
+// Auffüllliste drucken - für Thermodrucker optimiert
+window.printAuffuellliste = async () => {
+    const liste = await Buchungen.getAuffuellliste();
+    
+    // Nach Kategorie gruppieren
+    const byKat = {};
+    liste.forEach(item => {
+        if (!byKat[item.kategorie_name]) byKat[item.kategorie_name] = [];
+        byKat[item.kategorie_name].push(item);
+    });
+    
+    const total = liste.reduce((s, i) => s + i.menge, 0);
+    const datum = new Date().toLocaleDateString('de-AT');
+    const zeit = new Date().toLocaleTimeString('de-AT', {hour:'2-digit', minute:'2-digit'});
     
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Auffüllliste - ${new Date().toLocaleDateString('de-AT')}</title>
+            <title>Auffüllliste - ${datum}</title>
             <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
-                h1 { text-align: center; margin-bottom: 20px; }
-                h3 { background: #f0f0f0; padding: 10px; margin: 20px 0 0 0; }
-                table { width: 100%; border-collapse: collapse; }
-                td { padding: 8px; border-bottom: 1px solid #ddd; }
-                td:last-child { text-align: right; font-weight: bold; font-size: 1.2em; }
-                .footer { margin-top: 30px; text-align: center; color: #888; font-size: 0.9em; }
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { 
+                    font-family: 'Courier New', monospace; 
+                    font-size: 12px;
+                    width: 80mm;
+                    padding: 5mm;
+                }
+                .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
+                .header h1 { font-size: 16px; margin-bottom: 5px; }
+                .kategorie { font-weight: bold; background: #000; color: #fff; padding: 3px 5px; margin: 10px 0 5px 0; }
+                .item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dotted #ccc; }
+                .item-name { flex: 1; }
+                .item-check { width: 50px; text-align: center; font-family: monospace; }
+                .item-menge { width: 30px; text-align: right; font-weight: bold; }
+                .footer { margin-top: 15px; text-align: center; border-top: 1px dashed #000; padding-top: 10px; font-size: 10px; }
+                .total { font-size: 14px; font-weight: bold; text-align: center; margin: 10px 0; }
                 @media print { 
-                    body { padding: 0; }
-                    .no-print { display: none; }
+                    body { width: 100%; }
                 }
             </style>
         </head>
         <body>
-            <h1>🍺 Auffüllliste</h1>
-            <p style="text-align:center;">${new Date().toLocaleDateString('de-AT', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}</p>
-            ${content.innerHTML}
-            <div class="footer">Seollerhaus Kassa</div>
+            <div class="header">
+                <h1>AUFFÜLLLISTE</h1>
+                <div>${datum} ${zeit}</div>
+            </div>
+            
+            ${Object.keys(byKat).sort().map(kat => `
+                <div class="kategorie">${kat}</div>
+                ${byKat[kat].map(item => `
+                    <div class="item">
+                        <span class="item-name">${item.name}</span>
+                        <span class="item-check">__:__</span>
+                        <span class="item-menge">${item.menge}×</span>
+                    </div>
+                `).join('')}
+            `).join('')}
+            
+            <div class="total">GESAMT: ${total} Getränke</div>
+            
+            <div class="footer">
+                Seollerhaus Kassa<br>
+                ✓ = aufgefüllt
+            </div>
         </body>
         </html>
     `);
@@ -1830,10 +1919,34 @@ window.printAuffuellliste = () => {
     printWindow.print();
 };
 
-// Auffüllliste zurücksetzen
+// Auffüllliste zurücksetzen - GETRENNT vom Export!
 window.resetAuffuellliste = async () => {
-    if (confirm('Alle Buchungen als "aufgefüllt" markieren?\\n\\nDies setzt die Auffüllliste auf 0 zurück.')) {
-        await Buchungen.resetAuffuellliste();
+    const result = confirm(
+        '⚠️ ACHTUNG: Auffüllliste zurücksetzen?\n\n' +
+        'Dies markiert alle Buchungen als "aufgefüllt".\n\n' +
+        'Möchtest du vorher die Buchungen für die Registrierkasse exportieren?\n\n' +
+        'OK = Ja, erst exportieren\n' +
+        'Abbrechen = Nein, abbrechen'
+    );
+    
+    if (result) {
+        // Benutzer will erst exportieren
+        await ExportService.exportBuchungenExcel();
+        
+        // Dann fragen ob Reset
+        if (confirm('Export abgeschlossen.\n\nJetzt die Auffüllliste zurücksetzen?')) {
+            await Buchungen.markAsAufgefuellt();
+            Utils.showToast('Auffüllliste zurückgesetzt', 'success');
+            Router.navigate('admin-auffuellliste');
+        }
+    }
+};
+
+// Nur Auffüllliste zurücksetzen (ohne Export-Frage)
+window.resetAuffuelllisteOhneExport = async () => {
+    if (confirm('Auffüllliste zurücksetzen OHNE Export?\n\nDie Buchungen bleiben für den späteren Export erhalten.')) {
+        await Buchungen.markAsAufgefuellt();
+        Utils.showToast('Auffüllliste zurückgesetzt', 'success');
         Router.navigate('admin-auffuellliste');
     }
 };
@@ -1861,6 +1974,20 @@ Router.register('admin-alle-buchungen', async () => {
             <div style="padding:16px;text-align:center;">
                 <div style="font-size:1.5rem;font-weight:700;">${bs.length} Buchungen</div>
                 <div>Nach Datum sortiert (neueste zuerst)</div>
+            </div>
+        </div>
+        
+        <!-- GRUPPE ABGEREIST BUTTON -->
+        <div class="card mb-3" style="background:#e74c3c;color:white;">
+            <div style="padding:16px;">
+                <div style="font-weight:700;margin-bottom:8px;">🏠 Gruppe abgereist?</div>
+                <p style="font-size:0.9rem;margin-bottom:12px;opacity:0.9;">
+                    Alle Buchungen exportieren und als erledigt markieren.<br>
+                    Danach werden nur noch neue Buchungen angezeigt.
+                </p>
+                <button class="btn" onclick="handleGruppeAbgereist()" style="background:white;color:#e74c3c;font-weight:700;padding:12px 24px;">
+                    ✈️ Gruppe abreisen & Alle Buchungen abschließen
+                </button>
             </div>
         </div>
         
@@ -1908,6 +2035,34 @@ Router.register('admin-alle-buchungen', async () => {
         `}).join('') : '<p class="text-muted text-center" style="padding:40px;">Keine Buchungen vorhanden</p>'}
     </div>`);
 });
+
+// Gruppe abgereist - Alle Buchungen exportieren und abschließen
+window.handleGruppeAbgereist = async () => {
+    if (!confirm('⚠️ ACHTUNG: Gruppe abreisen?\n\nDies wird:\n1. Alle Buchungen für die Registrierkasse exportieren\n2. Alle Buchungen als exportiert markieren\n3. Auffüllliste zurücksetzen\n\nFortfahren?')) return;
+    
+    try {
+        // 1. Excel Export
+        await ExportService.exportBuchungenExcel();
+        
+        // 2. Alle als exportiert markieren
+        const bs = await Buchungen.getAll({ exportiert: false });
+        for (const b of bs) {
+            const update = { exportiert: true, exportiert_am: new Date().toISOString() };
+            try { await db.buchungen.update(b.buchung_id, update); } catch(e) {}
+            if (supabaseClient && isOnline) {
+                await supabaseClient.from('buchungen').update(update).eq('buchung_id', b.buchung_id);
+            }
+        }
+        
+        // 3. Auffüllliste auch zurücksetzen
+        await Buchungen.markAsAufgefuellt();
+        
+        Utils.showToast('✅ Gruppe abgereist - Alle Buchungen exportiert und abgeschlossen', 'success');
+        Router.navigate('admin-dashboard');
+    } catch (e) {
+        Utils.showToast('Fehler: ' + e.message, 'error');
+    }
+};
 
 // Admin Buchung löschen (stornieren)
 window.handleAdminDeleteBuchung = async (buchungId) => {
