@@ -255,7 +255,7 @@ window.Utils = Utils;
 
 const State = {
     currentUser: null, currentPage: 'login', selectedCategory: null,
-    isAdmin: false, currentPin: '', inactivityTimer: null, inactivityTimeout: 120000,
+    isAdmin: false, currentPin: '', inactivityTimer: null, inactivityTimeout: 20000,
     sessionId: null,
     setUser(u) { 
         this.currentUser = u; 
@@ -385,40 +385,49 @@ const RegisteredGuests = {
     },
     
     async getByFirstLetter(letter) {
+        // Erst lokale Daten prüfen (für schnelle Anzeige)
+        const local = await db.registeredGuests.toArray();
+        const localFiltered = local.filter(g => !g.geloescht && g.firstName?.toUpperCase().startsWith(letter.toUpperCase()));
+        
+        // Wenn online, auch von Supabase laden
         if (supabaseClient && isOnline) {
-            const { data, error } = await supabaseClient
-                .from('profiles')
-                .select('*')
-                .eq('geloescht', false)
-                .ilike('first_name', `${letter}%`)
-                .order('first_name');
-            
-            if (error || !data) {
-                // Fallback auf lokale Daten
-                const all = await db.registeredGuests.toArray();
-                const filtered = all.filter(g => !g.geloescht && g.firstName?.toUpperCase().startsWith(letter.toUpperCase()));
-                return filtered.sort((a,b) => a.firstName.localeCompare(b.firstName));
+            try {
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('geloescht', false)
+                    .ilike('first_name', `${letter}%`)
+                    .order('first_name');
+                
+                if (!error && data && data.length > 0) {
+                    console.log('Profile von Supabase:', data.length);
+                    // Cache aktualisieren
+                    for (const p of data) {
+                        try { 
+                            await db.registeredGuests.put({ id: p.id, firstName: p.first_name, email: p.email, geloescht: p.geloescht });
+                        } catch(e) {}
+                    }
+                    
+                    const cnt = {};
+                    return data.map(g => {
+                        const name = g.first_name;
+                        cnt[name] = (cnt[name] || 0) + 1;
+                        return { ...g, id: g.id, firstName: name, displayName: cnt[name] > 1 ? `${name} (${cnt[name]})` : name };
+                    });
+                } else {
+                    console.log('Supabase Profile Error/Empty, nutze lokal:', error?.message || 'keine Daten');
+                }
+            } catch(e) {
+                console.error('Supabase getByFirstLetter error:', e);
             }
-            
-            // Cache aktualisieren
-            for (const p of data) {
-                try { 
-                    await db.registeredGuests.put({ id: p.id, firstName: p.first_name, email: p.email, geloescht: p.geloescht });
-                } catch(e) {}
-            }
-            
-            const cnt = {};
-            return data.map(g => {
-                const name = g.first_name;
-                cnt[name] = (cnt[name] || 0) + 1;
-                return { ...g, id: g.id, firstName: name, displayName: cnt[name] > 1 ? `${name} (${cnt[name]})` : name };
-            });
-        } else {
-            const all = await db.registeredGuests.toArray();
-            const filtered = all.filter(g => !g.geloescht && g.firstName?.toUpperCase().startsWith(letter.toUpperCase())).sort((a,b) => a.firstName.localeCompare(b.firstName));
-            const cnt = {};
-            return filtered.map(g => { cnt[g.firstName] = (cnt[g.firstName]||0)+1; return {...g, displayName: cnt[g.firstName] > 1 ? `${g.firstName} (${cnt[g.firstName]})` : g.firstName}; });
         }
+        
+        // Fallback: Lokale Daten
+        const cnt = {};
+        return localFiltered.sort((a,b) => a.firstName.localeCompare(b.firstName)).map(g => { 
+            cnt[g.firstName] = (cnt[g.firstName]||0)+1; 
+            return {...g, displayName: cnt[g.firstName] > 1 ? `${g.firstName} (${cnt[g.firstName]})` : g.firstName}; 
+        });
     },
     
     async getAll() { 
@@ -717,37 +726,46 @@ const Buchungen = {
     },
     
     async getAll(filter={}) {
-        // Für Admin: Alle Buchungen von Supabase
-        if (supabaseClient && isOnline && State.isAdmin) {
-            let query = supabaseClient.from('buchungen').select('*');
-            
-            if (filter.exportiert !== undefined) {
-                query = query.eq('exportiert', filter.exportiert);
-            }
-            if (filter.datum) {
-                query = query.eq('datum', filter.datum);
-            }
-            if (filter.includeStorniert !== true) {
-                query = query.eq('storniert', false);
-            }
-            
-            query = query.order('erstellt_am', { ascending: false });
-            
-            const { data } = await query;
-            if (data) {
-                // Cache aktualisieren
-                for (const b of data) {
-                    try { await db.buchungen.put({ ...b, gast_id: b.user_id }); } catch(e) {}
+        // Wenn online, immer von Supabase laden
+        if (supabaseClient && isOnline) {
+            try {
+                let query = supabaseClient.from('buchungen').select('*');
+                
+                if (filter.exportiert !== undefined) {
+                    query = query.eq('exportiert', filter.exportiert);
                 }
-                return data.map(b => ({ ...b, gast_id: b.user_id }));
+                if (filter.datum) {
+                    query = query.eq('datum', filter.datum);
+                }
+                if (filter.includeStorniert !== true) {
+                    query = query.eq('storniert', false);
+                }
+                
+                query = query.order('erstellt_am', { ascending: false });
+                
+                const { data, error } = await query;
+                if (error) {
+                    console.error('Buchungen.getAll Supabase error:', error);
+                } else if (data) {
+                    console.log('Buchungen von Supabase geladen:', data.length);
+                    // Cache aktualisieren
+                    for (const b of data) {
+                        try { await db.buchungen.put({ ...b, gast_id: b.user_id }); } catch(e) {}
+                    }
+                    return data.map(b => ({ ...b, gast_id: b.user_id }));
+                }
+            } catch(e) {
+                console.error('Buchungen.getAll error:', e);
             }
         }
         
         // Fallback: Lokal
+        console.log('Buchungen von lokaler DB laden...');
         let r = await db.buchungen.toArray();
         if (filter.exportiert !== undefined) r = r.filter(b => b.exportiert === filter.exportiert);
         if (filter.datum) r = r.filter(b => b.datum === filter.datum);
         if (filter.includeStorniert !== true) r = r.filter(b => !b.storniert);
+        console.log('Lokale Buchungen:', r.length);
         return r.reverse();
     },
     
@@ -838,7 +856,12 @@ const FehlendeGetraenke = {
         
         // Supabase
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('fehlende_getraenke').insert(items);
+            try {
+                const { error } = await supabaseClient.from('fehlende_getraenke').insert(items);
+                if (error) console.error('Fehlende Getränke Supabase error:', error);
+            } catch(e) {
+                console.error('Fehlende Getränke sync error:', e);
+            }
         }
         
         await DataProtection.createBackup();
@@ -2237,11 +2260,27 @@ Router.register('buchen', async () => {
     const sessionBuchungen = await Buchungen.getSessionBuchungen();
     const sessionTotal = sessionBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
     
-    // ALLE Buchungen des Gastes laden (nicht exportiert, nicht storniert)
-    const alleBuchungen = await db.buchungen.toArray();
-    const meineBuchungen = alleBuchungen.filter(b => 
-        b.gast_id === gastId && !b.storniert && !b.exportiert
-    ).sort((a,b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
+    // ALLE Buchungen des Gastes laden (von Supabase wenn online)
+    let meineBuchungen = [];
+    if (supabaseClient && isOnline) {
+        const { data } = await supabaseClient
+            .from('buchungen')
+            .select('*')
+            .eq('user_id', gastId)
+            .eq('storniert', false)
+            .eq('exportiert', false)
+            .order('erstellt_am', { ascending: false });
+        if (data) {
+            meineBuchungen = data.map(b => ({ ...b, gast_id: b.user_id }));
+        }
+    }
+    // Fallback: Lokale Daten
+    if (meineBuchungen.length === 0) {
+        const alleBuchungen = await db.buchungen.toArray();
+        meineBuchungen = alleBuchungen.filter(b => 
+            (b.gast_id === gastId || b.user_id === gastId) && !b.storniert && !b.exportiert
+        ).sort((a,b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
+    }
     const gesamtSumme = meineBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
     
     // Nach Datum gruppieren
@@ -2474,7 +2513,8 @@ window.handleRegisterSubmit = async () => {
     try { 
         console.log('Registrierung startet...', v.trim(), p.length);
         await RegisteredGuests.register(v.trim(), p); 
-        setTimeout(() => Router.navigate('login'), 1500); 
+        // Direkt zum Dashboard (Artikelmenü) navigieren
+        setTimeout(() => Router.navigate('dashboard'), 500); 
     } catch(e) {
         console.error('Registrierung Fehler:', e);
         Utils.showToast('Fehler: ' + e.message, 'error');
