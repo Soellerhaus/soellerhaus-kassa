@@ -2755,12 +2755,13 @@ window.saveEditArticle = async () => {
         ]);
     }
     
-    // Auto-Login prüfen
-    if (await Auth.autoLogin()) {
-        Router.navigate('dashboard');
-    } else {
-        Router.init();
+    // KEIN Auto-Login - immer zur Startseite
+    // Supabase Session ausloggen damit frisch gestartet wird
+    if (supabaseClient) {
+        await supabaseClient.auth.signOut();
     }
+    State.currentUser = null;
+    Router.init();
     
     // Online-Status anzeigen
     if (!isOnline) {
