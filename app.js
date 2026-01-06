@@ -1127,6 +1127,240 @@ const Utils = {
 };
 window.Utils = Utils;
 
+// ================================
+// ÜBERSETZUNGSSYSTEM (i18n)
+// ================================
+const i18n = {
+    // Aktuelle Sprache (wird aus localStorage geladen)
+    currentLang: localStorage.getItem('kassa_lang') || 'de',
+    
+    // Übersetzungen
+    translations: {
+        de: {
+            // Login-Seite
+            'app_title': 'Söllerhaus Kassa',
+            'app_subtitle': 'Self-Service Buchung',
+            'select_first_letter': 'Wählen Sie den ersten Buchstaben:',
+            'no_account': 'Noch kein Account?',
+            'register_new': 'Neu registrieren',
+            'admin_login': 'Admin-Login',
+            'missing_drinks': 'Fehlende Getränke',
+            'total': 'Gesamt',
+            'please_take_after_login': 'Bitte nach Login übernehmen',
+            'message_from_team': 'Nachricht vom Team',
+            'important_message': 'WICHTIGE NACHRICHT!',
+            'hours_visible': 'Noch {h}h sichtbar',
+            'click_to_close': 'Klicke ✕ zum Schließen',
+            'read_close': 'Gelesen & Schließen',
+            
+            // Name-Auswahl
+            'letter': 'Buchstabe',
+            'select_your_name': 'Wählen Sie Ihren Namen:',
+            'back': 'Zurück',
+            'no_entries': 'Keine Einträge',
+            
+            // PIN-Eingabe
+            'enter_pin': 'PIN eingeben',
+            'login': 'Anmelden',
+            'pin_4digit_required': 'Bitte 4-stelligen PIN eingeben',
+            
+            // Registrierung
+            'register': 'Neu registrieren',
+            'first_name': 'Vorname',
+            'first_name_placeholder': 'z.B. Maria',
+            'pin_code': '4-stelliger PIN-Code',
+            'register_btn': 'Registrieren',
+            
+            // Buchungsseite
+            'search': 'Suchen...',
+            'my_bookings': 'Meine Buchungen',
+            'items': 'Artikel',
+            'total_sum': 'Gesamtsumme',
+            'just_booked': 'Gerade gebucht',
+            'done_logout': 'Fertig & Abmelden',
+            'logout': 'Abmelden',
+            'booked': 'gebucht!',
+            'cancel_booking': 'Buchung stornieren?',
+            'cancel': 'Abbrechen',
+            'article_not_found': 'Artikel nicht gefunden',
+            'booking_error': 'Fehler beim Buchen',
+            
+            // Gruppen
+            'select_group': 'Gruppe wählen',
+            'hello': 'Hallo',
+            'please_select_group': 'Bitte wähle deine Gruppe:',
+            'group_saved': 'Die Gruppe wird für alle deine Buchungen gespeichert.',
+            'group': 'Gruppe',
+            
+            // Fehlende Getränke
+            'missing_drinks_yesterday': 'Fehlende Getränke vom Vortag',
+            'please_take_if_forgot': 'Bitte übernehmen, falls Sie diese vergessen haben zu buchen',
+            
+            // Kategorien
+            'cat_all': 'Alle',
+            'cat_alkoholfrei': 'Alkoholfreie Getränke',
+            'cat_biere': 'Biere',
+            'cat_weine': 'Weine',
+            'cat_schnaepse': 'Schnäpse & Spirituosen',
+            'cat_heiss': 'Heiße Getränke',
+            'cat_suess': 'Süßes & Salziges',
+            'cat_sonstiges': 'Sonstiges',
+            
+            // Allgemein
+            'goodbye': 'Auf Wiedersehen!',
+            'welcome': 'Willkommen',
+            'offline_mode': 'Offline-Modus',
+            'error': 'Fehler',
+            'success': 'Erfolg',
+            'language': 'Sprache',
+            'message_read': 'Nachricht als gelesen markiert'
+        },
+        en: {
+            // Login page
+            'app_title': 'Söllerhaus Kassa',
+            'app_subtitle': 'Self-Service Booking',
+            'select_first_letter': 'Select the first letter:',
+            'no_account': 'No account yet?',
+            'register_new': 'Register now',
+            'admin_login': 'Admin Login',
+            'missing_drinks': 'Missing Drinks',
+            'total': 'Total',
+            'please_take_after_login': 'Please take after login',
+            'message_from_team': 'Message from the team',
+            'important_message': 'IMPORTANT MESSAGE!',
+            'hours_visible': 'Visible for {h}h',
+            'click_to_close': 'Click ✕ to close',
+            'read_close': 'Read & Close',
+            
+            // Name selection
+            'letter': 'Letter',
+            'select_your_name': 'Select your name:',
+            'back': 'Back',
+            'no_entries': 'No entries',
+            
+            // PIN entry
+            'enter_pin': 'Enter PIN',
+            'login': 'Login',
+            'pin_4digit_required': 'Please enter a 4-digit PIN',
+            
+            // Registration
+            'register': 'Register',
+            'first_name': 'First Name',
+            'first_name_placeholder': 'e.g. Maria',
+            'pin_code': '4-digit PIN code',
+            'register_btn': 'Register',
+            
+            // Booking page
+            'search': 'Search...',
+            'my_bookings': 'My Bookings',
+            'items': 'items',
+            'total_sum': 'Total',
+            'just_booked': 'Just booked',
+            'done_logout': 'Done & Logout',
+            'logout': 'Logout',
+            'booked': 'booked!',
+            'cancel_booking': 'Cancel booking?',
+            'cancel': 'Cancel',
+            'article_not_found': 'Article not found',
+            'booking_error': 'Error while booking',
+            
+            // Groups
+            'select_group': 'Select Group',
+            'hello': 'Hello',
+            'please_select_group': 'Please select your group:',
+            'group_saved': 'The group will be saved for all your bookings.',
+            'group': 'Group',
+            
+            // Missing drinks
+            'missing_drinks_yesterday': 'Missing drinks from yesterday',
+            'please_take_if_forgot': 'Please take if you forgot to book them',
+            
+            // Categories
+            'cat_all': 'All',
+            'cat_alkoholfrei': 'Soft Drinks',
+            'cat_biere': 'Beers',
+            'cat_weine': 'Wines',
+            'cat_schnaepse': 'Spirits',
+            'cat_heiss': 'Hot Drinks',
+            'cat_suess': 'Sweets & Snacks',
+            'cat_sonstiges': 'Other',
+            
+            // General
+            'goodbye': 'Goodbye!',
+            'welcome': 'Welcome',
+            'offline_mode': 'Offline mode',
+            'error': 'Error',
+            'success': 'Success',
+            'language': 'Language',
+            'message_read': 'Message marked as read'
+        }
+    },
+    
+    // Sprache setzen
+    setLang(lang) {
+        if (this.translations[lang]) {
+            this.currentLang = lang;
+            localStorage.setItem('kassa_lang', lang);
+            return true;
+        }
+        return false;
+    },
+    
+    // Übersetzung holen
+    t(key, params = {}) {
+        const lang = this.currentLang;
+        let text = this.translations[lang]?.[key] || this.translations['de']?.[key] || key;
+        
+        // Parameter ersetzen (z.B. {h} durch Stundenzahl)
+        for (const [k, v] of Object.entries(params)) {
+            text = text.replace(`{${k}}`, v);
+        }
+        
+        return text;
+    },
+    
+    // Sprache umschalten
+    toggle() {
+        const newLang = this.currentLang === 'de' ? 'en' : 'de';
+        this.setLang(newLang);
+        return newLang;
+    },
+    
+    // Button HTML rendern
+    renderLangButton() {
+        const otherLang = this.currentLang === 'de' ? 'EN' : 'DE';
+        return `<button onclick="toggleLanguage()" style="
+            position:fixed;
+            top:10px;
+            right:10px;
+            background:rgba(44,95,124,0.9);
+            color:white;
+            border:none;
+            border-radius:20px;
+            padding:8px 16px;
+            font-size:0.9rem;
+            font-weight:600;
+            cursor:pointer;
+            z-index:1000;
+            box-shadow:0 2px 8px rgba(0,0,0,0.2);
+            display:flex;
+            align-items:center;
+            gap:6px;
+        ">
+            🌐 ${otherLang}
+        </button>`;
+    }
+};
+window.i18n = i18n;
+
+// Sprache umschalten und Seite neu laden
+window.toggleLanguage = () => {
+    const newLang = i18n.toggle();
+    Utils.showToast(newLang === 'en' ? 'Language: English' : 'Sprache: Deutsch', 'info');
+    // Aktuelle Seite neu laden
+    Router.handleRoute();
+};
+
 const State = {
     currentUser: null, currentPage: 'login', selectedCategory: null,
     isAdmin: false, currentPin: '', inactivityTimer: null, inactivityTimeout: 20000,
@@ -2762,6 +2996,7 @@ const UI = {
 // Routes
 Router.register('login', async () => {
     State.currentPin = ''; window.selectedGastId = null; window.currentLetter = null;
+    const t = (key, params) => i18n.t(key, params);
     
     // Abgelaufene Nachrichten aufräumen
     await GastNachrichten.cleanupAbgelaufene();
@@ -2804,7 +3039,7 @@ Router.register('login', async () => {
                         </div>
                         <div style="font-size:0.8rem;opacity:0.85;display:flex;gap:12px;flex-wrap:wrap;">
                             <span>📅 ${erstelltUm}</span>
-                            <span>⏳ Noch ${verbleibend}h sichtbar</span>
+                            <span>⏳ ${t('hours_visible', {h: verbleibend})}</span>
                         </div>
                     </div>
                     <button onclick="dismissGastNachricht(${n.id})" style="
@@ -2819,7 +3054,7 @@ Router.register('login', async () => {
                         font-weight:bold;
                         margin-left:12px;
                         flex-shrink:0;
-                    " title="Gelesen & Schließen">✓</button>
+                    " title="${t('read_close')}">✓</button>
                 </div>
             </div>`;
         }).join('')}
@@ -2842,29 +3077,35 @@ Router.register('login', async () => {
     <div style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:24px;color:white;max-width:600px;margin:0 auto 24px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
             <span style="font-size:1.3rem;">⚠</span>
-            <div style="font-weight:700;">Fehlende Getränke</div>
+            <div style="font-weight:700;">${t('missing_drinks')}</div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
             ${fehlendeList.map(f => `<span style="background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:20px;font-size:0.9rem;">${f.menge}× ${f.name}</span>`).join('')}
         </div>
-        <div style="font-size:0.85rem;opacity:0.9;">Gesamt: ${Utils.formatCurrency(gesamtPreis)} • Bitte nach Login übernehmen</div>
+        <div style="font-size:0.85rem;opacity:0.9;">${t('total')}: ${Utils.formatCurrency(gesamtPreis)} • ${t('please_take_after_login')}</div>
     </div>
     ` : '';
     
-    UI.render(`<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,UklGRhASAABXRUJQVlA4WAoAAAAwAAAAKwEAMwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZBTFBI0wEAAAEPMP8REUJys22R5HyIA3MjhD8N75XKhOAARgPtNS3K69EhDFYngPf/gPi8UFBdcgAR/Z8AACirwxH17A9Rz3KMbwf5dZDz/0RXf4hr2MupAR7h8hQk2hgAApXMlKkiSCQKXfrH9AjlSkG2aCHTVaKQRikTtldcj7RK2sZlwk287pnGMBAy6ZUn+q2PpK2k4Vz0UEA9ssNt8tlWYeSZEzKRXbLNaeQ6YJFFp2yyzV4nRq5DZaMOGaSAibxxI52y27KHRVr2erQFNIu8oL3d5cmTTv7HHcABTfaQGQ/UsEPZkNtOEqDSjFGy6NZNLwBKN9dmIg0K/RTpI0nEDdAic8ky5Xq+9ppHZLiA9lQAcgc7UwJQmZcpdJJT00kECj8PWWQGRA9FcqUHGiSeZ4RzzQL7ZdL21AJtrpmp4oC6g53K+9ReId3UOuZ6No+9DeCYbpjeUyR3tYvvqEkdRXL30ObKgM8OTxTZVbTnjEzkQoae9DB0xxPXDVYyS142ok8bjTRk6IWxiijJY1EU20hMpTAiUdSqbQxoXBIpI8oTP9ErTyGLkuafShmLVK68+8eQXklUCpR+v0ZXGJDpUegi6cmlMmTBMlJpEhegAomYdBgsAWgOAFZQOCBGDgAA8EUAnQEqLAE0AD5RJI5Fo6IhEooGHDgFBLIBkgEDJAB2139O3fkB+QHyvVX+9fhD+i+0TyJ5E8uXkL++/mX/WPoT6Ifzf/sfcD/wX9a6Q/mA/Tf/o/6r3Of7h/ov7t7qP2J/zv6gfIB/Rf5h6yP/A9k/+u/732L/5V/Z//P64v68/CL+2n7h+0H/89Y78W/1j8XPBr/DflF2FGqXmX9LehH1KRl8muAF698A/aZ5z5gXrv9c76zUg73+wB/L/6L6L/4/wTPrP+59gL+Lf1T/nf4j15f+n/I+cr8u/xv/k9wT+R/0z/pf3n2qvWt+4vsL/qh/3GI6wAjRj9bMz7HBIzvWJRfblmeKxHz0t2F/QbdlgbQjS+e6KaJGvTwNut9lMjrfGREAQ55sZ4GsQ0R5P78FUEoELeXfFK4ICs/57Irep4bLZHxZ2eC55Puspd8wFwf0dzGnxfL2O3YXhSb26aaSoZcrwZ1fnVcoghDJi/BuhkBWHrIhKHlU/dUrZpqo/wDLl1HrQy3ZAGsaOtCuTvdm/dpHtrxFwMO7qjA3Y1E7ExaxGeYUrY+g5PZN3NI8JrmZqGRg2s5RPrtik7+rJ/FD0CO1MXgzGW0OxiuO+DafE52X/ACUhlqx9LbKqNoRE3UmRheu8NpUz5bh/PQwdq+yNEudSjeCjk8P9FIkWwWJU7AKwULj7Qer7iaAGNME88BEjomKT0tHFK12Btr0DcxEem6Rcw7l8PLAiudqrZrw6JaPeTPVGAD++oDstng5indz+W6cz7srqPIq/nHE58jAsViyXg2TOmuYIp5WhRzL8/xOOcDb9j/jhvRWkPdafKk4EW1hFFJ18nJpYr+Pnzw+1SnD2y5vFYWojn5pNjnl6+eBU6GBjK55GdXW8S11wyWCfA8ckes78+7+AubbKrZnLcAvMu6KHyUTSDD/hqqOut2P/1lHzNBWVh600xdznmVUHZ5B//2Gec+qqka3uap7R7LvMTM4TF3Ozbk7Fqbtpa7gh8jhe5MW3kNQMH8TOF07vHC+9t0CSR6wolbbzRGehUhlL1lL+oYmb9f/bc4CH8yJq66BoEsnUl7kPDwbcdBiqjsFLyToQbMQopgju5Gfn81+BwID7eN3nsHX/opP/9GI//+ilIVCm9pY3C5FwqiMESZQrWYkpmGpvr/+tO14evMmfrvb//7BIp76TESDJU7amA7Rfv7lFGsUi+bBguDC6LHXPCSGsbjE9wmikSbVq9SDIk9J8lRsXKQDiyItL48X4/6VUJ8uprEZrs+Cbpb9dQ4dDiWIGcI9hOcCSTXQ3logKfD6QErT3RRWrfOSZhj7CdcubtBtevqqNd7765p8df3KONDf2jtEM/Z+vsZyD88h6w7nxCqEfF+GP/iZzsq5+JDYspyzq2nL/W59iEjZUphyL1WuFG+XBEB0/cX1HMdklyZW2fPQOZ8ml97qkSgL8dBJx9//ukmFXUr+NqG8cbf5D8AUOx5sVYolpEbHzoPMVlu3bisTVfvjiwSzaz/R4H2C8y3BREeL4nrYUYECfMMULNhnhl9pXZcK8uhyFPBZBhfCsFwOSNukbjqBBaQKZYTTM26qFs2uGLNg1umIHHnyF9PvEgSKc0rmoA6iseC2LwSnkZEJkAJmJtc3yl/y+4ClyYwckDFrMwm84p9vXP8MD7xEuzAS10i7CgdKYNWxpVDTl0Xm5iWjAdWmbfm36FygNDe3stWfwHjHEZIIOqyglhR8QsQ+66TTIiXa1O1002ezTjklzQuCvLBgK+mmV3/4eGDARqpgjj9RaamqLH2RuOCyzp4T3fzW+7sL057wTXo3bnWA5LcaMKjSvaOJqtCOpJ9HXDkxjVHekYjYNO6Lb8hkNs9qnHR+tvcq8U+5aopZzrgfj46I7907wgSP1LBr7jytYQMecmXzRnfVR6RgVuxpIt6o1ciPP5ZG7zfjLxq3IotmNJmTkktsJC0+vJRRySHfiB28d1HVi2iWBARGheYu/fPhMPeie0ABWGPWN676JJkbaGZdDj5GD9DykoH2f+IwTZ+6hQAGF1n70s9EzffN32c9p75x746ECTl8P5X+udHzBNRyXCVLhKO0gqI0b6Z1OMRJH5puyeVWpK643OuQ1gnH4DzjhWOstzVjlG/208mC5NDxn46cIWsFhkyRXwle++Qdn7/AbrHRsZxBEiACzzV1WcWscoSz5y3fnXsqwAW9lPJ/w9F9XHIj67bV0+RDBm+t3Oa4BUNt99buEbkgnYeJNNZS7bET8GH3+/47gzmNdQiNZ8JaOOhPFz8OuyhQp0PLHldpM0CuGzNBVl/E4mlGUD04sgKI+LBRr44/1bah/Xcb5VRaBGur7v/ybxPlQ/mj//hOVdjvIEyD48ghebMOgv066iBYFEnatkHHN8n03EeYjrtjnuUfng1RhgTBgbueXq0kgOwN+0w1V7WxOBCBLogyuTK+e/JjMzbeaGFfh6oXlNaHTRpYec5+fSiuAzS8hai9MsjIYsr7bB//9KNH1NmTjJhjWoyAoEPgJ8k9/ovASQniQCpJWoppv4KAsusREuJu2jVEWTk4n2gcR3m0+qG0tlvVVZXZSFpnkGfJwcaKiambNVuvAAVqtMZEYo7HGSmq6tcy/+HOZFa0gxn/4c5mfyHI/IXQ1E+XayEwd7Q+1gj5S1RVlUikOP2ID+lLqVQJceWFyNZ8qDLyDM3ddq2RdlsgOpgfi7fgPjpwZxmB5J9S9yb1HbkwZyYy/HCN4tmzVkzx70Mp/DWOyP6aB61D8cVM8qJLJf5/VjtAavWpY89JHuZYl92bDZRIfoASfoi1ErNlcbxS5SvhxwPZloxv95vmwMo0/WsQ7fIQMMjY89eL8gDc1xsOof4caL/D2vk/w1Lc95z73oRRNSOysBFXN/ZMufPCrcG1C00OnZeXeOYJM/8+H/yjVTVsLdEN/Al4+jgBNbARDOpRcV48ZO9YR24iFWy31Bzv347vddYYS8IG9Jl/p6Y3p/7aFm1uN4rSUEo3I9oKHXBop6RZ3Vv8q/5zPVm+WjfgEgwWm3egMbEjyOYbgllp8K0oz9ok6BuKp3S++PHtQdr05LLafgKwHsfVw0rGsVbd2ehmnPLI5gPjLwCD2vuNNdG521ZWWVhA4zVyUH8F9O7boRH8aNkhg1WWhD0YL2CG1M0HCNzcEyFHWuqN1bs8xEzF1v7dOs1ged4fJK35MeHZtslQ7GkQznqYkfx7x1uizSz1tIj4QafoHODT4yOvR9fdAelJHBCZ/PH0JAq9yJh6vt8uFHaRm+WLqv1ny8N++dwCNAhLOkWd7Ua3yfsXph3G+NGUWKdNH/8RXxEzDEIcvIEZPL445umG7MvGj/Y6g+cItrx2bz5bwT1uqmyliNqqVtid6xKSNWF6YiUDuOce6G4p1GcqfmBoZ1OKHYG/0lJE7CX9xURSZe3ChNel95pe4zspxLomgdKvMBDFwekhhozzDnYnqtsL5uiAmV2/by2ea3DO3vUaTAUo4kKIlf7E7K9IM0yw0n3V/lSL0AJCWurkFN5c/xkzYdq2jtMnsthdm14zIiVEZIweR4kLalqu8822dBPa6ftuTO5HtlIKg85zHfzwLLxFFcuCnKRvfir28pXW7K5K39FoTHrOo+DdNLEKlyFjV1jx9Sq3ebiGlrcV4NfpQo5UiGvNdijO7UJXQqWv3kmGBfsfKjcd0S+7XLIqepJfkSvkaw/0wmcDVv/X4CPnVZsC+HEqh79makb60hRQWJzTz6Tg8DfwZM+PoAsvepYCM07CzSBX5K/XneAm4kwRl/6nK+ArHucWsVYkTU/yJc+mUXi/Qaz2ZtSmccKNOGHGYlys7Bh8bGjB46trITKHa4x1LCOdwJMYZMpiBHKt5uP050s6BfN+0pUTojlcgqsM74NgbDjm1qcA6y5qYBQmatWHOH5KSmFq7QYpBKdVCz5dCkDP/4R7UWqtn0ktW6WMqxcYiE+ygJ1xDuy1Lw1icK5rdfe1gTgcaUhrljbiGQZRHmzXUpXk0NXshia0ol22NO58wwgbhGNlhWjv3iLl65Ukwsja5mAmyMrGuExxGufldj5Ra5OljojsOD1WCoWD50zUpyLc1nMV+R3XarIeE3Nf/alr+Te4yASxOFwEXzJT7FEd/naLlNCNi92gaMzmxUi8OfvJ7awia/oiNiNhoRTvstmiXRd+m++LjlGL+IZT2GvBJK9w65yXRCuYEzg6WbAuYaMtUXFKgcXjwCXHj8pHN/vDo5M8hWGsE2e7dQbm7/vu9gFm7EgBWTrEzZ6dimjpU/ox4655UQfeEoW1lx0VavGidviFQHxlnWWTK0nztPD1SjL6gg7b72IuORuEhAitdEnTqa4A73XofeBaIqcgVBTmFXuSxd8XvazwzJROeLldKzOx9wrej3/PmoXtwGEPzTPhjD1K7Gv1+uTh6jDY1Vp/Wm2C5VNfOVC8HUz/q4oiu/DRmBGrOayOpiR5PoQx3//0xi0Iv/8ufzO3Irr8WfSswJkWO0WEC5NMQXIux/QOsvEfwlP9vnd4TWIaOzznp3MuawHUvH+j3/pbsej+YPH2qrAmKcHrqohB8J7x9YXhgJMDvp36dPaGk8+9h4+W6f0eAwEeDgj22kBDPsROlYt1ldsQfQtLIjwMzV3D03C7DUMJjvcEc01tGsgxm3fI9w8cmoOhkvLpUe9m/i3TjKIKFxr7mjwDNfNzJWgKHJ0ZNI8aDU5VeG7SQuJWRWuwqHBsefmJFhYsi9Mp656ptz/8oXcNl1rfb/ubSrDm82KB9KMOJt3EZkAq0nkhpeAdRhP7sffaLBLirFi4rbc1srB7PClXgSq/tRwRrZu3uQy/f/n4qZAAe6b9Ajiz/G7DwAAA" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">Söllerhaus Kassa</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">Self-Service Buchung</p>${nachrichtHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;">${UI.renderAlphabet('handleLetterSelect')}<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">Noch kein Account?</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">Neu registrieren</button></div><div style="margin-top:24px;"><button class="btn btn-secondary" onclick="handleAdminClick()">Admin-Login</button></div></div></div></div>`);
+    // Sprachauswahl Button
+    const langBtn = i18n.renderLangButton();
+    
+    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;"><button class="btn btn-secondary" onclick="handleAdminClick()">${t('admin_login')}</button></div></div></div></div>`);
 });
 
 Router.register('register', () => {
     window.registerPin = '';
-    UI.render(`<div class="main-content"><div style="max-width:500px;margin:40px auto;">
-        <h1 class="page-title" style="text-align:center;">Neu registrieren</h1>
+    const t = (key, params) => i18n.t(key, params);
+    const langBtn = i18n.renderLangButton();
+    const placeholder = i18n.currentLang === 'en' ? 'e.g. Maria' : 'z.B. Maria';
+    UI.render(`${langBtn}<div class="main-content"><div style="max-width:500px;margin:40px auto;">
+        <h1 class="page-title" style="text-align:center;">${t('register')}</h1>
         <div class="card">
             <div class="form-group">
-                <label class="form-label">Vorname *</label>
-                <input type="text" id="register-vorname" class="form-input" placeholder="z.B. Maria" autofocus style="font-size:1.2rem;padding:16px;">
+                <label class="form-label">${t('first_name')} *</label>
+                <input type="text" id="register-vorname" class="form-input" placeholder="${placeholder}" autofocus style="font-size:1.2rem;padding:16px;">
             </div>
             <div class="form-group">
-                <label class="form-label" style="text-align:center;display:block;">4-stelliger PIN-Code *</label>
+                <label class="form-label" style="text-align:center;display:block;">${t('pin_code')} *</label>
                 <div class="pin-display" id="register-pin-display" style="display:flex;justify-content:center;gap:12px;margin:16px 0;">
                     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
                 </div>
@@ -2872,12 +3113,12 @@ Router.register('register', () => {
                     ${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pin-btn" onclick="handleRegisterPinInput('${n}')">${n}</button>`).join('')}
                     <button type="button" class="pin-btn" style="visibility:hidden;"></button>
                     <button type="button" class="pin-btn" onclick="handleRegisterPinInput('0')">0</button>
-                    <button type="button" class="pin-btn pin-btn-delete" onclick="handleRegisterPinDelete()">❌«</button>
+                    <button type="button" class="pin-btn pin-btn-delete" onclick="handleRegisterPinDelete()">⌫</button>
                 </div>
             </div>
-            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">✔ Registrieren</button>
+            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">✔ ${t('register_btn')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← Zurück</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← ${t('back')}</button>
     </div></div>`);
 });
 
@@ -2900,16 +3141,25 @@ function updateRegisterPinDisplay() {
 
 Router.register('name-select', async () => {
     if (!window.currentLetter) { Router.navigate('login'); return; }
+    const t = (key, params) => i18n.t(key, params);
+    const langBtn = i18n.renderLangButton();
     const gaeste = await Auth.getGaesteByLetter(window.currentLetter);
-    UI.render(`<div class="main-content"><div style="max-width:600px;margin:40px auto;"><h1 class="page-title" style="text-align:center;">Buchstabe: ${window.currentLetter}</h1>${UI.renderNameList(gaeste, 'handleNameSelect')}</div></div>`);
+    
+    const nameListHtml = !gaeste?.length 
+        ? `<div class="name-list-empty"><p>${t('no_entries')}</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">${t('back')}</button></div>`
+        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">${t('back')}</button></div>`;
+    
+    UI.render(`${langBtn}<div class="main-content"><div style="max-width:600px;margin:40px auto;"><h1 class="page-title" style="text-align:center;">${t('letter')}: ${window.currentLetter}</h1>${nameListHtml}</div></div>`);
 });
 
 Router.register('pin-entry', () => {
     if (!window.selectedGastId) { Router.navigate('login'); return; }
     window.loginPin = '';
-    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;">
+    const t = (key, params) => i18n.t(key, params);
+    const langBtn = i18n.renderLangButton();
+    UI.render(`${langBtn}<div class="main-content"><div style="max-width:500px;margin:60px auto;">
         <div class="card">
-            <label class="form-label" style="text-align:center;display:block;font-size:1.2rem;margin-bottom:16px;">PIN eingeben</label>
+            <label class="form-label" style="text-align:center;display:block;font-size:1.2rem;margin-bottom:16px;">${t('enter_pin')}</label>
             <div class="pin-display" id="login-pin-display" style="display:flex;justify-content:center;gap:12px;margin:16px 0;">
                 <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
             </div>
@@ -2917,11 +3167,11 @@ Router.register('pin-entry', () => {
                 ${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pin-btn" onclick="handleLoginPinInput('${n}')">${n}</button>`).join('')}
                 <button type="button" class="pin-btn" style="visibility:hidden;"></button>
                 <button type="button" class="pin-btn" onclick="handleLoginPinInput('0')">0</button>
-                <button type="button" class="pin-btn pin-btn-delete" onclick="handleLoginPinDelete()">❌«</button>
+                <button type="button" class="pin-btn pin-btn-delete" onclick="handleLoginPinDelete()">⌫</button>
             </div>
-            <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;">✔ Anmelden</button>
+            <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;">✔ ${t('login')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">← Zurück</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">← ${t('back')}</button>
     </div></div>`);
 });
 
@@ -2947,7 +3197,7 @@ function updateLoginPinDisplay() {
 }
 window.handlePinLogin = async () => {
     if (window.loginPin.length !== 4) {
-        Utils.showToast('Bitte 4-stelligen PIN eingeben', 'warning');
+        Utils.showToast(i18n.t('pin_4digit_required'), 'warning');
         return;
     }
     try {
@@ -2976,16 +3226,18 @@ window.navigateAfterLogin = async () => {
 // Route: Gruppe wählen
 Router.register('gruppe-waehlen', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
+    const t = (key, params) => i18n.t(key, params);
+    const langBtn = i18n.renderLangButton();
     
     const gruppen = await Gruppen.getAll();
     const name = State.currentUser.firstName || State.currentUser.vorname;
     
-    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">🏫 Gruppe wählen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Auth.logout()">Abbrechen</button></div></div>
+    UI.render(`${langBtn}<div class="app-header"><div class="header-left"><div class="header-title">🏫 ${t('select_group')}</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Auth.logout()">${t('cancel')}</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:20px;text-align:center;">
-                <div style="font-size:1.2rem;">Hallo <strong>${name}</strong>!</div>
-                <div style="margin-top:8px;opacity:0.9;">Bitte wähle deine Gruppe:</div>
+                <div style="font-size:1.2rem;">${t('hello')} <strong>${name}</strong>!</div>
+                <div style="margin-top:8px;opacity:0.9;">${t('please_select_group')}</div>
             </div>
         </div>
         
@@ -2998,7 +3250,7 @@ Router.register('gruppe-waehlen', async () => {
         </div>
         
         <p style="text-align:center;margin-top:24px;color:#888;font-size:0.9rem;">
-            Die Gruppe wird für alle deine Buchungen gespeichert.
+            ${t('group_saved')}
         </p>
     </div>`);
 });
@@ -4967,6 +5219,10 @@ Router.register('dashboard', async () => {
 Router.register('buchen', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
     
+    // i18n Setup
+    const t = (key, params) => i18n.t(key, params);
+    const langBtn = i18n.renderLangButton();
+    
     // Prüfen ob Gruppenauswahl nötig
     const gruppenAktiv = await Gruppen.isAbfrageAktiv();
     if (gruppenAktiv && !State.selectedGroup) {
@@ -5031,13 +5287,13 @@ Router.register('buchen', async () => {
     
     const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#4A5859'})[id] || '#2C5F7C';
     
-    UI.render(`
+    UI.render(`${langBtn}
     <div class="app-header">
         <div class="header-left">
             <div class="header-title">👤 ${name}</div>
             ${currentGroup ? `<div style="font-size:0.8rem;opacity:0.8;">🏫 ${currentGroup}</div>` : ''}
         </div>
-        <div class="header-right"><button class="btn btn-secondary" onclick="handleGastAbmelden()">Abmelden</button></div>
+        <div class="header-right"><button class="btn btn-secondary" onclick="handleGastAbmelden()">${t('logout')}</button></div>
     </div>
     <div class="main-content" style="padding-bottom:${sessionBuchungen.length ? '180px' : '20px'};">
         
@@ -5045,8 +5301,8 @@ Router.register('buchen', async () => {
         <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);border-radius:16px;margin-bottom:20px;overflow:hidden;">
             <div onclick="toggleBuchungsDetails()" style="padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
                 <div style="color:white;">
-                    <div style="font-weight:700;font-size:1.1rem;">📋 Meine Buchungen</div>
-                    <div style="font-size:0.9rem;opacity:0.9;">${meineBuchungen.length} Artikel • Gesamtsumme</div>
+                    <div style="font-weight:700;font-size:1.1rem;">📋 ${t('my_bookings')}</div>
+                    <div style="font-size:0.9rem;opacity:0.9;">${meineBuchungen.length} ${t('items')} • ${t('total_sum')}</div>
                 </div>
                 <div style="text-align:right;color:white;">
                     <div style="font-size:1.5rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
@@ -5079,8 +5335,8 @@ Router.register('buchen', async () => {
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
                 <span style="font-size:1.5rem;">⚠</span>
                 <div>
-                    <div style="font-weight:700;font-size:1.1rem;">Fehlende Getränke vom Vortag</div>
-                    <div style="font-size:0.9rem;opacity:0.9;">Bitte übernehmen, falls Sie diese vergessen haben zu buchen</div>
+                    <div style="font-weight:700;font-size:1.1rem;">${t('missing_drinks_yesterday')}</div>
+                    <div style="font-size:0.9rem;opacity:0.9;">${t('please_take_if_forgot')}</div>
                 </div>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:8px;">
@@ -5097,10 +5353,10 @@ Router.register('buchen', async () => {
         </div>
         ` : ''}
         
-        <div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="searchArtikel(this.value)"></div>
+        <div class="form-group"><input type="text" class="form-input" placeholder="🔍 ${t('search')}" oninput="searchArtikel(this.value)"></div>
         <div class="category-tabs">
             ${kats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0)).map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})">${k.name}</div>`).join('')}
-            <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')">Alle</div>
+            <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')">${t('cat_all')}</div>
         </div>
         <div class="artikel-grid">
             ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" onclick="bucheArtikelDirekt(${a.artikel_id})">${renderTileContent(a)}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
@@ -5110,7 +5366,7 @@ Router.register('buchen', async () => {
     <div class="session-popup" style="position:fixed;bottom:20px;right:20px;left:20px;max-width:400px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2);border:2px solid var(--color-alpine-green);z-index:1000;">
         <div style="padding:16px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <strong style="font-size:1.1rem;">🛒 Gerade gebucht</strong>
+                <strong style="font-size:1.1rem;">🛒 ${t('just_booked')}</strong>
                 <span style="font-size:1.4rem;font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(sessionTotal)}</span>
             </div>
             <div style="max-height:150px;overflow-y:auto;">
@@ -5128,7 +5384,7 @@ Router.register('buchen', async () => {
                 `).join('')}
             </div>
             <div style="display:flex;gap:10px;margin-top:12px;">
-                <button class="btn btn-primary" onclick="handleGastAbmelden()" style="flex:1;padding:14px;font-size:1rem;">✔ Fertig & Abmelden</button>
+                <button class="btn btn-primary" onclick="handleGastAbmelden()" style="flex:1;padding:14px;font-size:1rem;">✔ ${t('done_logout')}</button>
             </div>
         </div>
     </div>
@@ -5166,18 +5422,18 @@ window.uebernehmeFehlend = async (id) => {
 window.bucheArtikelDirekt = async (id) => {
     try {
         const a = await Artikel.getById(id);
-        if (!a) { Utils.showToast('Artikel nicht gefunden', 'error'); return; }
+        if (!a) { Utils.showToast(i18n.t('article_not_found'), 'error'); return; }
         await Buchungen.create(a, 1);
-        Utils.showToast(`${a.name_kurz||a.name} gebucht!`, 'success');
+        Utils.showToast(`${a.name_kurz||a.name} ${i18n.t('booked')}`, 'success');
         Router.navigate('buchen');
     } catch (e) {
-        Utils.showToast(e.message || 'Fehler beim Buchen', 'error');
+        Utils.showToast(e.message || i18n.t('booking_error'), 'error');
     }
 };
 
 // Storno durch Gast
 window.stornoBuchung = async (buchung_id) => {
-    if (confirm('Buchung stornieren?')) {
+    if (confirm(i18n.t('cancel_booking'))) {
         try {
             await Buchungen.storno(buchung_id);
             Router.navigate('buchen');
@@ -5192,7 +5448,7 @@ window.handleBuchenUndAbmelden = async () => {
     await Buchungen.fixSessionBuchungen();
     State.clearUser();
     Router.navigate('login');
-    Utils.showToast('Buchungen gespeichert. Auf Wiedersehen!', 'success');
+    Utils.showToast(i18n.t('goodbye'), 'success');
 };
 
 // Gast Abmelden (gleiche Funktion, immer Buchungen speichern)
@@ -5200,19 +5456,7 @@ window.handleGastAbmelden = async () => {
     await Buchungen.fixSessionBuchungen();
     State.clearUser();
     Router.navigate('login');
-    Utils.showToast('Auf Wiedersehen!', 'success');
-};
-
-// Storno durch Gast
-window.stornoBuchung = async (buchung_id) => {
-    if (confirm('Buchung wirklich stornieren?')) {
-        try {
-            await Buchungen.storno(buchung_id);
-            Router.navigate('buchen');
-        } catch (e) {
-            Utils.showToast(e.message, 'error');
-        }
-    }
+    Utils.showToast(i18n.t('goodbye'), 'success');
 };
 
 Router.register('historie', async () => {
