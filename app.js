@@ -311,11 +311,27 @@ window.State = State;
 const RegisteredGuests = {
     // Supabase Auth + Profile
     async register(firstName, password) {
-        if (!firstName?.trim()) throw new Error('Vorname erforderlich');
+        if (!firstName?.trim()) throw new Error('Name erforderlich');
         if (!password || password.length < 4) throw new Error('PIN muss mind. 4 Zeichen haben');
         
-        // Prüfen ob PIN schon vergeben
+        // Name bereinigen und validieren
+        const cleanName = firstName.trim().toUpperCase();
+        
+        // Nur Buchstaben, Leerzeichen und Bindestrich erlaubt
+        if (!/^[A-ZÄÖÜ][A-ZÄÖÜ\s\-]*$/.test(cleanName)) {
+            throw new Error('Name darf nur Buchstaben und Bindestriche enthalten!');
+        }
+        
+        // Prüfen ob Name schon vergeben
         const alleGaeste = await db.registeredGuests.toArray();
+        const nameExists = alleGaeste.find(g => 
+            ((g.nachname || g.firstName || '').toUpperCase() === cleanName) && !g.geloescht
+        );
+        if (nameExists) {
+            throw new Error('Dieser Name ist bereits vergeben! Bitte wähle einen anderen.');
+        }
+        
+        // Prüfen ob PIN schon vergeben
         const pinExists = alleGaeste.find(g => 
             (g.passwort === password || g.passwordHash === password) && !g.geloescht
         );
@@ -325,7 +341,7 @@ const RegisteredGuests = {
         
         // Generiere pseudo-Email für Supabase Auth
         const uniqueId = Utils.uuid().substring(0, 8);
-        const email = `${firstName.toLowerCase().replace(/[^a-z]/g, '')}.${uniqueId}@kassa.local`;
+        const email = `${cleanName.toLowerCase().replace(/[^a-z]/g, '')}.${uniqueId}@kassa.local`;
         
         // Supabase erfordert min. 6 Zeichen - PIN mit Prefix erweitern
         const supabasePassword = 'PIN_' + password + '_KASSA';
@@ -335,7 +351,7 @@ const RegisteredGuests = {
             const { data: authData, error: authError } = await supabaseClient.auth.signUp({
                 email: email,
                 password: supabasePassword,
-                options: { data: { first_name: firstName.trim() } }
+                options: { data: { first_name: cleanName } }
             });
             
             if (authError) {
@@ -3076,6 +3092,15 @@ Router.register('admin-guests', async () => {
     
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
+        <style>
+            .switch { position:relative; display:inline-block; width:50px; height:26px; }
+            .switch input { opacity:0; width:0; height:0; }
+            .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.3s; border-radius:26px; }
+            .slider:before { position:absolute; content:""; height:20px; width:20px; left:3px; bottom:3px; background-color:white; transition:.3s; border-radius:50%; }
+            input:checked + .slider { background-color:#e67e22; }
+            input:checked + .slider:before { transform:translateX(24px); }
+        </style>
+        
         <!-- Such- und Filterleiste -->
         <div class="card mb-3" style="background:#fffde7;">
             <div class="card-body" style="padding:12px;">
@@ -3133,10 +3158,9 @@ Router.register('admin-guests', async () => {
                                 <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:1.2rem;font-weight:bold;color:#2c3e50;">${pw}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;">
-                                    <label style="position:relative;display:inline-block;width:50px;height:26px;">
-                                        <input type="checkbox" ${ausnahme ? 'checked' : ''} onchange="toggleAusnahme('${g.id}', this.checked)" style="opacity:0;width:0;height:0;">
-                                        <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:${ausnahme ? '#e67e22' : '#ccc'};transition:.3s;border-radius:26px;"></span>
-                                        <span style="position:absolute;content:'';height:20px;width:20px;left:${ausnahme ? '27px' : '3px'};bottom:3px;background-color:white;transition:.3s;border-radius:50%;"></span>
+                                    <label class="switch">
+                                        <input type="checkbox" ${ausnahme ? 'checked' : ''} onchange="toggleAusnahme('${g.id}', this.checked)">
+                                        <span class="slider"></span>
                                     </label>
                                 </td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;">
@@ -3274,13 +3298,33 @@ window.saveGast = async () => {
         Utils.showToast('Nachname erforderlich!', 'error');
         return;
     }
+    
+    // Nur Buchstaben, Leerzeichen und Bindestrich erlaubt
+    if (!/^[A-ZÄÖÜ][A-ZÄÖÜ\s\-]*$/.test(nachname)) {
+        Utils.showToast('Name darf nur Buchstaben und Bindestriche enthalten!', 'error');
+        return;
+    }
+    
     if (!passwort || passwort.length < 4) {
         Utils.showToast('PIN muss mindestens 4 Zeichen haben!', 'error');
         return;
     }
     
-    // Prüfen ob PIN schon vergeben
+    // Alle Gäste laden
     const alleGaeste = await db.registeredGuests.toArray();
+    
+    // Prüfen ob Name schon vergeben (außer beim Bearbeiten des eigenen)
+    const nameExists = alleGaeste.find(g => 
+        ((g.nachname || g.firstName || '').toUpperCase() === nachname) && 
+        String(g.id) !== String(editId) && 
+        !g.geloescht
+    );
+    if (nameExists) {
+        Utils.showToast('Dieser Name ist bereits vergeben!', 'error');
+        return;
+    }
+    
+    // Prüfen ob PIN schon vergeben
     const pinExists = alleGaeste.find(g => 
         (g.passwort === passwort || g.passwordHash === passwort) && 
         String(g.id) !== String(editId) && 
@@ -3304,7 +3348,6 @@ window.saveGast = async () => {
     
     if (editId) {
         // Bearbeiten - finde Gast mit dieser ID
-        const alleGaeste = await db.registeredGuests.toArray();
         const gast = alleGaeste.find(g => String(g.id) === String(editId));
         if (gast) {
             await db.registeredGuests.update(gast.id, gastData);
