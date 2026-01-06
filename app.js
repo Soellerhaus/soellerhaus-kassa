@@ -3494,9 +3494,14 @@ Router.register('admin-articles', async () => {
             <td style="width:50px;text-align:center;">${img}</td>
             <td><strong>${a.name}</strong>${a.sku?` <small style="color:var(--color-stone-dark);">(${a.sku})</small>`:''}</td>
             <td style="text-align:right;font-weight:600;">${Utils.formatCurrency(a.preis)}</td>
-            <td style="text-align:center;">${a.aktiv?'✅':'❌'}</td>
+            <td style="text-align:center;">
+                <label class="switch">
+                    <input type="checkbox" ${a.aktiv?'checked':''} onchange="toggleArtikelAktiv(${a.artikel_id}, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </td>
             <td style="text-align:right;white-space:nowrap;">
-                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✔</button>
+                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✏️</button>
                 <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">🗑</button>
             </td>
         </tr>`;
@@ -3516,6 +3521,14 @@ Router.register('admin-articles', async () => {
     });
     
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <style>
+        .switch { position:relative; display:inline-block; width:50px; height:26px; }
+        .switch input { opacity:0; width:0; height:0; }
+        .switch .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.3s; border-radius:26px; }
+        .switch .slider:before { position:absolute; content:""; height:20px; width:20px; left:3px; bottom:3px; background-color:white; transition:.3s; border-radius:50%; }
+        .switch input:checked + .slider { background-color:#27ae60; }
+        .switch input:checked + .slider:before { transform:translateX(24px); }
+    </style>
     <div class="main-content">
         <div class="card mb-3">
             <div class="card-header"><h2 class="card-title">📥 CSV Import</h2></div>
@@ -3985,6 +3998,25 @@ window.handlePermanentDeleteGuest = async id => {
     } 
 };
 window.handleDeleteArticle = async id => { if(confirm('Artikel löschen?')) { await Artikel.delete(id); Router.navigate('admin-articles'); } };
+window.toggleArtikelAktiv = async (id, aktiv) => {
+    try {
+        // Direkt DB updaten ohne Toast von Artikel.update
+        await db.artikel.update(id, { aktiv: aktiv });
+        
+        // Supabase auch updaten
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('artikel').update({ aktiv: aktiv }).eq('artikel_id', id);
+        }
+        
+        // Cache invalidieren
+        artikelCache = null;
+        
+        Utils.showToast(aktiv ? 'Artikel aktiviert' : 'Artikel deaktiviert', 'success');
+    } catch (e) {
+        Utils.showToast('Fehler: ' + e.message, 'error');
+        Router.navigate('admin-articles');
+    }
+};
 window.filterGuestList = q => { document.querySelectorAll('.guest-item').forEach(i => { i.style.display = i.dataset.name.includes(q.toLowerCase()) ? '' : 'none'; }); };
 window.filterArticleList = q => { const ql = q.toLowerCase(); document.querySelectorAll('.article-item').forEach(i => { i.style.display = (i.dataset.name.includes(ql) || i.dataset.sku.includes(ql)) ? '' : 'none'; }); };
 window.filterCategory = id => { State.selectedCategory = id; Router.navigate('buchen'); };
