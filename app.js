@@ -331,13 +331,7 @@ const RegisteredGuests = {
             throw new Error('Dieser Name ist bereits vergeben! Bitte wähle einen anderen.');
         }
         
-        // Prüfen ob PIN schon vergeben
-        const pinExists = alleGaeste.find(g => 
-            (g.passwort === password || g.passwordHash === password) && !g.geloescht
-        );
-        if (pinExists) {
-            throw new Error('Diese PIN ist bereits vergeben! Bitte wähle eine andere.');
-        }
+        // PIN-Duplikate sind erlaubt - keine Prüfung nötig
         
         // Generiere pseudo-Email für Supabase Auth
         const uniqueId = Utils.uuid().substring(0, 8);
@@ -3335,16 +3329,7 @@ window.saveGast = async () => {
         return;
     }
     
-    // Prüfen ob PIN schon vergeben
-    const pinExists = alleGaeste.find(g => 
-        (g.passwort === passwort || g.passwordHash === passwort) && 
-        String(g.id) !== String(editId) && 
-        !g.geloescht
-    );
-    if (pinExists) {
-        Utils.showToast('Diese PIN ist bereits vergeben!', 'error');
-        return;
-    }
+    // PIN-Duplikate sind erlaubt - keine Prüfung nötig
     
     const gastData = {
         nachname: nachname,
