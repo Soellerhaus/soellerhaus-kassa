@@ -4644,9 +4644,40 @@ window.deaktiviereNachricht = async () => {
 Router.register('admin-guests', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Alle Gäste laden
-    let guests = await db.registeredGuests.toArray();
-    guests = guests.filter(g => !g.geloescht);
+    // Alle Gäste laden - von Supabase wenn online (enthält pin_hash)
+    let guests = [];
+    
+    if (supabaseClient && isOnline) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('geloescht', false)
+                .order('vorname');
+            
+            if (!error && data) {
+                // Supabase Daten mit korrekten Feldnamen mappen
+                guests = data.map(g => ({
+                    ...g,
+                    nachname: g.vorname || g.first_name,
+                    firstName: g.vorname || g.first_name,
+                    passwort: g.pin_hash,  // PIN aus Supabase
+                    passwordHash: g.pin_hash,
+                    gruppenname: g.group_name || 'keiner Gruppe zugehörig',
+                    ausnahmeumlage: g.ausnahmeumlage || false
+                }));
+                console.log('Gäste von Supabase geladen:', guests.length);
+            }
+        } catch(e) {
+            console.error('Supabase Gäste laden Fehler:', e);
+        }
+    }
+    
+    // Fallback: Lokale Daten
+    if (guests.length === 0) {
+        guests = await db.registeredGuests.toArray();
+        guests = guests.filter(g => !g.geloescht);
+    }
     
     // Nach Nachname sortieren
     guests.sort((a, b) => {
