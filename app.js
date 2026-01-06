@@ -886,6 +886,7 @@ const Buchungen = {
     
     async getAuffuellliste() {
         // Auffüllliste: Nur Buchungen die NICHT aufgefüllt sind (unabhängig von Export!)
+        // WICHTIG: Umlagen NIE auf Auffüllliste anzeigen!
         let bs = [];
         
         if (supabaseClient && isOnline) {
@@ -896,7 +897,10 @@ const Buchungen = {
                     .eq('storniert', false)
                     .or('aufgefuellt.is.null,aufgefuellt.eq.false')
                     .order('erstellt_am', { ascending: false });
-                if (data) bs = data;
+                if (data) {
+                    // Umlagen ausfiltern
+                    bs = data.filter(b => !b.ist_umlage);
+                }
             } catch(e) {
                 console.error('getAuffuellliste error:', e);
             }
@@ -905,7 +909,7 @@ const Buchungen = {
         // Fallback: Lokal
         if (bs.length === 0) {
             const all = await db.buchungen.toArray();
-            bs = all.filter(b => !b.storniert && !b.aufgefuellt);
+            bs = all.filter(b => !b.storniert && !b.aufgefuellt && !b.ist_umlage);
         }
         
         const byArtikel = {};
@@ -2341,7 +2345,10 @@ Router.register('admin-alle-buchungen', async () => {
             <div class="card mb-3">
                 <div class="card-header" style="background:var(--color-stone-light);display:flex;justify-content:space-between;align-items:center;">
                     <h3 style="font-weight:700;margin:0;">📅 ${datum}</h3>
-                    <span style="font-weight:600;color:var(--color-alpine-green);">${buchungen.length} Buchungen • ${Utils.formatCurrency(tagesUmsatz)}</span>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <span style="font-weight:600;color:var(--color-alpine-green);">${buchungen.length} Buchungen • ${Utils.formatCurrency(tagesUmsatz)}</span>
+                        <button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="handleDeleteBuchungenByDate('${datum}')" title="Alle Buchungen dieses Tages löschen">🗑 Tag löschen</button>
+                    </div>
                 </div>
                 <div class="card-body" style="padding:0;max-height:400px;overflow-y:auto;">
                     <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
@@ -2415,6 +2422,54 @@ window.handleAdminDeleteBuchung = async (buchungId) => {
     try {
         await Buchungen.storno(buchungId);
         Utils.showToast('Buchung storniert', 'success');
+        Router.navigate('admin-alle-buchungen');
+    } catch (e) {
+        Utils.showToast('Fehler: ' + e.message, 'error');
+    }
+};
+
+// Alle Buchungen eines Tages ENDGÜLTIG löschen
+window.handleDeleteBuchungenByDate = async (datum) => {
+    if (!confirm(`⚠️ ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGÜLTIG gelöscht!\n\nDies kann nicht rückgängig gemacht werden.\n\nFortfahren?`)) return;
+    
+    try {
+        // Buchungen von diesem Datum laden
+        let buchungenIds = [];
+        
+        if (supabaseClient && isOnline) {
+            const { data } = await supabaseClient
+                .from('buchungen')
+                .select('buchung_id')
+                .eq('datum', datum);
+            if (data) buchungenIds = data.map(b => b.buchung_id);
+        }
+        
+        // Fallback: Auch lokal
+        const lokale = await db.buchungen.where('datum').equals(datum).toArray();
+        lokale.forEach(b => {
+            if (!buchungenIds.includes(b.buchung_id)) {
+                buchungenIds.push(b.buchung_id);
+            }
+        });
+        
+        if (buchungenIds.length === 0) {
+            Utils.showToast('Keine Buchungen gefunden', 'warning');
+            return;
+        }
+        
+        // Endgültig löschen (nicht nur stornieren)
+        for (const id of buchungenIds) {
+            // Lokal löschen
+            try { await db.buchungen.delete(id); } catch(e) {}
+            
+            // Supabase löschen
+            if (supabaseClient && isOnline) {
+                await supabaseClient.from('buchungen').delete().eq('buchung_id', id);
+            }
+        }
+        
+        await DataProtection.createBackup();
+        Utils.showToast(`✅ ${buchungenIds.length} Buchungen vom ${datum} gelöscht`, 'success');
         Router.navigate('admin-alle-buchungen');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -3485,6 +3540,9 @@ Router.register('admin-articles', async () => {
         ).join('');
         
         return `<tr class="article-row" data-name="${a.name.toLowerCase()}" data-sku="${(a.sku||'').toLowerCase()}" data-id="${a.artikel_id}">
+            <td style="width:50px;text-align:center;font-family:monospace;font-size:0.85rem;">
+                <span onclick="changeArtikelId(${a.artikel_id})" style="cursor:pointer;padding:4px 8px;background:#f0f0f0;border-radius:4px;border:1px solid #ddd;" title="Klicken zum Ändern der ID">${a.artikel_id}</span>
+            </td>
             <td style="width:40px;text-align:center;font-weight:700;color:var(--color-alpine-green);">${pos}</td>
             <td style="width:50px;text-align:center;">${img}</td>
             <td><strong>${a.name}</strong>${a.sku?` <small style="color:var(--color-stone-dark);">(${a.sku})</small>`:''}</td>
@@ -3514,7 +3572,7 @@ Router.register('admin-articles', async () => {
     sortedKats.forEach(katId => {
         const katName = katMap[katId] || 'Sonstiges';
         const artikelList = byCategory[katId];
-        tableContent += `<tr class="category-header"><td colspan="7" style="background:var(--color-alpine-green);color:white;padding:12px;font-weight:700;font-size:1.1rem;">${katName} (${artikelList.length})</td></tr>`;
+        tableContent += `<tr class="category-header"><td colspan="8" style="background:var(--color-alpine-green);color:white;padding:12px;font-weight:700;font-size:1.1rem;">${katName} (${artikelList.length})</td></tr>`;
         artikelList.forEach((a, idx) => {
             tableContent += renderArticleRow(a, idx + 1);
         });
@@ -3550,6 +3608,7 @@ Router.register('admin-articles', async () => {
                     <table style="width:100%;border-collapse:collapse;" id="article-table">
                         <thead>
                             <tr style="background:var(--color-stone-light);text-align:left;">
+                                <th style="padding:12px 8px;width:50px;">ID</th>
                                 <th style="padding:12px 8px;width:40px;">Pos.</th>
                                 <th style="padding:12px 8px;width:50px;">Foto</th>
                                 <th style="padding:12px 8px;">Name</th>
@@ -3560,7 +3619,7 @@ Router.register('admin-articles', async () => {
                             </tr>
                         </thead>
                         <tbody>
-                            ${tableContent || '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--color-stone-dark);">Keine Artikel</td></tr>'}
+                            ${tableContent || '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--color-stone-dark);">Keine Artikel</td></tr>'}
                         </tbody>
                     </table>
                 </div>
@@ -4044,6 +4103,66 @@ window.changeArtikelKategorie = async (id, neueKategorieId) => {
         // Seite neu laden um Artikel in neuer Kategorie zu zeigen
         Router.navigate('admin-articles');
     } catch (e) {
+        Utils.showToast('Fehler: ' + e.message, 'error');
+    }
+};
+
+// Artikel-ID ändern (für Registrierkasse wichtig!)
+window.changeArtikelId = async (alteId) => {
+    const artikel = await Artikel.getById(alteId);
+    if (!artikel) {
+        Utils.showToast('Artikel nicht gefunden', 'error');
+        return;
+    }
+    
+    const neueIdStr = prompt(`⚠️ ACHTUNG: Artikel-ID ändern\n\nDiese ID wird für die Registrierkasse verwendet!\nNur ändern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
+    
+    if (neueIdStr === null) return; // Abgebrochen
+    
+    const neueId = parseInt(neueIdStr);
+    if (isNaN(neueId) || neueId <= 0) {
+        Utils.showToast('Ungültige ID (muss eine positive Zahl sein)', 'error');
+        return;
+    }
+    
+    if (neueId === alteId) {
+        Utils.showToast('ID wurde nicht geändert', 'info');
+        return;
+    }
+    
+    // Prüfen ob neue ID bereits existiert
+    const existing = await Artikel.getById(neueId);
+    if (existing) {
+        Utils.showToast(`ID ${neueId} ist bereits vergeben (${existing.name})`, 'error');
+        return;
+    }
+    
+    // Bestätigung einholen
+    if (!confirm(`⚠️ LETZTE WARNUNG!\n\nArtikel-ID wirklich ändern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
+        return;
+    }
+    
+    try {
+        // Neuen Artikel mit neuer ID erstellen
+        const neuerArtikel = { ...artikel, artikel_id: neueId };
+        
+        // In IndexedDB: Alten löschen, neuen anlegen
+        await db.artikel.delete(alteId);
+        await db.artikel.add(neuerArtikel);
+        
+        // In Supabase: Alten löschen, neuen anlegen
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('artikel').delete().eq('artikel_id', alteId);
+            await supabaseClient.from('artikel').insert(neuerArtikel);
+        }
+        
+        artikelCache = null;
+        await DataProtection.createBackup();
+        
+        Utils.showToast(`✅ Artikel-ID geändert: ${alteId} → ${neueId}`, 'success');
+        Router.navigate('admin-articles');
+    } catch (e) {
+        console.error('ID ändern Fehler:', e);
         Utils.showToast('Fehler: ' + e.message, 'error');
     }
 };
