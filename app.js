@@ -109,6 +109,19 @@ db.version(5).stores({
     gruppen: '++id, name, aktiv'
 });
 
+// Version 6: Erweiterte Gästedaten (wie Access-Tabelle)
+db.version(6).stores({
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
+    artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
+    kategorien: 'kategorie_id, name, sortierung',
+    settings: 'key',
+    exports: '++id, timestamp, anzahl_buchungen',
+    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, geloescht, geloeschtAm, group_name, firstName, passwordHash',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
+    gruppen: '++id, name, aktiv'
+});
+
 const DataProtection = {
     async createBackup() {
         try {
@@ -392,10 +405,26 @@ const RegisteredGuests = {
             const g = await db.registeredGuests.get(id);
             if (!g) throw new Error('Gast nicht gefunden');
             if (g.geloescht) throw new Error('Account deaktiviert');
-            if (await Utils.hashPassword(password, g.salt) !== g.passwordHash) throw new Error('Falsches Passwort');
+            
+            // Passwort-Check: Unterstützt sowohl Hash als auch Klartext
+            let passwortOk = false;
+            if (g.salt && g.passwordHash) {
+                // Alte Methode: Hash-Check
+                passwortOk = (await Utils.hashPassword(password, g.salt) === g.passwordHash);
+            } else if (g.passwort) {
+                // Neue Methode: Klartext-Check (wie Access)
+                passwortOk = (password === g.passwort);
+            } else if (g.passwordHash && !g.salt) {
+                // Fallback: passwordHash ist Klartext
+                passwortOk = (password === g.passwordHash);
+            }
+            
+            if (!passwortOk) throw new Error('Falsches Passwort');
+            
             await db.registeredGuests.update(id, { lastLoginAt: new Date().toISOString() });
-            State.setUser(g);
-            Utils.showToast(`Willkommen, ${g.firstName}! (Offline)`, 'success');
+            const displayName = g.nachname || g.firstName;
+            State.setUser({ ...g, firstName: displayName });
+            Utils.showToast(`Willkommen, ${displayName}! (Offline)`, 'success');
             return g;
         }
     },
@@ -403,7 +432,11 @@ const RegisteredGuests = {
     async getByFirstLetter(letter) {
         // Erst lokale Daten prüfen (für schnelle Anzeige)
         const local = await db.registeredGuests.toArray();
-        const localFiltered = local.filter(g => !g.geloescht && g.firstName?.toUpperCase().startsWith(letter.toUpperCase()));
+        const localFiltered = local.filter(g => {
+            if (g.geloescht) return false;
+            const name = (g.nachname || g.firstName || '').toUpperCase();
+            return name.startsWith(letter.toUpperCase());
+        });
         
         // Wenn online, auch von Supabase laden
         if (supabaseClient && isOnline) {
@@ -412,23 +445,30 @@ const RegisteredGuests = {
                     .from('profiles')
                     .select('*')
                     .eq('geloescht', false)
-                    .ilike('first_name', `${letter}%`)
-                    .order('first_name');
+                    .or(`vorname.ilike.${letter}%,first_name.ilike.${letter}%`)
+                    .order('vorname');
                 
                 if (!error && data && data.length > 0) {
                     console.log('Profile von Supabase:', data.length);
                     // Cache aktualisieren
                     for (const p of data) {
                         try { 
-                            await db.registeredGuests.put({ id: p.id, firstName: p.first_name, email: p.email, geloescht: p.geloescht });
+                            await db.registeredGuests.put({ 
+                                id: p.id, 
+                                firstName: p.first_name || p.vorname, 
+                                nachname: p.vorname || p.first_name,
+                                passwort: p.pin_hash,
+                                gruppenname: p.group_name,
+                                geloescht: p.geloescht 
+                            });
                         } catch(e) {}
                     }
                     
                     const cnt = {};
                     return data.map(g => {
-                        const name = g.first_name;
+                        const name = g.vorname || g.first_name;
                         cnt[name] = (cnt[name] || 0) + 1;
-                        return { ...g, id: g.id, firstName: name, displayName: cnt[name] > 1 ? `${name} (${cnt[name]})` : name };
+                        return { ...g, id: g.id, firstName: name, nachname: name, displayName: cnt[name] > 1 ? `${name} (${cnt[name]})` : name };
                     });
                 } else {
                     console.log('Supabase Profile Error/Empty, nutze lokal:', error?.message || 'keine Daten');
@@ -440,9 +480,14 @@ const RegisteredGuests = {
         
         // Fallback: Lokale Daten
         const cnt = {};
-        return localFiltered.sort((a,b) => a.firstName.localeCompare(b.firstName)).map(g => { 
-            cnt[g.firstName] = (cnt[g.firstName]||0)+1; 
-            return {...g, displayName: cnt[g.firstName] > 1 ? `${g.firstName} (${cnt[g.firstName]})` : g.firstName}; 
+        return localFiltered.sort((a,b) => {
+            const nameA = a.nachname || a.firstName || '';
+            const nameB = b.nachname || b.firstName || '';
+            return nameA.localeCompare(nameB);
+        }).map(g => { 
+            const name = g.nachname || g.firstName;
+            cnt[name] = (cnt[name]||0)+1; 
+            return {...g, firstName: name, displayName: cnt[name] > 1 ? `${name} (${cnt[name]})` : name}; 
         });
     },
     
@@ -2982,80 +3027,345 @@ window.deleteGruppe = async (id) => {
 
 Router.register('admin-guests', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
-    const alleInDb = await db.registeredGuests.toArray();
-    const guests = alleInDb.filter(g => !g.geloescht);
-    const geloeschte = alleInDb.filter(g => g.geloescht);
+    
+    // Alle Gäste laden
+    let guests = await db.registeredGuests.toArray();
+    guests = guests.filter(g => !g.geloescht);
+    
+    // Nach Nachname sortieren
+    guests.sort((a, b) => {
+        const nameA = (a.nachname || a.firstName || '').toUpperCase();
+        const nameB = (b.nachname || b.firstName || '').toUpperCase();
+        return nameA.localeCompare(nameB);
+    });
+    
+    // Gruppen laden
+    const gruppen = await db.gruppen.toArray();
+    const gruppenAktiv = gruppen.filter(g => g.aktiv);
     
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
-        <div class="card mb-3">
-            <div class="card-header">
-                <h2 class="card-title">Aktive Gäste (${guests.length})</h2>
-                <button class="btn btn-secondary" onclick="DataProtection.exportGuestsCSV()">📥 Export</button>
-            </div>
-            <div class="card-body">
-                <div class="form-group"><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="filterGuestList(this.value)"></div>
-                <div id="guest-list">
-                    ${guests.length ? guests.map(g => `
-                    <div class="list-item guest-item" data-name="${g.firstName.toLowerCase()}">
-                        <div style="flex:1;">
-                            <strong>${g.firstName}</strong><br>
-                            <small class="text-muted">ID: ${g.id} | ${new Date(g.createdAt).toLocaleDateString('de-AT')}</small>
-                        </div>
-                        <button class="btn btn-danger" onclick="handleSoftDeleteGuest(${g.id})" style="padding:8px 16px;">🗑️</button>
-                    </div>
-                    `).join('') : '<p class="text-muted text-center">Keine Gäste</p>'}
-                </div>
-            </div>
-        </div>
-        
-        ${geloeschte.length ? `
-        <div class="card mb-3" style="border:2px dashed var(--color-stone-medium);">
-            <div class="card-header" style="background:var(--color-stone-light);">
-                <h2 class="card-title">🗑️ Papierkorb (${geloeschte.length})</h2>
-            </div>
-            <div class="card-body">
-                ${geloeschte.map(g => `
-                <div class="list-item" style="background:var(--color-stone-light);">
-                    <div style="flex:1;">
-                        <strong style="text-decoration:line-through;color:var(--color-stone-dark);">${g.firstName}</strong><br>
-                        <small class="text-muted">Gelöscht: ${g.geloeschtAm ? new Date(g.geloeschtAm).toLocaleDateString('de-AT') : '?'}</small>
-                    </div>
-                    <div style="display:flex;gap:8px;">
-                        <button class="btn btn-secondary" onclick="handleRestoreGuest(${g.id})" style="padding:8px 12px;">↩️</button>
-                        <button class="btn btn-danger" onclick="handlePermanentDeleteGuest(${g.id})" style="padding:8px 12px;">❌</button>
-                    </div>
-                </div>
-                `).join('')}
-            </div>
-        </div>
-        ` : ''}
-        
-        <div class="card" style="background:#f8f9fa;">
-            <div class="card-header"><h3>🔧 Datenbank (${alleInDb.length} Einträge)</h3></div>
-            <div class="card-body">
-                <p style="color:var(--color-stone-dark);margin-bottom:12px;">Alle Gäste in der Datenbank:</p>
-                ${alleInDb.map(g => `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:white;border-radius:8px;margin-bottom:4px;border:1px solid ${g.geloescht ? '#e74c3c' : '#27ae60'};">
+        <!-- Such- und Filterleiste -->
+        <div class="card mb-3" style="background:#fffde7;">
+            <div class="card-body" style="padding:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:12px;align-items:end;">
                     <div>
-                        <strong>${g.firstName}</strong>
-                        <small style="margin-left:8px;color:${g.geloescht ? '#e74c3c' : '#27ae60'};">${g.geloescht ? '(gelöscht)' : '(aktiv)'}</small>
+                        <label style="font-weight:600;font-size:0.85rem;">Nachname:</label>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="search-nachname" class="form-input" style="flex:1;">
+                            <button class="btn btn-secondary" onclick="filterGaesteTabelle()">suchen</button>
+                        </div>
                     </div>
-                    <button class="btn btn-danger" onclick="handleForceDeleteGuest(${g.id})" style="padding:4px 10px;font-size:0.85rem;">❌ Entfernen</button>
+                    <div>
+                        <label style="font-weight:600;font-size:0.85rem;">Gruppe:</label>
+                        <div style="display:flex;gap:8px;">
+                            <select id="search-gruppe" class="form-input" style="flex:1;">
+                                <option value="">Alle Gruppen</option>
+                                ${gruppenAktiv.map(g => `<option value="${g.name}">${g.name}</option>`).join('')}
+                                <option value="keiner Gruppe zugehörig">keiner Gruppe zugehörig</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="filterGaesteTabelle()">suchen</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" onclick="clearGaesteFilter()">Suche löschen</button>
+                    <button class="btn btn-primary" onclick="openNeuerGastModal()">+ Neuer Gast</button>
                 </div>
-                `).join('')}
+            </div>
+        </div>
+        
+        <!-- Tabelle -->
+        <div class="card">
+            <div class="card-header" style="background:#fffde7;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-weight:700;">Aktive Gäste (${guests.length})</span>
+                <button class="btn btn-secondary" onclick="exportGaesteExcel()">📥 Export für Access</button>
+            </div>
+            <div style="overflow-x:auto;">
+                <table id="gaeste-tabelle" style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+                    <thead>
+                        <tr style="background:#fffde7;">
+                            <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:60px;">ID</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:120px;">Nachname</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:80px;">Gruppennr</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:150px;">Gruppenname</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:80px;">Passwort</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:80px;">Ausnahme</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:100px;">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gaeste-tbody">
+                        ${guests.map(g => {
+                            const visId = g.visibleId || g.id;
+                            const name = g.nachname || g.firstName || '-';
+                            const grpNr = g.gruppennr || 0;
+                            const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
+                            const pw = g.passwort || g.passwordHash || '-';
+                            const ausnahme = g.ausnahmeumlage ? '✓' : '';
+                            return `
+                            <tr class="gaeste-row" data-name="${name.toLowerCase()}" data-gruppe="${grpName.toLowerCase()}">
+                                <td style="padding:8px;border:1px solid #ddd;">${visId}</td>
+                                <td style="padding:8px;border:1px solid #ddd;font-weight:600;">${name}</td>
+                                <td style="padding:8px;border:1px solid #ddd;">${grpNr}</td>
+                                <td style="padding:8px;border:1px solid #ddd;">${grpName}</td>
+                                <td style="padding:8px;border:1px solid #ddd;font-family:monospace;">${pw}</td>
+                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">${ausnahme}</td>
+                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">
+                                    <button onclick="openEditGastModal(${g.id})" style="padding:4px 8px;margin-right:4px;cursor:pointer;">✏️</button>
+                                    <button onclick="handleDeleteGast(${g.id})" style="padding:4px 8px;cursor:pointer;background:#e74c3c;color:white;border:none;border-radius:4px;">🗑️</button>
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <div style="padding:12px;background:#f8f9fa;border-top:1px solid #ddd;">
+                <small>Datensatz: 1 von ${guests.length}</small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal für Neuer/Bearbeiten Gast -->
+    <div id="gast-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+        <div style="background:white;padding:24px;border-radius:12px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
+            <h3 id="gast-modal-title" style="margin-bottom:16px;">Neuer Gast</h3>
+            <input type="hidden" id="gast-edit-id">
+            
+            <div style="display:grid;gap:12px;">
+                <div>
+                    <label style="font-weight:600;">Sichtbare ID (für Access):</label>
+                    <input type="number" id="gast-visibleId" class="form-input" placeholder="z.B. 6800">
+                </div>
+                <div>
+                    <label style="font-weight:600;">Nachname: *</label>
+                    <input type="text" id="gast-nachname" class="form-input" placeholder="MÜLLER" style="text-transform:uppercase;">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="font-weight:600;">Gruppennr:</label>
+                        <input type="number" id="gast-gruppennr" class="form-input" value="0">
+                    </div>
+                    <div>
+                        <label style="font-weight:600;">Gruppenname:</label>
+                        <select id="gast-gruppenname" class="form-input">
+                            <option value="keiner Gruppe zugehörig">keiner Gruppe zugehörig</option>
+                            ${gruppenAktiv.map(g => `<option value="${g.name}">${g.name}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label style="font-weight:600;">Passwort (PIN): *</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="gast-passwort" class="form-input" placeholder="4-stellige PIN" maxlength="4" style="font-family:monospace;font-size:1.2rem;letter-spacing:4px;">
+                        <button type="button" class="btn btn-secondary" onclick="generateRandomPIN()">🎲</button>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="gast-ausnahme">
+                    <label for="gast-ausnahme">Ausnahme Umlage</label>
+                </div>
+            </div>
+            
+            <div style="display:flex;gap:12px;margin-top:20px;">
+                <button class="btn btn-primary" onclick="saveGast()" style="flex:1;">💾 Speichern</button>
+                <button class="btn btn-secondary" onclick="closeGastModal()" style="flex:1;">Abbrechen</button>
             </div>
         </div>
     </div>`);
 });
 
-window.handleForceDeleteGuest = async (id) => {
-    if (confirm('Gast SOFORT und ENDGÜLTIG aus der Datenbank entfernen?')) {
-        await db.registeredGuests.delete(id);
-        await DataProtection.createBackup();
-        Utils.showToast('Gast entfernt', 'success');
-        Router.navigate('admin-guests');
+// Filter Funktionen
+window.filterGaesteTabelle = () => {
+    const suchName = (document.getElementById('search-nachname')?.value || '').toLowerCase();
+    const suchGruppe = (document.getElementById('search-gruppe')?.value || '').toLowerCase();
+    
+    document.querySelectorAll('.gaeste-row').forEach(row => {
+        const name = row.dataset.name || '';
+        const gruppe = row.dataset.gruppe || '';
+        
+        const matchName = !suchName || name.includes(suchName);
+        const matchGruppe = !suchGruppe || gruppe.includes(suchGruppe);
+        
+        row.style.display = (matchName && matchGruppe) ? '' : 'none';
+    });
+};
+
+window.clearGaesteFilter = () => {
+    document.getElementById('search-nachname').value = '';
+    document.getElementById('search-gruppe').value = '';
+    document.querySelectorAll('.gaeste-row').forEach(row => row.style.display = '');
+};
+
+// Modal Funktionen
+window.openNeuerGastModal = async () => {
+    document.getElementById('gast-modal-title').textContent = 'Neuer Gast';
+    document.getElementById('gast-edit-id').value = '';
+    document.getElementById('gast-nachname').value = '';
+    document.getElementById('gast-gruppennr').value = '0';
+    document.getElementById('gast-gruppenname').value = 'keiner Gruppe zugehörig';
+    document.getElementById('gast-passwort').value = '';
+    document.getElementById('gast-ausnahme').checked = false;
+    
+    // Nächste freie ID vorschlagen
+    const guests = await db.registeredGuests.toArray();
+    const maxId = Math.max(...guests.map(g => g.visibleId || g.id || 0), 6700);
+    document.getElementById('gast-visibleId').value = maxId + 1;
+    
+    document.getElementById('gast-modal').style.display = 'flex';
+};
+
+window.openEditGastModal = async (id) => {
+    const gast = await db.registeredGuests.get(id);
+    if (!gast) return;
+    
+    document.getElementById('gast-modal-title').textContent = 'Gast bearbeiten';
+    document.getElementById('gast-edit-id').value = id;
+    document.getElementById('gast-visibleId').value = gast.visibleId || gast.id;
+    document.getElementById('gast-nachname').value = gast.nachname || gast.firstName || '';
+    document.getElementById('gast-gruppennr').value = gast.gruppennr || 0;
+    document.getElementById('gast-gruppenname').value = gast.gruppenname || gast.group_name || 'keiner Gruppe zugehörig';
+    document.getElementById('gast-passwort').value = gast.passwort || gast.passwordHash || '';
+    document.getElementById('gast-ausnahme').checked = gast.ausnahmeumlage || false;
+    
+    document.getElementById('gast-modal').style.display = 'flex';
+};
+
+window.closeGastModal = () => {
+    document.getElementById('gast-modal').style.display = 'none';
+};
+
+window.generateRandomPIN = () => {
+    const pin = Math.floor(1000 + Math.random() * 9000).toString();
+    document.getElementById('gast-passwort').value = pin;
+};
+
+window.saveGast = async () => {
+    const editId = document.getElementById('gast-edit-id').value;
+    const visibleId = parseInt(document.getElementById('gast-visibleId').value) || 0;
+    const nachname = document.getElementById('gast-nachname').value.trim().toUpperCase();
+    const gruppennr = parseInt(document.getElementById('gast-gruppennr').value) || 0;
+    const gruppenname = document.getElementById('gast-gruppenname').value;
+    const passwort = document.getElementById('gast-passwort').value.trim();
+    const ausnahmeumlage = document.getElementById('gast-ausnahme').checked;
+    
+    if (!nachname) {
+        Utils.showToast('Nachname erforderlich!', 'error');
+        return;
     }
+    if (!passwort || passwort.length < 4) {
+        Utils.showToast('PIN muss 4 Zeichen haben!', 'error');
+        return;
+    }
+    
+    // Prüfen ob PIN schon vergeben
+    const alleGaeste = await db.registeredGuests.toArray();
+    const pinExists = alleGaeste.find(g => 
+        (g.passwort === passwort || g.passwordHash === passwort) && 
+        g.id != editId && 
+        !g.geloescht
+    );
+    if (pinExists) {
+        Utils.showToast('Diese PIN ist bereits vergeben!', 'error');
+        return;
+    }
+    
+    const gastData = {
+        visibleId: visibleId,
+        nachname: nachname,
+        firstName: nachname, // Kompatibilität
+        gruppennr: gruppennr,
+        gruppenname: gruppenname,
+        group_name: gruppenname, // Kompatibilität
+        passwort: passwort,
+        passwordHash: passwort, // Kompatibilität
+        ausnahmeumlage: ausnahmeumlage,
+        aktiv: true,
+        geloescht: false
+    };
+    
+    if (editId) {
+        // Bearbeiten
+        await db.registeredGuests.update(parseInt(editId), gastData);
+        Utils.showToast('Gast aktualisiert', 'success');
+    } else {
+        // Neu anlegen
+        gastData.createdAt = new Date().toISOString();
+        await db.registeredGuests.add(gastData);
+        Utils.showToast('Gast angelegt', 'success');
+    }
+    
+    // Zu Supabase synchronisieren
+    if (supabaseClient && isOnline) {
+        try {
+            const profileData = {
+                vorname: nachname,
+                pin_hash: passwort,
+                aktiv: true,
+                group_name: gruppenname
+            };
+            if (editId) {
+                // Update ist komplizierter - für jetzt nur lokal
+            } else {
+                await supabaseClient.from('profiles').insert(profileData);
+            }
+        } catch (e) {
+            console.log('Supabase sync optional:', e);
+        }
+    }
+    
+    await DataProtection.createBackup();
+    closeGastModal();
+    Router.navigate('admin-guests');
+};
+
+window.handleDeleteGast = async (id) => {
+    const gast = await db.registeredGuests.get(id);
+    if (!gast) return;
+    
+    const name = gast.nachname || gast.firstName;
+    if (!confirm(`Gast "${name}" wirklich löschen?`)) return;
+    
+    // Soft delete
+    await db.registeredGuests.update(id, {
+        geloescht: true,
+        geloeschtAm: new Date().toISOString(),
+        aktiv: false
+    });
+    
+    await DataProtection.createBackup();
+    Utils.showToast('Gast gelöscht', 'success');
+    Router.navigate('admin-guests');
+};
+
+// Export für Access
+window.exportGaesteExcel = async () => {
+    let guests = await db.registeredGuests.toArray();
+    guests = guests.filter(g => !g.geloescht);
+    
+    const rows = guests.map(g => ({
+        'ID': g.visibleId || g.id,
+        'Vorname': '',
+        'Nachname': g.nachname || g.firstName || '',
+        'Adresse': '',
+        'Ort': '',
+        'Postleitzahl': '',
+        'Telefon/privat': '',
+        'Email-Name': '',
+        'Geburtsdatum': '',
+        'Gruppennr': g.gruppennr || 0,
+        'Gruppenname': g.gruppenname || g.group_name || 'keiner Gruppe zugehörig',
+        'Aktiv': g.aktiv !== false,
+        'Passwort': g.passwort || g.passwordHash || '',
+        'Ausnahmeumlage': g.ausnahmeumlage || false
+    }));
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Gaeste');
+    
+    const heute = new Date();
+    const datumStr = `${heute.getDate().toString().padStart(2,'0')}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getFullYear()}`;
+    XLSX.writeFile(wb, `Gaeste_Export_${datumStr}.xlsx`);
+    
+    Utils.showToast(`${guests.length} Gäste exportiert`, 'success');
 };
 
 Router.register('admin-articles', async () => {
