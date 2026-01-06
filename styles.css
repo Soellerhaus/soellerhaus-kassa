@@ -1036,7 +1036,9 @@ a {
 
 /* ===== ALPHABET SEARCH ===== */
 .alphabet-container {
-    padding: 24px;
+    padding: 16px 8px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .alphabet-title {
@@ -1044,29 +1046,35 @@ a {
     font-size: var(--text-lg);
     font-weight: 500;
     color: var(--color-slate);
-    margin-bottom: 24px;
+    margin-bottom: 16px;
 }
 
 .alphabet-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
-    gap: 8px;
-    max-width: 600px;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    max-width: 400px;
     margin: 0 auto;
+    padding: 0 4px;
+    box-sizing: border-box;
 }
 
 .alphabet-btn {
     aspect-ratio: 1;
-    min-height: 60px;
+    min-height: 44px;
+    max-height: 54px;
     background: var(--color-mountain-blue);
     color: white;
     border: none;
     border-radius: var(--radius-md);
-    font-size: var(--text-xl);
+    font-size: var(--text-lg);
     font-weight: 700;
     cursor: pointer;
     transition: all var(--transition-fast);
     box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .alphabet-btn:hover {
@@ -1080,14 +1088,35 @@ a {
     background: var(--color-mountain-blue-dark);
 }
 
-@media (max-width: 768px) {
+/* Tablet */
+@media (min-width: 500px) {
     .alphabet-grid {
         grid-template-columns: repeat(7, 1fr);
+        max-width: 500px;
+        gap: 8px;
     }
     
     .alphabet-btn {
         min-height: 50px;
-        font-size: var(--text-lg);
+        max-height: 60px;
+        font-size: var(--text-xl);
+    }
+}
+
+/* Desktop */
+@media (min-width: 768px) {
+    .alphabet-container {
+        padding: 24px;
+    }
+    
+    .alphabet-grid {
+        grid-template-columns: repeat(9, 1fr);
+        max-width: 600px;
+    }
+    
+    .alphabet-btn {
+        min-height: 55px;
+        max-height: 65px;
     }
 }
 
