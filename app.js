@@ -314,6 +314,15 @@ const RegisteredGuests = {
         if (!firstName?.trim()) throw new Error('Vorname erforderlich');
         if (!password || password.length < 4) throw new Error('PIN muss mind. 4 Zeichen haben');
         
+        // Prüfen ob PIN schon vergeben
+        const alleGaeste = await db.registeredGuests.toArray();
+        const pinExists = alleGaeste.find(g => 
+            (g.passwort === password || g.passwordHash === password) && !g.geloescht
+        );
+        if (pinExists) {
+            throw new Error('Diese PIN ist bereits vergeben! Bitte wähle eine andere.');
+        }
+        
         // Generiere pseudo-Email für Supabase Auth
         const uniqueId = Utils.uuid().substring(0, 8);
         const email = `${firstName.toLowerCase().replace(/[^a-z]/g, '')}.${uniqueId}@kassa.local`;
@@ -337,6 +346,12 @@ const RegisteredGuests = {
             // Warte kurz auf Trigger (Profile wird automatisch erstellt)
             await new Promise(r => setTimeout(r, 500));
             
+            // Profile mit PIN updaten
+            await supabaseClient.from('profiles').update({ 
+                pin_hash: password,
+                vorname: firstName.trim()
+            }).eq('id', authData.user.id);
+            
             // Profile laden
             const { data: profile } = await supabaseClient
                 .from('profiles')
@@ -344,25 +359,41 @@ const RegisteredGuests = {
                 .eq('id', authData.user.id)
                 .single();
             
-            // Lokalen Cache aktualisieren
+            // Lokalen Cache aktualisieren - MIT PIN als Klartext!
             const localGuest = { 
                 id: authData.user.id, 
-                firstName: firstName.trim(), 
+                firstName: firstName.trim().toUpperCase(),
+                nachname: firstName.trim().toUpperCase(),
                 email: email,
+                passwort: password,  // PIN als Klartext!
+                passwordHash: password,
+                gruppenname: 'keiner Gruppe zugehörig',
+                ausnahmeumlage: false,
+                aktiv: true,
                 createdAt: new Date().toISOString(),
                 geloescht: false 
             };
             try { await db.registeredGuests.add(localGuest); } catch(e) {}
             
             Utils.showToast('Registrierung erfolgreich!', 'success');
-            State.setUser({ ...authData.user, ...profile, firstName: firstName.trim() });
+            State.setUser({ ...authData.user, ...profile, firstName: firstName.trim().toUpperCase() });
             return localGuest;
         } else {
-            // Offline-Modus: Nur lokal speichern
-            const salt = Utils.generateSalt();
-            const guest = { firstName: firstName.trim(), passwordHash: await Utils.hashPassword(password, salt), salt, createdAt: new Date().toISOString(), geloescht: false, pendingSync: true };
+            // Offline-Modus: Lokal speichern MIT PIN als Klartext!
+            const guest = { 
+                firstName: firstName.trim().toUpperCase(), 
+                nachname: firstName.trim().toUpperCase(),
+                passwort: password,  // PIN als Klartext!
+                passwordHash: password,
+                gruppenname: 'keiner Gruppe zugehörig',
+                ausnahmeumlage: false,
+                aktiv: true,
+                createdAt: new Date().toISOString(), 
+                geloescht: false, 
+                pendingSync: true 
+            };
             guest.id = await db.registeredGuests.add(guest);
-            Utils.showToast('Offline-Registrierung', 'info');
+            Utils.showToast('Registrierung erfolgreich!', 'success');
             return guest;
         }
     },
@@ -3048,15 +3079,15 @@ Router.register('admin-guests', async () => {
         <!-- Such- und Filterleiste -->
         <div class="card mb-3" style="background:#fffde7;">
             <div class="card-body" style="padding:12px;">
-                <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:12px;align-items:end;">
-                    <div>
+                <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;">
+                    <div style="flex:1;min-width:150px;">
                         <label style="font-weight:600;font-size:0.85rem;">Nachname:</label>
                         <div style="display:flex;gap:8px;">
                             <input type="text" id="search-nachname" class="form-input" style="flex:1;">
                             <button class="btn btn-secondary" onclick="filterGaesteTabelle()">suchen</button>
                         </div>
                     </div>
-                    <div>
+                    <div style="flex:1;min-width:150px;">
                         <label style="font-weight:600;font-size:0.85rem;">Gruppe:</label>
                         <div style="display:flex;gap:8px;">
                             <select id="search-gruppe" class="form-input" style="flex:1;">
@@ -3083,34 +3114,29 @@ Router.register('admin-guests', async () => {
                 <table id="gaeste-tabelle" style="width:100%;border-collapse:collapse;font-size:0.9rem;">
                     <thead>
                         <tr style="background:#fffde7;">
-                            <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:60px;">ID</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:120px;">Nachname</th>
-                            <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:80px;">Gruppennr</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:150px;">Gruppenname</th>
-                            <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:80px;">Passwort</th>
-                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:80px;">Ausnahme</th>
-                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:100px;">Aktionen</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:100px;">Passwort (PIN)</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:100px;">Ausnahme Umlage</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:180px;">Aktionen</th>
                         </tr>
                     </thead>
                     <tbody id="gaeste-tbody">
-                        ${guests.map(g => {
-                            const visId = g.visibleId || g.id;
+                        ${guests.length === 0 ? '<tr><td colspan="5" style="padding:20px;text-align:center;color:#666;">Keine Gäste vorhanden</td></tr>' : guests.map(g => {
                             const name = g.nachname || g.firstName || '-';
-                            const grpNr = g.gruppennr || 0;
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
                             const pw = g.passwort || g.passwordHash || '-';
-                            const ausnahme = g.ausnahmeumlage ? '✓' : '';
+                            const ausnahme = g.ausnahmeumlage ? '✓ Ausgenommen' : '-';
                             return `
-                            <tr class="gaeste-row" data-name="${name.toLowerCase()}" data-gruppe="${grpName.toLowerCase()}">
-                                <td style="padding:8px;border:1px solid #ddd;">${visId}</td>
-                                <td style="padding:8px;border:1px solid #ddd;font-weight:600;">${name}</td>
-                                <td style="padding:8px;border:1px solid #ddd;">${grpNr}</td>
-                                <td style="padding:8px;border:1px solid #ddd;">${grpName}</td>
-                                <td style="padding:8px;border:1px solid #ddd;font-family:monospace;">${pw}</td>
-                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">${ausnahme}</td>
-                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">
-                                    <button onclick="openEditGastModal(${g.id})" style="padding:4px 8px;margin-right:4px;cursor:pointer;">✏️</button>
-                                    <button onclick="handleDeleteGast(${g.id})" style="padding:4px 8px;cursor:pointer;background:#e74c3c;color:white;border:none;border-radius:4px;">🗑️</button>
+                            <tr class="gaeste-row" data-name="${name.toLowerCase()}" data-gruppe="${grpName.toLowerCase()}" data-id="${g.id}">
+                                <td style="padding:10px;border:1px solid #ddd;font-weight:600;">${name}</td>
+                                <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:1.2rem;font-weight:bold;color:#2c3e50;">${pw}</td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;color:${g.ausnahmeumlage ? '#e67e22' : '#999'};">${ausnahme}</td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;">
+                                    <button class="btn btn-primary" onclick="adminBuchenFuerGast(${g.id})" style="padding:6px 12px;margin-right:4px;" title="Für diesen Gast buchen">🍺 Buchen</button>
+                                    <button class="btn btn-secondary" onclick="editGast(${g.id})" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
+                                    <button class="btn btn-danger" onclick="handleDeleteGast(${g.id})" style="padding:6px 10px;" title="Löschen">🗑️</button>
                                 </td>
                             </tr>`;
                         }).join('')}
@@ -3118,7 +3144,7 @@ Router.register('admin-guests', async () => {
                 </table>
             </div>
             <div style="padding:12px;background:#f8f9fa;border-top:1px solid #ddd;">
-                <small>Datensatz: 1 von ${guests.length}</small>
+                <small>Gesamt: ${guests.length} Gäste | Ausgenommen von Umlage: ${guests.filter(g => g.ausnahmeumlage).length}</small>
             </div>
         </div>
     </div>
@@ -3129,44 +3155,37 @@ Router.register('admin-guests', async () => {
             <h3 id="gast-modal-title" style="margin-bottom:16px;">Neuer Gast</h3>
             <input type="hidden" id="gast-edit-id">
             
-            <div style="display:grid;gap:12px;">
-                <div>
-                    <label style="font-weight:600;">Sichtbare ID (für Access):</label>
-                    <input type="number" id="gast-visibleId" class="form-input" placeholder="z.B. 6800">
-                </div>
+            <div style="display:grid;gap:16px;">
                 <div>
                     <label style="font-weight:600;">Nachname: *</label>
-                    <input type="text" id="gast-nachname" class="form-input" placeholder="MÜLLER" style="text-transform:uppercase;">
+                    <input type="text" id="gast-nachname" class="form-input" placeholder="z.B. MÜLLER" style="text-transform:uppercase;font-size:1.1rem;">
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                    <div>
-                        <label style="font-weight:600;">Gruppennr:</label>
-                        <input type="number" id="gast-gruppennr" class="form-input" value="0">
-                    </div>
-                    <div>
-                        <label style="font-weight:600;">Gruppenname:</label>
-                        <select id="gast-gruppenname" class="form-input">
-                            <option value="keiner Gruppe zugehörig">keiner Gruppe zugehörig</option>
-                            ${gruppenAktiv.map(g => `<option value="${g.name}">${g.name}</option>`).join('')}
-                        </select>
-                    </div>
+                <div>
+                    <label style="font-weight:600;">Gruppenname:</label>
+                    <select id="gast-gruppenname" class="form-input">
+                        <option value="keiner Gruppe zugehörig">keiner Gruppe zugehörig</option>
+                        ${gruppenAktiv.map(g => `<option value="${g.name}">${g.name}</option>`).join('')}
+                    </select>
                 </div>
                 <div>
                     <label style="font-weight:600;">Passwort (PIN): *</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="gast-passwort" class="form-input" placeholder="4-stellige PIN" maxlength="4" style="font-family:monospace;font-size:1.2rem;letter-spacing:4px;">
-                        <button type="button" class="btn btn-secondary" onclick="generateRandomPIN()">🎲</button>
-                    </div>
+                    <input type="text" id="gast-passwort" class="form-input" placeholder="4-stellige PIN eingeben" maxlength="4" style="font-family:monospace;font-size:1.5rem;letter-spacing:8px;text-align:center;font-weight:bold;">
+                    <small style="color:#666;">Der Gast meldet sich mit dieser PIN an</small>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <input type="checkbox" id="gast-ausnahme">
-                    <label for="gast-ausnahme">Ausnahme Umlage</label>
+                <div style="padding:12px;background:#fff3cd;border-radius:8px;border:1px solid #ffc107;">
+                    <label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
+                        <input type="checkbox" id="gast-ausnahme" style="width:24px;height:24px;">
+                        <div>
+                            <strong>Ausnahme Umlage</strong><br>
+                            <small style="color:#666;">Dieser Gast wird bei der Umlage-Berechnung NICHT mitgezählt</small>
+                        </div>
+                    </label>
                 </div>
             </div>
             
-            <div style="display:flex;gap:12px;margin-top:20px;">
-                <button class="btn btn-primary" onclick="saveGast()" style="flex:1;">💾 Speichern</button>
-                <button class="btn btn-secondary" onclick="closeGastModal()" style="flex:1;">Abbrechen</button>
+            <div style="display:flex;gap:12px;margin-top:24px;">
+                <button class="btn btn-primary" onclick="saveGast()" style="flex:1;padding:14px;">💾 Speichern</button>
+                <button class="btn btn-secondary" onclick="closeGastModal()" style="flex:1;padding:14px;">Abbrechen</button>
             </div>
         </div>
     </div>`);
@@ -3196,31 +3215,26 @@ window.clearGaesteFilter = () => {
 
 // Modal Funktionen
 window.openNeuerGastModal = async () => {
-    document.getElementById('gast-modal-title').textContent = 'Neuer Gast';
+    document.getElementById('gast-modal-title').textContent = 'Neuer Gast anlegen';
     document.getElementById('gast-edit-id').value = '';
     document.getElementById('gast-nachname').value = '';
-    document.getElementById('gast-gruppennr').value = '0';
     document.getElementById('gast-gruppenname').value = 'keiner Gruppe zugehörig';
     document.getElementById('gast-passwort').value = '';
     document.getElementById('gast-ausnahme').checked = false;
     
-    // Nächste freie ID vorschlagen
-    const guests = await db.registeredGuests.toArray();
-    const maxId = Math.max(...guests.map(g => g.visibleId || g.id || 0), 6700);
-    document.getElementById('gast-visibleId').value = maxId + 1;
-    
     document.getElementById('gast-modal').style.display = 'flex';
 };
 
-window.openEditGastModal = async (id) => {
+window.editGast = async (id) => {
     const gast = await db.registeredGuests.get(id);
-    if (!gast) return;
+    if (!gast) {
+        Utils.showToast('Gast nicht gefunden!', 'error');
+        return;
+    }
     
     document.getElementById('gast-modal-title').textContent = 'Gast bearbeiten';
     document.getElementById('gast-edit-id').value = id;
-    document.getElementById('gast-visibleId').value = gast.visibleId || gast.id;
     document.getElementById('gast-nachname').value = gast.nachname || gast.firstName || '';
-    document.getElementById('gast-gruppennr').value = gast.gruppennr || 0;
     document.getElementById('gast-gruppenname').value = gast.gruppenname || gast.group_name || 'keiner Gruppe zugehörig';
     document.getElementById('gast-passwort').value = gast.passwort || gast.passwordHash || '';
     document.getElementById('gast-ausnahme').checked = gast.ausnahmeumlage || false;
@@ -3232,16 +3246,9 @@ window.closeGastModal = () => {
     document.getElementById('gast-modal').style.display = 'none';
 };
 
-window.generateRandomPIN = () => {
-    const pin = Math.floor(1000 + Math.random() * 9000).toString();
-    document.getElementById('gast-passwort').value = pin;
-};
-
 window.saveGast = async () => {
     const editId = document.getElementById('gast-edit-id').value;
-    const visibleId = parseInt(document.getElementById('gast-visibleId').value) || 0;
     const nachname = document.getElementById('gast-nachname').value.trim().toUpperCase();
-    const gruppennr = parseInt(document.getElementById('gast-gruppennr').value) || 0;
     const gruppenname = document.getElementById('gast-gruppenname').value;
     const passwort = document.getElementById('gast-passwort').value.trim();
     const ausnahmeumlage = document.getElementById('gast-ausnahme').checked;
@@ -3251,7 +3258,7 @@ window.saveGast = async () => {
         return;
     }
     if (!passwort || passwort.length < 4) {
-        Utils.showToast('PIN muss 4 Zeichen haben!', 'error');
+        Utils.showToast('PIN muss mindestens 4 Zeichen haben!', 'error');
         return;
     }
     
@@ -3259,7 +3266,7 @@ window.saveGast = async () => {
     const alleGaeste = await db.registeredGuests.toArray();
     const pinExists = alleGaeste.find(g => 
         (g.passwort === passwort || g.passwordHash === passwort) && 
-        g.id != editId && 
+        String(g.id) !== String(editId) && 
         !g.geloescht
     );
     if (pinExists) {
@@ -3268,14 +3275,12 @@ window.saveGast = async () => {
     }
     
     const gastData = {
-        visibleId: visibleId,
         nachname: nachname,
-        firstName: nachname, // Kompatibilität
-        gruppennr: gruppennr,
+        firstName: nachname,
         gruppenname: gruppenname,
-        group_name: gruppenname, // Kompatibilität
+        group_name: gruppenname,
         passwort: passwort,
-        passwordHash: passwort, // Kompatibilität
+        passwordHash: passwort,
         ausnahmeumlage: ausnahmeumlage,
         aktiv: true,
         geloescht: false
@@ -3284,12 +3289,12 @@ window.saveGast = async () => {
     if (editId) {
         // Bearbeiten
         await db.registeredGuests.update(parseInt(editId), gastData);
-        Utils.showToast('Gast aktualisiert', 'success');
+        Utils.showToast('Gast aktualisiert!', 'success');
     } else {
         // Neu anlegen
         gastData.createdAt = new Date().toISOString();
         await db.registeredGuests.add(gastData);
-        Utils.showToast('Gast angelegt', 'success');
+        Utils.showToast('Gast angelegt!', 'success');
     }
     
     // Zu Supabase synchronisieren
@@ -3299,13 +3304,10 @@ window.saveGast = async () => {
                 vorname: nachname,
                 pin_hash: passwort,
                 aktiv: true,
-                group_name: gruppenname
+                group_name: gruppenname,
+                geloescht: false
             };
-            if (editId) {
-                // Update ist komplizierter - für jetzt nur lokal
-            } else {
-                await supabaseClient.from('profiles').insert(profileData);
-            }
+            await supabaseClient.from('profiles').insert(profileData);
         } catch (e) {
             console.log('Supabase sync optional:', e);
         }
@@ -3335,13 +3337,38 @@ window.handleDeleteGast = async (id) => {
     Router.navigate('admin-guests');
 };
 
+// Admin bucht für Gast
+window.adminBuchenFuerGast = async (id) => {
+    const gast = await db.registeredGuests.get(id);
+    if (!gast) {
+        Utils.showToast('Gast nicht gefunden!', 'error');
+        return;
+    }
+    
+    // Gast als aktuellen User setzen
+    const name = gast.nachname || gast.firstName;
+    State.setUser({
+        ...gast,
+        firstName: name,
+        id: gast.id
+    });
+    
+    // Gruppe setzen falls vorhanden
+    State.selectedGroup = gast.gruppenname || gast.group_name || null;
+    
+    Utils.showToast(`Buchen für: ${name}`, 'info');
+    
+    // Zum Buchungsmenü navigieren
+    Router.navigate('buchen');
+};
+
 // Export für Access
 window.exportGaesteExcel = async () => {
     let guests = await db.registeredGuests.toArray();
     guests = guests.filter(g => !g.geloescht);
     
-    const rows = guests.map(g => ({
-        'ID': g.visibleId || g.id,
+    const rows = guests.map((g, index) => ({
+        'ID': index + 6700,
         'Vorname': '',
         'Nachname': g.nachname || g.firstName || '',
         'Adresse': '',
@@ -3350,9 +3377,9 @@ window.exportGaesteExcel = async () => {
         'Telefon/privat': '',
         'Email-Name': '',
         'Geburtsdatum': '',
-        'Gruppennr': g.gruppennr || 0,
+        'Gruppennr': 0,
         'Gruppenname': g.gruppenname || g.group_name || 'keiner Gruppe zugehörig',
-        'Aktiv': g.aktiv !== false,
+        'Aktiv': true,
         'Passwort': g.passwort || g.passwordHash || '',
         'Ausnahmeumlage': g.ausnahmeumlage || false
     }));
