@@ -327,6 +327,365 @@ const DataProtection = {
         document.body.appendChild(modal);
     },
 
+    // ============ RESTORE FUNKTIONEN ============
+    
+    // Backup-Datei auswählen und Restore-Dialog anzeigen
+    async selectRestoreFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                
+                // Backup validieren
+                if (!this.validateBackup(data)) {
+                    Utils.showToast('Ungültige Backup-Datei!', 'error');
+                    return;
+                }
+                
+                // Restore-Dialog anzeigen
+                this.showRestoreDialog(data, file.name);
+                
+            } catch (e) {
+                console.error('Backup lesen Fehler:', e);
+                Utils.showToast('Fehler beim Lesen der Datei: ' + e.message, 'error');
+            }
+        };
+        
+        input.click();
+    },
+    
+    // Backup-Datei validieren
+    validateBackup(data) {
+        // Mindestens eine dieser Tabellen muss vorhanden sein
+        const requiredTables = ['registeredGuests', 'artikel', 'buchungen', 'gaeste'];
+        const hasTable = requiredTables.some(t => data[t] && Array.isArray(data[t]));
+        
+        if (!hasTable) {
+            console.error('Keine gültigen Tabellen gefunden');
+            return false;
+        }
+        
+        return true;
+    },
+    
+    // Restore-Dialog anzeigen
+    showRestoreDialog(data, filename) {
+        // Statistiken berechnen
+        const stats = {
+            gaeste: (data.registeredGuests || []).filter(g => !g.geloescht).length,
+            artikel: (data.artikel || []).filter(a => a.aktiv !== false).length,
+            buchungen: (data.buchungen || []).filter(b => !b.storniert).length,
+            kategorien: (data.kategorien || []).length,
+            gruppen: (data.gruppen || []).length,
+            fehlendeGetraenke: (data.fehlendeGetraenke || []).length
+        };
+        
+        const backupDatum = data.exportDatum ? new Date(data.exportDatum).toLocaleString('de-AT') : 'Unbekannt';
+        const version = data.version || '1.0';
+        const quelle = data.quelle || 'lokal';
+        
+        const modal = document.createElement('div');
+        modal.id = 'restore-modal';
+        modal.innerHTML = `
+            <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">
+                <div style="background:white;border-radius:16px;max-width:550px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+                    
+                    <!-- Header -->
+                    <div style="background:linear-gradient(135deg, #e74c3c, #c0392b);color:white;padding:24px;border-radius:16px 16px 0 0;">
+                        <div style="display:flex;align-items:center;gap:16px;">
+                            <div style="font-size:3rem;">🔄</div>
+                            <div>
+                                <h2 style="margin:0 0 4px 0;">Backup wiederherstellen</h2>
+                                <div style="font-size:0.9rem;opacity:0.9;">${filename}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Backup Info -->
+                    <div style="padding:20px;border-bottom:1px solid #eee;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:0.9rem;">
+                            <div><span style="color:#888;">Erstellt:</span> <strong>${backupDatum}</strong></div>
+                            <div><span style="color:#888;">Version:</span> <strong>${version}</strong></div>
+                            <div><span style="color:#888;">Quelle:</span> <strong>${quelle}</strong></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Inhalt -->
+                    <div style="padding:20px;">
+                        <h3 style="margin:0 0 16px 0;color:#2C5F7C;">📦 Inhalt des Backups</h3>
+                        <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;">
+                            <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
+                                <input type="checkbox" id="restore-gaeste" checked ${stats.gaeste === 0 ? 'disabled' : ''}>
+                                <span>👥 Gäste <strong>(${stats.gaeste})</strong></span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
+                                <input type="checkbox" id="restore-artikel" checked ${stats.artikel === 0 ? 'disabled' : ''}>
+                                <span>📦 Artikel <strong>(${stats.artikel})</strong></span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
+                                <input type="checkbox" id="restore-buchungen" checked ${stats.buchungen === 0 ? 'disabled' : ''}>
+                                <span>🧾 Buchungen <strong>(${stats.buchungen})</strong></span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
+                                <input type="checkbox" id="restore-kategorien" checked ${stats.kategorien === 0 ? 'disabled' : ''}>
+                                <span>📂 Kategorien <strong>(${stats.kategorien})</strong></span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
+                                <input type="checkbox" id="restore-gruppen" ${stats.gruppen === 0 ? 'disabled' : ''}>
+                                <span>🏫 Gruppen <strong>(${stats.gruppen})</strong></span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
+                                <input type="checkbox" id="restore-fehlende" ${stats.fehlendeGetraenke === 0 ? 'disabled' : ''}>
+                                <span>⚠️ Fehlende <strong>(${stats.fehlendeGetraenke})</strong></span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Modus -->
+                    <div style="padding:0 20px 20px;">
+                        <h3 style="margin:0 0 12px 0;color:#2C5F7C;">⚙️ Wiederherstellungs-Modus</h3>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fff3cd;border:2px solid #ffc107;border-radius:8px;cursor:pointer;">
+                                <input type="radio" name="restore-mode" value="merge" checked style="margin-top:3px;">
+                                <div>
+                                    <strong>🔀 Zusammenführen (empfohlen)</strong>
+                                    <div style="font-size:0.85rem;color:#666;">Bestehende Daten bleiben erhalten, nur fehlende werden ergänzt</div>
+                                </div>
+                            </label>
+                            <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#f8d7da;border:2px solid #dc3545;border-radius:8px;cursor:pointer;">
+                                <input type="radio" name="restore-mode" value="replace" style="margin-top:3px;">
+                                <div>
+                                    <strong>🗑️ Ersetzen (Vorsicht!)</strong>
+                                    <div style="font-size:0.85rem;color:#666;">ALLE bestehenden Daten werden gelöscht und durch Backup ersetzt</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Warnung -->
+                    <div style="padding:0 20px 20px;">
+                        <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;display:flex;align-items:flex-start;gap:10px;">
+                            <span style="font-size:1.5rem;">⚠️</span>
+                            <div style="font-size:0.85rem;color:#856404;">
+                                <strong>Wichtig:</strong> Erstellen Sie vor der Wiederherstellung ein aktuelles Backup der bestehenden Daten!
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Buttons -->
+                    <div style="padding:20px;background:#f8f9fa;border-radius:0 0 16px 16px;display:flex;gap:12px;">
+                        <button onclick="document.getElementById('restore-modal').remove();" 
+                                style="flex:1;padding:14px;background:#6c757d;color:white;border:none;border-radius:8px;font-size:1rem;cursor:pointer;">
+                            Abbrechen
+                        </button>
+                        <button onclick="DataProtection.executeRestore()" 
+                                style="flex:1;padding:14px;background:#e74c3c;color:white;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;">
+                            🔄 Wiederherstellen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Backup-Daten im Window speichern für executeRestore
+        window._pendingRestoreData = data;
+        
+        document.body.appendChild(modal);
+    },
+    
+    // Restore ausführen
+    async executeRestore() {
+        const data = window._pendingRestoreData;
+        if (!data) {
+            Utils.showToast('Keine Backup-Daten gefunden', 'error');
+            return;
+        }
+        
+        // Optionen sammeln
+        const options = {
+            gaeste: document.getElementById('restore-gaeste')?.checked,
+            artikel: document.getElementById('restore-artikel')?.checked,
+            buchungen: document.getElementById('restore-buchungen')?.checked,
+            kategorien: document.getElementById('restore-kategorien')?.checked,
+            gruppen: document.getElementById('restore-gruppen')?.checked,
+            fehlende: document.getElementById('restore-fehlende')?.checked,
+            mode: document.querySelector('input[name="restore-mode"]:checked')?.value || 'merge'
+        };
+        
+        // Letzte Bestätigung
+        const modeText = options.mode === 'replace' 
+            ? 'ALLE bestehenden Daten werden GELÖSCHT!' 
+            : 'Daten werden zusammengeführt.';
+        
+        if (!confirm(`Wiederherstellung wirklich durchführen?\n\n${modeText}\n\nDieser Vorgang kann nicht rückgängig gemacht werden!`)) {
+            return;
+        }
+        
+        // Modal schließen
+        document.getElementById('restore-modal')?.remove();
+        
+        // Fortschrittsanzeige
+        Utils.showToast('⏳ Wiederherstellung läuft...', 'info');
+        
+        try {
+            let restored = { gaeste: 0, artikel: 0, buchungen: 0, kategorien: 0, gruppen: 0, fehlende: 0 };
+            
+            // Bei "replace" erst alles löschen
+            if (options.mode === 'replace') {
+                if (options.gaeste) await db.registeredGuests.clear();
+                if (options.artikel) await db.artikel.clear();
+                if (options.buchungen) await db.buchungen.clear();
+                if (options.kategorien) await db.kategorien.clear();
+                if (options.gruppen) await db.gruppen.clear();
+                if (options.fehlende) await db.fehlendeGetraenke.clear();
+            }
+            
+            // Gäste wiederherstellen
+            if (options.gaeste && data.registeredGuests) {
+                for (const g of data.registeredGuests) {
+                    try {
+                        if (options.mode === 'merge') {
+                            // Prüfen ob schon existiert
+                            const existing = await db.registeredGuests.get(g.id);
+                            if (!existing) {
+                                await db.registeredGuests.add(g);
+                                restored.gaeste++;
+                            }
+                        } else {
+                            await db.registeredGuests.add(g);
+                            restored.gaeste++;
+                        }
+                    } catch(e) { /* Duplikat ignorieren */ }
+                }
+            }
+            
+            // Artikel wiederherstellen
+            if (options.artikel && data.artikel) {
+                for (const a of data.artikel) {
+                    try {
+                        if (options.mode === 'merge') {
+                            const existing = await db.artikel.get(a.artikel_id);
+                            if (!existing) {
+                                await db.artikel.add(a);
+                                restored.artikel++;
+                            }
+                        } else {
+                            await db.artikel.add(a);
+                            restored.artikel++;
+                        }
+                    } catch(e) { /* Duplikat ignorieren */ }
+                }
+            }
+            
+            // Buchungen wiederherstellen
+            if (options.buchungen && data.buchungen) {
+                for (const b of data.buchungen) {
+                    try {
+                        if (options.mode === 'merge') {
+                            const existing = await db.buchungen.get(b.buchung_id);
+                            if (!existing) {
+                                await db.buchungen.add(b);
+                                restored.buchungen++;
+                            }
+                        } else {
+                            await db.buchungen.add(b);
+                            restored.buchungen++;
+                        }
+                    } catch(e) { /* Duplikat ignorieren */ }
+                }
+            }
+            
+            // Kategorien wiederherstellen
+            if (options.kategorien && data.kategorien) {
+                for (const k of data.kategorien) {
+                    try {
+                        if (options.mode === 'merge') {
+                            const existing = await db.kategorien.get(k.kategorie_id);
+                            if (!existing) {
+                                await db.kategorien.add(k);
+                                restored.kategorien++;
+                            }
+                        } else {
+                            await db.kategorien.add(k);
+                            restored.kategorien++;
+                        }
+                    } catch(e) { /* Duplikat ignorieren */ }
+                }
+            }
+            
+            // Gruppen wiederherstellen
+            if (options.gruppen && data.gruppen) {
+                for (const g of data.gruppen) {
+                    try {
+                        if (options.mode === 'merge') {
+                            const existing = await db.gruppen.get(g.id);
+                            if (!existing) {
+                                await db.gruppen.add(g);
+                                restored.gruppen++;
+                            }
+                        } else {
+                            await db.gruppen.add(g);
+                            restored.gruppen++;
+                        }
+                    } catch(e) { /* Duplikat ignorieren */ }
+                }
+            }
+            
+            // Fehlende Getränke wiederherstellen
+            if (options.fehlende && data.fehlendeGetraenke) {
+                for (const f of data.fehlendeGetraenke) {
+                    try {
+                        if (options.mode === 'merge') {
+                            const existing = await db.fehlendeGetraenke.get(f.id);
+                            if (!existing) {
+                                await db.fehlendeGetraenke.add(f);
+                                restored.fehlende++;
+                            }
+                        } else {
+                            await db.fehlendeGetraenke.add(f);
+                            restored.fehlende++;
+                        }
+                    } catch(e) { /* Duplikat ignorieren */ }
+                }
+            }
+            
+            // Cache invalidieren
+            artikelCache = null;
+            
+            // Aufräumen
+            delete window._pendingRestoreData;
+            
+            // Erfolgsmeldung
+            const summary = [];
+            if (restored.gaeste > 0) summary.push(`${restored.gaeste} Gäste`);
+            if (restored.artikel > 0) summary.push(`${restored.artikel} Artikel`);
+            if (restored.buchungen > 0) summary.push(`${restored.buchungen} Buchungen`);
+            if (restored.kategorien > 0) summary.push(`${restored.kategorien} Kategorien`);
+            if (restored.gruppen > 0) summary.push(`${restored.gruppen} Gruppen`);
+            if (restored.fehlende > 0) summary.push(`${restored.fehlende} Fehlende`);
+            
+            Utils.showToast(`✅ Wiederherstellung erfolgreich!\n${summary.join(', ') || 'Keine neuen Daten'}`, 'success');
+            
+            // Seite neu laden um Änderungen anzuzeigen
+            setTimeout(() => {
+                if (confirm('Seite neu laden um alle Änderungen anzuzeigen?')) {
+                    location.reload();
+                }
+            }, 1000);
+            
+        } catch (e) {
+            console.error('Restore Fehler:', e);
+            Utils.showToast('Fehler bei Wiederherstellung: ' + e.message, 'error');
+        }
+    },
+
     async manualExport() {
         const data = {
             registeredGuests: await db.registeredGuests.toArray(),
@@ -2253,10 +2612,15 @@ Router.register('admin-dashboard', async () => {
             <div class="card-header"><h2 class="card-title">🔄 Daten-Management</h2></div>
             <div class="card-body">
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
-                    <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
-                        <h3 style="font-weight:600;margin-bottom:8px;">💾 Backup</h3>
-                        <div style="font-size:0.8rem;color:#666;margin-bottom:8px;">Letztes: ${DataProtection.getLastBackupText()}</div>
-                        <button class="btn btn-secondary" onclick="DataProtection.createFullBackup()">📥 Vollständig</button>
+                    <div style="padding:16px;background:linear-gradient(135deg, #27ae60, #2ecc71);border-radius:var(--radius-md);color:white;">
+                        <h3 style="font-weight:600;margin-bottom:8px;">💾 Backup erstellen</h3>
+                        <div style="font-size:0.8rem;opacity:0.9;margin-bottom:8px;">Letztes: ${DataProtection.getLastBackupText()}</div>
+                        <button class="btn" onclick="DataProtection.createFullBackup()" style="background:white;color:#27ae60;border:none;padding:8px 16px;">📥 Jetzt sichern</button>
+                    </div>
+                    <div style="padding:16px;background:linear-gradient(135deg, #e74c3c, #c0392b);border-radius:var(--radius-md);color:white;">
+                        <h3 style="font-weight:600;margin-bottom:8px;">🔄 Backup laden</h3>
+                        <div style="font-size:0.8rem;opacity:0.9;margin-bottom:8px;">Daten aus JSON wiederherstellen</div>
+                        <button class="btn" onclick="DataProtection.selectRestoreFile()" style="background:white;color:#e74c3c;border:none;padding:8px 16px;">📤 Datei wählen</button>
                     </div>
                     <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
                         <h3 style="font-weight:600;margin-bottom:8px;">📤 Buchungen CSV</h3>
