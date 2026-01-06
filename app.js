@@ -3126,17 +3126,23 @@ Router.register('admin-guests', async () => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
                             const pw = g.passwort || g.passwordHash || '-';
-                            const ausnahme = g.ausnahmeumlage ? '✓ Ausgenommen' : '-';
+                            const ausnahme = g.ausnahmeumlage || false;
                             return `
                             <tr class="gaeste-row" data-name="${name.toLowerCase()}" data-gruppe="${grpName.toLowerCase()}" data-id="${g.id}">
                                 <td style="padding:10px;border:1px solid #ddd;font-weight:600;">${name}</td>
                                 <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:1.2rem;font-weight:bold;color:#2c3e50;">${pw}</td>
-                                <td style="padding:10px;border:1px solid #ddd;text-align:center;color:${g.ausnahmeumlage ? '#e67e22' : '#999'};">${ausnahme}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;">
-                                    <button class="btn btn-primary" onclick="adminBuchenFuerGast(${g.id})" style="padding:6px 12px;margin-right:4px;" title="Für diesen Gast buchen">🍺 Buchen</button>
-                                    <button class="btn btn-secondary" onclick="editGast(${g.id})" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
-                                    <button class="btn btn-danger" onclick="handleDeleteGast(${g.id})" style="padding:6px 10px;" title="Löschen">🗑️</button>
+                                    <label style="position:relative;display:inline-block;width:50px;height:26px;">
+                                        <input type="checkbox" ${ausnahme ? 'checked' : ''} onchange="toggleAusnahme('${g.id}', this.checked)" style="opacity:0;width:0;height:0;">
+                                        <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:${ausnahme ? '#e67e22' : '#ccc'};transition:.3s;border-radius:26px;"></span>
+                                        <span style="position:absolute;content:'';height:20px;width:20px;left:${ausnahme ? '27px' : '3px'};bottom:3px;background-color:white;transition:.3s;border-radius:50%;"></span>
+                                    </label>
+                                </td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;">
+                                    <button class="btn btn-primary" onclick="adminBuchenFuerGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="Für diesen Gast buchen">🍺 Buchen</button>
+                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
+                                    <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Löschen">🗑️</button>
                                 </td>
                             </tr>`;
                         }).join('')}
@@ -3171,15 +3177,6 @@ Router.register('admin-guests', async () => {
                     <label style="font-weight:600;">Passwort (PIN): *</label>
                     <input type="text" id="gast-passwort" class="form-input" placeholder="4-stellige PIN eingeben" maxlength="4" style="font-family:monospace;font-size:1.5rem;letter-spacing:8px;text-align:center;font-weight:bold;">
                     <small style="color:#666;">Der Gast meldet sich mit dieser PIN an</small>
-                </div>
-                <div style="padding:12px;background:#fff3cd;border-radius:8px;border:1px solid #ffc107;">
-                    <label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
-                        <input type="checkbox" id="gast-ausnahme" style="width:24px;height:24px;">
-                        <div>
-                            <strong>Ausnahme Umlage</strong><br>
-                            <small style="color:#666;">Dieser Gast wird bei der Umlage-Berechnung NICHT mitgezählt</small>
-                        </div>
-                    </label>
                 </div>
             </div>
             
@@ -3220,24 +3217,28 @@ window.openNeuerGastModal = async () => {
     document.getElementById('gast-nachname').value = '';
     document.getElementById('gast-gruppenname').value = 'keiner Gruppe zugehörig';
     document.getElementById('gast-passwort').value = '';
-    document.getElementById('gast-ausnahme').checked = false;
     
     document.getElementById('gast-modal').style.display = 'flex';
 };
 
 window.editGast = async (id) => {
-    const gast = await db.registeredGuests.get(id);
+    console.log('editGast called with id:', id);
+    
+    // ID kann String oder Nummer sein - suche in allen Gästen
+    const alleGaeste = await db.registeredGuests.toArray();
+    const gast = alleGaeste.find(g => String(g.id) === String(id));
+    
     if (!gast) {
         Utils.showToast('Gast nicht gefunden!', 'error');
+        console.error('Gast nicht gefunden für ID:', id);
         return;
     }
     
     document.getElementById('gast-modal-title').textContent = 'Gast bearbeiten';
-    document.getElementById('gast-edit-id').value = id;
+    document.getElementById('gast-edit-id').value = gast.id;
     document.getElementById('gast-nachname').value = gast.nachname || gast.firstName || '';
     document.getElementById('gast-gruppenname').value = gast.gruppenname || gast.group_name || 'keiner Gruppe zugehörig';
     document.getElementById('gast-passwort').value = gast.passwort || gast.passwordHash || '';
-    document.getElementById('gast-ausnahme').checked = gast.ausnahmeumlage || false;
     
     document.getElementById('gast-modal').style.display = 'flex';
 };
@@ -3246,12 +3247,28 @@ window.closeGastModal = () => {
     document.getElementById('gast-modal').style.display = 'none';
 };
 
+// Toggle Ausnahme direkt in Tabelle
+window.toggleAusnahme = async (id, checked) => {
+    try {
+        const alleGaeste = await db.registeredGuests.toArray();
+        const gast = alleGaeste.find(g => String(g.id) === String(id));
+        
+        if (gast) {
+            await db.registeredGuests.update(gast.id, { ausnahmeumlage: checked });
+            await DataProtection.createBackup();
+            Utils.showToast(checked ? 'Ausnahme aktiviert' : 'Ausnahme deaktiviert', 'success');
+        }
+    } catch (e) {
+        console.error('Toggle Ausnahme Error:', e);
+        Utils.showToast('Fehler beim Speichern', 'error');
+    }
+};
+
 window.saveGast = async () => {
     const editId = document.getElementById('gast-edit-id').value;
     const nachname = document.getElementById('gast-nachname').value.trim().toUpperCase();
     const gruppenname = document.getElementById('gast-gruppenname').value;
     const passwort = document.getElementById('gast-passwort').value.trim();
-    const ausnahmeumlage = document.getElementById('gast-ausnahme').checked;
     
     if (!nachname) {
         Utils.showToast('Nachname erforderlich!', 'error');
@@ -3281,14 +3298,17 @@ window.saveGast = async () => {
         group_name: gruppenname,
         passwort: passwort,
         passwordHash: passwort,
-        ausnahmeumlage: ausnahmeumlage,
         aktiv: true,
         geloescht: false
     };
     
     if (editId) {
-        // Bearbeiten
-        await db.registeredGuests.update(parseInt(editId), gastData);
+        // Bearbeiten - finde Gast mit dieser ID
+        const alleGaeste = await db.registeredGuests.toArray();
+        const gast = alleGaeste.find(g => String(g.id) === String(editId));
+        if (gast) {
+            await db.registeredGuests.update(gast.id, gastData);
+        }
         Utils.showToast('Gast aktualisiert!', 'success');
     } else {
         // Neu anlegen
@@ -3319,14 +3339,21 @@ window.saveGast = async () => {
 };
 
 window.handleDeleteGast = async (id) => {
-    const gast = await db.registeredGuests.get(id);
-    if (!gast) return;
+    console.log('handleDeleteGast called with id:', id);
+    
+    const alleGaeste = await db.registeredGuests.toArray();
+    const gast = alleGaeste.find(g => String(g.id) === String(id));
+    
+    if (!gast) {
+        Utils.showToast('Gast nicht gefunden!', 'error');
+        return;
+    }
     
     const name = gast.nachname || gast.firstName;
     if (!confirm(`Gast "${name}" wirklich löschen?`)) return;
     
     // Soft delete
-    await db.registeredGuests.update(id, {
+    await db.registeredGuests.update(gast.id, {
         geloescht: true,
         geloeschtAm: new Date().toISOString(),
         aktiv: false
@@ -3339,7 +3366,11 @@ window.handleDeleteGast = async (id) => {
 
 // Admin bucht für Gast
 window.adminBuchenFuerGast = async (id) => {
-    const gast = await db.registeredGuests.get(id);
+    console.log('adminBuchenFuerGast called with id:', id);
+    
+    const alleGaeste = await db.registeredGuests.toArray();
+    const gast = alleGaeste.find(g => String(g.id) === String(id));
+    
     if (!gast) {
         Utils.showToast('Gast nicht gefunden!', 'error');
         return;
