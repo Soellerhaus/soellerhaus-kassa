@@ -1,7 +1,7 @@
 {
-  "name": "Seollerhaus Kassa",
+  "name": "Söllerhaus Kassa",
   "short_name": "Kassa",
-  "description": "Self-Service Buchungssystem für das Seollerhaus",
+  "description": "Self-Service Buchungssystem für das Söllerhaus",
   "start_url": "/kassa/",
   "display": "standalone",
   "background_color": "#2C5F7C",
