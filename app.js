@@ -4461,10 +4461,10 @@ Router.register('admin-nachricht', async () => {
                     </div>
                 </div>
                 <ul style="margin:0;padding-left:20px;font-size:0.9rem;opacity:0.95;">
-                    <li>Nachricht erscheint prominent auf der Login-Seite</li>
+                    <li>Nachricht erscheint permanent auf der Login-Seite</li>
                     <li>Automatisches Ablaufen nach <strong>18 Stunden</strong></li>
-                    <li>Gäste können die Nachricht wegklicken (nur für ihre Session)</li>
-                    <li>Du kannst die Nachricht jederzeit manuell deaktivieren</li>
+                    <li>Gäste können die Nachricht <strong>nicht</strong> wegklicken</li>
+                    <li>Nur du (Admin) kannst die Nachricht manuell löschen</li>
                 </ul>
             </div>
         </div>
