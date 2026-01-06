@@ -122,6 +122,20 @@ db.version(6).stores({
     gruppen: '++id, name, aktiv'
 });
 
+// Version 7: Gäste-Nachrichten hinzufügen
+db.version(7).stores({
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
+    artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
+    kategorien: 'kategorie_id, name, sortierung',
+    settings: 'key',
+    exports: '++id, timestamp, anzahl_buchungen',
+    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, geloescht, geloeschtAm, group_name, firstName, passwordHash',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
+    gruppen: '++id, name, aktiv',
+    gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
+});
+
 const DataProtection = {
     async createBackup() {
         try {
@@ -727,6 +741,282 @@ const DataProtection = {
     }
 };
 window.DataProtection = DataProtection;
+
+// ============ GAST-NACHRICHTEN SYSTEM ============
+const GastNachricht = {
+    ABLAUF_STUNDEN: 18, // Nachricht läuft nach 18 Stunden ab
+    
+    // Aktive Nachricht holen (prüft auch Ablauf)
+    async getAktive() {
+        // Erst von Supabase laden wenn online
+        if (supabaseClient && isOnline) {
+            try {
+                const { data } = await supabaseClient
+                    .from('settings')
+                    .select('value')
+                    .eq('key', 'gast_nachricht')
+                    .single();
+                
+                if (data?.value) {
+                    const nachricht = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                    
+                    // Prüfen ob abgelaufen
+                    if (nachricht.aktiv && nachricht.erstellt_am) {
+                        const erstelltAm = new Date(nachricht.erstellt_am);
+                        const jetzt = new Date();
+                        const stundenVergangen = (jetzt - erstelltAm) / (1000 * 60 * 60);
+                        
+                        if (stundenVergangen >= this.ABLAUF_STUNDEN) {
+                            // Automatisch deaktivieren
+                            await this.deaktivieren();
+                            return null;
+                        }
+                        
+                        return nachricht;
+                    }
+                }
+            } catch(e) {
+                console.log('Keine Nachricht in Supabase');
+            }
+        }
+        
+        // Fallback: Lokal
+        try {
+            const setting = await db.settings.get('gast_nachricht');
+            if (setting?.value) {
+                const nachricht = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
+                
+                if (nachricht.aktiv && nachricht.erstellt_am) {
+                    const erstelltAm = new Date(nachricht.erstellt_am);
+                    const jetzt = new Date();
+                    const stundenVergangen = (jetzt - erstelltAm) / (1000 * 60 * 60);
+                    
+                    if (stundenVergangen >= this.ABLAUF_STUNDEN) {
+                        await this.deaktivieren();
+                        return null;
+                    }
+                    
+                    return nachricht;
+                }
+            }
+        } catch(e) {}
+        
+        return null;
+    },
+    
+    // Neue Nachricht erstellen
+    async erstellen(text, typ = 'info') {
+        if (!text || text.trim() === '') {
+            throw new Error('Nachricht darf nicht leer sein');
+        }
+        
+        const nachricht = {
+            text: text.trim(),
+            typ: typ, // 'info', 'warnung', 'dringend'
+            aktiv: true,
+            erstellt_am: new Date().toISOString(),
+            erstellt_von: 'Admin'
+        };
+        
+        // Lokal speichern
+        await db.settings.put({ key: 'gast_nachricht', value: JSON.stringify(nachricht) });
+        
+        // Supabase
+        if (supabaseClient && isOnline) {
+            try {
+                await supabaseClient.from('settings').upsert({ 
+                    key: 'gast_nachricht', 
+                    value: nachricht 
+                });
+            } catch(e) {
+                console.error('Nachricht Supabase sync error:', e);
+            }
+        }
+        
+        Utils.showToast('📢 Nachricht aktiviert!', 'success');
+        return nachricht;
+    },
+    
+    // Nachricht deaktivieren
+    async deaktivieren() {
+        const nachricht = {
+            aktiv: false,
+            deaktiviert_am: new Date().toISOString()
+        };
+        
+        await db.settings.put({ key: 'gast_nachricht', value: JSON.stringify(nachricht) });
+        
+        if (supabaseClient && isOnline) {
+            try {
+                await supabaseClient.from('settings').upsert({ 
+                    key: 'gast_nachricht', 
+                    value: nachricht 
+                });
+            } catch(e) {}
+        }
+        
+        Utils.showToast('Nachricht deaktiviert', 'info');
+    },
+    
+    // Verbleibende Zeit berechnen
+    getVerbleibendeZeit(nachricht) {
+        if (!nachricht?.erstellt_am) return null;
+        
+        const erstelltAm = new Date(nachricht.erstellt_am);
+        const ablaufZeit = new Date(erstelltAm.getTime() + (this.ABLAUF_STUNDEN * 60 * 60 * 1000));
+        const jetzt = new Date();
+        const verbleibend = ablaufZeit - jetzt;
+        
+        if (verbleibend <= 0) return 'Abgelaufen';
+        
+        const stunden = Math.floor(verbleibend / (1000 * 60 * 60));
+        const minuten = Math.floor((verbleibend % (1000 * 60 * 60)) / (1000 * 60));
+        
+        if (stunden > 0) {
+            return `${stunden}h ${minuten}min`;
+        }
+        return `${minuten} Minuten`;
+    },
+    
+    // HTML für die Anzeige auf Login-Seite
+    renderHtml(nachricht) {
+        if (!nachricht || !nachricht.aktiv) return '';
+        
+        const verbleibend = this.getVerbleibendeZeit(nachricht);
+        
+        // Farben je nach Typ
+        const farben = {
+            info: 'linear-gradient(135deg, #3498db, #2980b9)',
+            warnung: 'linear-gradient(135deg, #f39c12, #e67e22)',
+            dringend: 'linear-gradient(135deg, #e74c3c, #c0392b)'
+        };
+        
+        const icons = {
+            info: 'ℹ️',
+            warnung: '⚠️',
+            dringend: '🚨'
+        };
+        
+        const hintergrund = farben[nachricht.typ] || farben.info;
+        const icon = icons[nachricht.typ] || icons.info;
+        
+        // Extra-intensive Animation für dringend
+        const isDringend = nachricht.typ === 'dringend';
+        const animationClass = isDringend ? 'dringend-animation' : 'normal-animation';
+        
+        return `
+        <div id="gast-nachricht-box" class="${animationClass}" style="
+            background: ${hintergrund};
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            color: white;
+            max-width: 600px;
+            margin: 0 auto 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            position: relative;
+            ${isDringend ? 'border: 4px solid transparent;' : ''}
+        ">
+            <style>
+                @keyframes nachrichtPulse {
+                    0%, 100% { transform: scale(1); box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+                    50% { transform: scale(1.02); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+                }
+                @keyframes textBlink {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.7; }
+                }
+                @keyframes borderFlash {
+                    0%, 100% { border-color: #fff; box-shadow: 0 0 20px rgba(255,255,255,0.5), 0 8px 32px rgba(0,0,0,0.3); }
+                    50% { border-color: #ffff00; box-shadow: 0 0 40px rgba(255,255,0,0.8), 0 12px 40px rgba(0,0,0,0.4); }
+                }
+                @keyframes iconShake {
+                    0%, 100% { transform: rotate(0deg); }
+                    25% { transform: rotate(-15deg); }
+                    75% { transform: rotate(15deg); }
+                }
+                @keyframes urgentPulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+                
+                #gast-nachricht-box.normal-animation {
+                    animation: nachrichtPulse 2s ease-in-out infinite;
+                }
+                #gast-nachricht-box.dringend-animation {
+                    animation: borderFlash 0.8s ease-in-out infinite, urgentPulse 1.5s ease-in-out infinite;
+                }
+                #gast-nachricht-box .nachricht-text {
+                    animation: textBlink 1.5s ease-in-out infinite;
+                }
+                #gast-nachricht-box.dringend-animation .nachricht-icon {
+                    animation: iconShake 0.5s ease-in-out infinite;
+                    display: inline-block;
+                }
+                #gast-nachricht-box.dringend-animation .nachricht-titel {
+                    font-size: 1.3rem !important;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                }
+            </style>
+            
+            <button onclick="GastNachricht.schliessen()" style="
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                background: rgba(255,255,255,0.3);
+                border: none;
+                color: white;
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: bold;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            ">✕</button>
+            
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div class="nachricht-icon" style="font-size: ${isDringend ? '2.5rem' : '2rem'}; line-height: 1;">${icon}</div>
+                <div style="flex: 1;">
+                    <div class="nachricht-titel" style="font-weight: 700; font-size: 1.1rem; margin-bottom: 6px;">
+                        ${isDringend ? '🔔 WICHTIGE NACHRICHT! 🔔' : 'Nachricht vom Team'}
+                    </div>
+                    <div class="nachricht-text" style="font-size: ${isDringend ? '1.3rem' : '1.15rem'}; line-height: 1.4; font-weight: ${isDringend ? '600' : '400'};">
+                        ${nachricht.text}
+                    </div>
+                    <div style="margin-top: 12px; font-size: 0.85rem; opacity: 0.9; display: flex; align-items: center; gap: 8px;">
+                        <span>⏱️ Noch ${verbleibend} sichtbar</span>
+                        <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;">Klicke ✕ zum Schließen</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+    },
+    
+    // Nachricht für diesen Gast schließen (nur visuell, nicht für alle)
+    schliessen() {
+        const box = document.getElementById('gast-nachricht-box');
+        if (box) {
+            box.style.animation = 'none';
+            box.style.transition = 'all 0.3s ease';
+            box.style.transform = 'scale(0.9)';
+            box.style.opacity = '0';
+            setTimeout(() => box.remove(), 300);
+        }
+        // Merken dass dieser Gast die Nachricht geschlossen hat (für diese Session)
+        sessionStorage.setItem('nachricht_geschlossen', 'true');
+    },
+    
+    // Prüfen ob Nachricht für diese Session geschlossen wurde
+    istGeschlossen() {
+        return sessionStorage.getItem('nachricht_geschlossen') === 'true';
+    }
+};
+window.GastNachricht = GastNachricht;
 
 db.open().then(async () => {
     await DataProtection.requestPersistentStorage();
@@ -1790,6 +2080,134 @@ const Gruppen = {
     }
 };
 
+// ============ GÄSTE-NACHRICHTEN ============
+const GastNachrichten = {
+    // Nachricht an Gast senden (18 Stunden gültig)
+    async senden(gast_id, gastName, nachricht, stunden = 18) {
+        if (!nachricht?.trim()) throw new Error('Nachricht erforderlich');
+        
+        const jetzt = new Date();
+        const gueltigBis = new Date(jetzt.getTime() + (stunden * 60 * 60 * 1000));
+        
+        const msg = {
+            gast_id: String(gast_id),
+            gast_name: gastName,
+            nachricht: nachricht.trim(),
+            erstellt_am: jetzt.toISOString(),
+            gueltig_bis: gueltigBis.toISOString(),
+            gelesen: false,
+            erledigt: false
+        };
+        
+        const id = await db.gastNachrichten.add(msg);
+        msg.id = id;
+        
+        // Supabase sync
+        if (supabaseClient && isOnline) {
+            try {
+                await supabaseClient.from('gast_nachrichten').insert(msg);
+            } catch(e) {
+                console.error('Nachricht sync error:', e);
+            }
+        }
+        
+        console.log('📨 Nachricht gesendet an', gastName, '- gültig bis', gueltigBis.toLocaleString('de-AT'));
+        return msg;
+    },
+    
+    // Aktive Nachrichten für einen Gast holen
+    async getAktiveForGast(gast_id) {
+        const jetzt = new Date().toISOString();
+        const alle = await db.gastNachrichten.toArray();
+        
+        return alle.filter(n => 
+            String(n.gast_id) === String(gast_id) && 
+            !n.erledigt && 
+            n.gueltig_bis > jetzt
+        ).sort((a, b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
+    },
+    
+    // Alle aktiven Nachrichten (für Login-Seite)
+    async getAlleAktiven() {
+        const jetzt = new Date().toISOString();
+        const alle = await db.gastNachrichten.toArray();
+        
+        return alle.filter(n => 
+            !n.erledigt && 
+            n.gueltig_bis > jetzt
+        ).sort((a, b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
+    },
+    
+    // Alle Nachrichten (für Admin)
+    async getAll() {
+        return await db.gastNachrichten.orderBy('id').reverse().toArray();
+    },
+    
+    // Nachricht als gelesen markieren (Gast drückt weg)
+    async markiereGelesen(id) {
+        await db.gastNachrichten.update(id, { 
+            gelesen: true, 
+            gelesen_am: new Date().toISOString() 
+        });
+        
+        if (supabaseClient && isOnline) {
+            try {
+                await supabaseClient.from('gast_nachrichten').update({ 
+                    gelesen: true, 
+                    gelesen_am: new Date().toISOString() 
+                }).eq('id', id);
+            } catch(e) {}
+        }
+    },
+    
+    // Nachricht als erledigt markieren (Admin)
+    async markiereErledigt(id) {
+        await db.gastNachrichten.update(id, { 
+            erledigt: true, 
+            erledigt_am: new Date().toISOString() 
+        });
+        
+        if (supabaseClient && isOnline) {
+            try {
+                await supabaseClient.from('gast_nachrichten').update({ 
+                    erledigt: true, 
+                    erledigt_am: new Date().toISOString() 
+                }).eq('id', id);
+            } catch(e) {}
+        }
+        
+        Utils.showToast('Nachricht als erledigt markiert', 'success');
+    },
+    
+    // Nachricht löschen
+    async loeschen(id) {
+        await db.gastNachrichten.delete(id);
+        
+        if (supabaseClient && isOnline) {
+            try {
+                await supabaseClient.from('gast_nachrichten').delete().eq('id', id);
+            } catch(e) {}
+        }
+        
+        Utils.showToast('Nachricht gelöscht', 'success');
+    },
+    
+    // Abgelaufene Nachrichten aufräumen
+    async cleanupAbgelaufene() {
+        const jetzt = new Date().toISOString();
+        const alle = await db.gastNachrichten.toArray();
+        const abgelaufen = alle.filter(n => n.gueltig_bis < jetzt);
+        
+        for (const n of abgelaufen) {
+            await db.gastNachrichten.delete(n.id);
+        }
+        
+        if (abgelaufen.length > 0) {
+            console.log('🧹 ' + abgelaufen.length + ' abgelaufene Nachrichten gelöscht');
+        }
+    }
+};
+
 // Umlage auf alle Gäste
 const Umlage = {
     async bucheAufAlle(artikel_id, beschreibung = 'Umlage') {
@@ -2345,6 +2763,69 @@ const UI = {
 Router.register('login', async () => {
     State.currentPin = ''; window.selectedGastId = null; window.currentLetter = null;
     
+    // Abgelaufene Nachrichten aufräumen
+    await GastNachrichten.cleanupAbgelaufene();
+    
+    // Gast-Nachricht laden (wenn nicht geschlossen) - globale Nachricht
+    let nachrichtHtml = '';
+    if (!GastNachricht.istGeschlossen()) {
+        const nachricht = await GastNachricht.getAktive();
+        nachrichtHtml = GastNachricht.renderHtml(nachricht);
+    }
+    
+    // Gast-spezifische Nachrichten laden (GastNachrichten - mehrere pro Gast möglich)
+    const gastNachrichten = await GastNachrichten.getAlleAktiven();
+    const gastNachrichtenHtml = gastNachrichten.length ? `
+    <div style="max-width:600px;margin:0 auto 24px;">
+        ${gastNachrichten.map(n => {
+            const verbleibend = Math.ceil((new Date(n.gueltig_bis) - new Date()) / (1000 * 60 * 60));
+            const istDringend = verbleibend <= 3;
+            const erstelltUm = new Date(n.erstellt_am).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+            return `
+            <div id="gast-nachricht-${n.id}" style="
+                background: linear-gradient(135deg, ${istDringend ? '#e74c3c, #c0392b' : '#3498db, #2980b9'});
+                border-radius: 16px;
+                padding: 16px;
+                margin-bottom: 12px;
+                color: white;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+                animation: nachrichtPulse 2s ease-in-out infinite;
+            ">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div style="flex:1;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="font-size:1.5rem;">📢</span>
+                            <span style="font-weight:700;font-size:1.1rem;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;">
+                                ${n.gast_name}
+                            </span>
+                        </div>
+                        <div style="font-size:1.15rem;font-weight:500;line-height:1.4;margin-bottom:8px;">
+                            ${n.nachricht}
+                        </div>
+                        <div style="font-size:0.8rem;opacity:0.85;display:flex;gap:12px;flex-wrap:wrap;">
+                            <span>📅 ${erstelltUm}</span>
+                            <span>⏳ Noch ${verbleibend}h sichtbar</span>
+                        </div>
+                    </div>
+                    <button onclick="dismissGastNachricht(${n.id})" style="
+                        background:rgba(255,255,255,0.3);
+                        border:none;
+                        color:white;
+                        width:36px;
+                        height:36px;
+                        border-radius:50%;
+                        cursor:pointer;
+                        font-size:1.2rem;
+                        font-weight:bold;
+                        margin-left:12px;
+                        flex-shrink:0;
+                    " title="Gelesen & Schließen">✓</button>
+                </div>
+            </div>`;
+        }).join('')}
+    </div>
+    ` : '';
+    
     // Fehlende Getränke laden und zusammenfassen
     const fehlendeOffen = await FehlendeGetraenke.getOffene();
     const zusammenfassung = {};
@@ -2370,7 +2851,7 @@ Router.register('login', async () => {
     </div>
     ` : '';
     
-    UI.render(`<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">Söllerhaus Kassa</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">Self-Service Buchung</p>${fehlendeHtml}<div style="max-width:600px;margin:0 auto;">${UI.renderAlphabet('handleLetterSelect')}<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">Noch kein Account?</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">Neu registrieren</button></div><div style="margin-top:24px;"><button class="btn btn-secondary" onclick="handleAdminClick()">Admin-Login</button></div></div></div></div>`);
+    UI.render(`<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">Söllerhaus Kassa</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">Self-Service Buchung</p>${nachrichtHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;">${UI.renderAlphabet('handleLetterSelect')}<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">Noch kein Account?</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">Neu registrieren</button></div><div style="margin-top:24px;"><button class="btn btn-secondary" onclick="handleAdminClick()">Admin-Login</button></div></div></div></div>`);
 });
 
 Router.register('register', () => {
@@ -2564,6 +3045,10 @@ Router.register('admin-dashboard', async () => {
     const auffuellAnzahl = auffuellListe.reduce((s, i) => s + i.menge, 0);
     const fehlendeOffen = await FehlendeGetraenke.getOffene();
     
+    // Aktive Nachricht laden
+    const aktiveNachricht = await GastNachricht.getAktive();
+    const verbleibendeZeit = aktiveNachricht ? GastNachricht.getVerbleibendeZeit(aktiveNachricht) : null;
+    
     UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">🔧 Admin Dashboard</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="stats-grid">
@@ -2571,6 +3056,35 @@ Router.register('admin-dashboard', async () => {
             <div class="stat-card"><div class="stat-value">${artCount}</div><div class="stat-label">Artikel</div></div>
             <div class="stat-card"><div class="stat-value">${heuteB.length}</div><div class="stat-label">Buchungen heute</div></div>
             <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(heuteB.reduce((s,b) => s+b.preis*b.menge, 0))}</div><div class="stat-label">Umsatz heute</div></div>
+        </div>
+        
+        <!-- GÄSTE-NACHRICHT/ANKÜNDIGUNG -->
+        <div onclick="Router.navigate('admin-nachricht')" style="
+            background: ${aktiveNachricht ? 'linear-gradient(135deg, #e74c3c, #c0392b)' : 'linear-gradient(135deg, #95a5a6, #7f8c8d)'};
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 2rem;">${aktiveNachricht ? '📢' : '💬'}</span>
+                    <div>
+                        <div style="font-weight: 700; font-size: 1.2rem;">
+                            ${aktiveNachricht ? '🔔 Nachricht aktiv!' : 'Gäste-Nachricht'}
+                        </div>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">
+                            ${aktiveNachricht 
+                                ? `"${aktiveNachricht.text.substring(0, 40)}${aktiveNachricht.text.length > 40 ? '...' : ''}" • Noch ${verbleibendeZeit}`
+                                : 'Wichtige Info an alle Gäste senden'}
+                        </div>
+                    </div>
+                </div>
+                <span style="font-size: 1.5rem;">→</span>
+            </div>
         </div>
         
         <!-- AUFFÜLLLISTE -->
@@ -3686,6 +4200,221 @@ window.deleteGruppe = async (id) => {
         await Gruppen.delete(id);
         Utils.showToast('Gruppe gelöscht', 'success');
         Router.navigate('admin-gruppen');
+    } catch (e) {
+        Utils.showToast(e.message, 'error');
+    }
+};
+
+// ============ GÄSTE-NACHRICHT VERWALTUNG ============
+Router.register('admin-nachricht', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    
+    const aktiveNachricht = await GastNachricht.getAktive();
+    const verbleibendeZeit = aktiveNachricht ? GastNachricht.getVerbleibendeZeit(aktiveNachricht) : null;
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📢 Gäste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        
+        <!-- INFO BOX -->
+        <div class="card mb-3" style="background:linear-gradient(135deg, #3498db, #2980b9);color:white;">
+            <div style="padding:20px;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                    <span style="font-size:2rem;">💡</span>
+                    <div>
+                        <div style="font-weight:700;font-size:1.1rem;">So funktioniert's</div>
+                        <div style="font-size:0.9rem;opacity:0.9;">
+                            Sende wichtige Nachrichten an alle Gäste auf der Login-Seite
+                        </div>
+                    </div>
+                </div>
+                <ul style="margin:0;padding-left:20px;font-size:0.9rem;opacity:0.95;">
+                    <li>Nachricht erscheint prominent auf der Login-Seite</li>
+                    <li>Automatisches Ablaufen nach <strong>18 Stunden</strong></li>
+                    <li>Gäste können die Nachricht wegklicken (nur für ihre Session)</li>
+                    <li>Du kannst die Nachricht jederzeit manuell deaktivieren</li>
+                </ul>
+            </div>
+        </div>
+        
+        ${aktiveNachricht ? `
+        <!-- AKTIVE NACHRICHT -->
+        <div class="card mb-3" style="border:3px solid #e74c3c;">
+            <div class="card-header" style="background:#e74c3c;color:white;">
+                <h2 class="card-title" style="margin:0;color:white;">🔔 Aktive Nachricht</h2>
+            </div>
+            <div class="card-body">
+                <div style="background:var(--color-stone-light);padding:16px;border-radius:8px;margin-bottom:16px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '🚨' : aktiveNachricht.typ === 'warnung' ? '⚠️' : 'ℹ️'}</span>
+                        <span style="background:${aktiveNachricht.typ === 'dringend' ? '#e74c3c' : aktiveNachricht.typ === 'warnung' ? '#f39c12' : '#3498db'};color:white;padding:2px 10px;border-radius:12px;font-size:0.85rem;font-weight:600;">
+                            ${aktiveNachricht.typ === 'dringend' ? 'DRINGEND' : aktiveNachricht.typ === 'warnung' ? 'Warnung' : 'Info'}
+                        </span>
+                    </div>
+                    <div style="font-size:1.2rem;font-weight:600;line-height:1.4;">
+                        "${aktiveNachricht.text}"
+                    </div>
+                </div>
+                
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                    <div style="text-align:center;padding:12px;background:var(--color-stone-light);border-radius:8px;">
+                        <div style="font-size:0.85rem;color:var(--color-stone-dark);">Erstellt am</div>
+                        <div style="font-weight:600;">${new Date(aktiveNachricht.erstellt_am).toLocaleString('de-AT')}</div>
+                    </div>
+                    <div style="text-align:center;padding:12px;background:#fff3cd;border-radius:8px;">
+                        <div style="font-size:0.85rem;color:#856404;">⏱️ Verbleibend</div>
+                        <div style="font-weight:700;color:#856404;font-size:1.1rem;">${verbleibendeZeit}</div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-danger btn-block" onclick="deaktiviereNachricht()" style="padding:16px;font-size:1.1rem;">
+                    ❌ Nachricht jetzt deaktivieren
+                </button>
+            </div>
+        </div>
+        ` : `
+        <!-- KEINE AKTIVE NACHRICHT -->
+        <div class="card mb-3" style="background:var(--color-stone-light);">
+            <div style="padding:40px;text-align:center;">
+                <div style="font-size:4rem;margin-bottom:16px;opacity:0.5;">📭</div>
+                <div style="font-size:1.2rem;font-weight:600;color:var(--color-stone-dark);">
+                    Keine aktive Nachricht
+                </div>
+                <div style="font-size:0.9rem;color:var(--color-stone-dark);margin-top:8px;">
+                    Erstelle eine neue Nachricht unten
+                </div>
+            </div>
+        </div>
+        `}
+        
+        <!-- NEUE NACHRICHT ERSTELLEN -->
+        <div class="card">
+            <div class="card-header" style="background:var(--color-alpine-green);color:white;">
+                <h2 class="card-title" style="margin:0;color:white;">✏️ Neue Nachricht erstellen</h2>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:600;">Nachrichtentext *</label>
+                    <textarea id="nachricht-text" class="form-input" rows="3" placeholder="z.B. Auto mit Kennzeichen W-12345 bitte umparken!" style="font-size:1.1rem;"></textarea>
+                    <small style="color:var(--color-stone-dark);">Halte die Nachricht kurz und prägnant</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:600;">Dringlichkeit</label>
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+                        <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('info')">
+                            <input type="radio" name="nachricht-typ" value="info" checked style="display:none;">
+                            <span style="font-size:2rem;margin-bottom:8px;">ℹ️</span>
+                            <span style="font-weight:600;">Info</span>
+                            <span style="font-size:0.8rem;color:var(--color-stone-dark);">Normal</span>
+                        </label>
+                        <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('warnung')">
+                            <input type="radio" name="nachricht-typ" value="warnung" style="display:none;">
+                            <span style="font-size:2rem;margin-bottom:8px;">⚠️</span>
+                            <span style="font-weight:600;">Warnung</span>
+                            <span style="font-size:0.8rem;color:var(--color-stone-dark);">Auffällig</span>
+                        </label>
+                        <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('dringend')">
+                            <input type="radio" name="nachricht-typ" value="dringend" style="display:none;">
+                            <span style="font-size:2rem;margin-bottom:8px;">🚨</span>
+                            <span style="font-weight:600;">Dringend</span>
+                            <span style="font-size:0.8rem;color:var(--color-stone-dark);">Blinkt!</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary btn-block" onclick="erstelleNachricht()" style="padding:20px;font-size:1.2rem;margin-top:16px;">
+                    📢 Nachricht aktivieren
+                </button>
+                
+                ${aktiveNachricht ? `
+                <p style="text-align:center;margin-top:12px;color:#e74c3c;font-size:0.9rem;">
+                    ⚠️ Die aktuelle Nachricht wird ersetzt!
+                </p>
+                ` : ''}
+            </div>
+        </div>
+        
+        <!-- BEISPIELE -->
+        <div class="card mt-3" style="background:var(--color-stone-light);">
+            <div style="padding:16px;">
+                <strong>📝 Beispiel-Nachrichten:</strong>
+                <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+                    <button onclick="setBeispiel('Auto mit Kennzeichen W-12345 bitte umparken!')" style="text-align:left;padding:10px;background:white;border:1px solid var(--color-stone-medium);border-radius:8px;cursor:pointer;">
+                        🚗 "Auto mit Kennzeichen W-12345 bitte umparken!"
+                    </button>
+                    <button onclick="setBeispiel('Heute Abend 19:00 Uhr gemeinsames Grillen auf der Terrasse!')" style="text-align:left;padding:10px;background:white;border:1px solid var(--color-stone-medium);border-radius:8px;cursor:pointer;">
+                        🎉 "Heute Abend 19:00 Uhr gemeinsames Grillen auf der Terrasse!"
+                    </button>
+                    <button onclick="setBeispiel('Bitte Kühlschrank kontrollieren - es fehlen Getränke!')" style="text-align:left;padding:10px;background:white;border:1px solid var(--color-stone-medium);border-radius:8px;cursor:pointer;">
+                        🍺 "Bitte Kühlschrank kontrollieren - es fehlen Getränke!"
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>`);
+    
+    // Initial den ersten Typ markieren
+    setTimeout(() => selectTyp('info'), 100);
+});
+
+// Typ auswählen (visuelle Markierung)
+window.selectTyp = (typ) => {
+    const labels = document.querySelectorAll('label[onclick^="selectTyp"]');
+    labels.forEach(label => {
+        label.style.borderColor = 'transparent';
+        label.style.background = 'var(--color-stone-light)';
+    });
+    
+    const colors = {
+        info: '#3498db',
+        warnung: '#f39c12',
+        dringend: '#e74c3c'
+    };
+    
+    const input = document.querySelector(`input[value="${typ}"]`);
+    if (input) {
+        input.checked = true;
+        input.closest('label').style.borderColor = colors[typ];
+        input.closest('label').style.background = `${colors[typ]}20`;
+    }
+};
+
+// Beispiel-Text setzen
+window.setBeispiel = (text) => {
+    document.getElementById('nachricht-text').value = text;
+    Utils.showToast('Text eingefügt!', 'info');
+};
+
+// Nachricht erstellen
+window.erstelleNachricht = async () => {
+    const text = document.getElementById('nachricht-text')?.value?.trim();
+    const typ = document.querySelector('input[name="nachricht-typ"]:checked')?.value || 'info';
+    
+    if (!text) {
+        Utils.showToast('Bitte Nachrichtentext eingeben!', 'warning');
+        return;
+    }
+    
+    if (text.length > 200) {
+        Utils.showToast('Nachricht zu lang! Max. 200 Zeichen.', 'warning');
+        return;
+    }
+    
+    try {
+        await GastNachricht.erstellen(text, typ);
+        Router.navigate('admin-nachricht');
+    } catch (e) {
+        Utils.showToast(e.message, 'error');
+    }
+};
+
+// Nachricht deaktivieren
+window.deaktiviereNachricht = async () => {
+    if (!confirm('Nachricht wirklich deaktivieren?\n\nSie wird für alle Gäste sofort ausgeblendet.')) return;
+    
+    try {
+        await GastNachricht.deaktivieren();
+        Router.navigate('admin-nachricht');
     } catch (e) {
         Utils.showToast(e.message, 'error');
     }
