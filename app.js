@@ -382,6 +382,46 @@ const Utils = {
     formatDate: d => { const dt = d instanceof Date ? d : new Date(d); return dt.toLocaleDateString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric'}); },
     formatTime: d => (d instanceof Date ? d : new Date(d)).toTimeString().split(' ')[0],
     formatCurrency: a => new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(a),
+    
+    // Buchungsdatum basierend auf 7:00-7:00 Periode
+    // Buchungen zwischen 00:00 und 06:59 gehören noch zum Vortag
+    getBuchungsDatum() {
+        const jetzt = new Date();
+        const stunde = jetzt.getHours();
+        
+        // Vor 7 Uhr morgens? → Datum vom Vortag verwenden
+        if (stunde < 7) {
+            const gestern = new Date(jetzt);
+            gestern.setDate(gestern.getDate() - 1);
+            return this.formatDate(gestern);
+        }
+        
+        // Ab 7 Uhr → heutiges Datum
+        return this.formatDate(jetzt);
+    },
+    
+    // Aktuelles "Buchungs-Heute" (für Dashboard etc.)
+    getBuchungsHeute() {
+        return this.getBuchungsDatum();
+    },
+    
+    // Vortag relativ zum aktuellen Buchungsdatum (für fehlende Getränke)
+    getVortagBuchungsDatum() {
+        const jetzt = new Date();
+        const stunde = jetzt.getHours();
+        
+        // Basis-Datum berechnen
+        let basisDatum = new Date(jetzt);
+        if (stunde < 7) {
+            // Vor 7 Uhr: Basis ist gestern
+            basisDatum.setDate(basisDatum.getDate() - 1);
+        }
+        
+        // Davon nochmal einen Tag abziehen für "Vortag"
+        basisDatum.setDate(basisDatum.getDate() - 1);
+        return this.formatDate(basisDatum);
+    },
+    
     generateSalt: () => { const a = new Uint8Array(16); crypto.getRandomValues(a); return Array.from(a, b => b.toString(16).padStart(2,'0')).join(''); },
     async hashPassword(p, s='') { const d = new TextEncoder().encode(s+p); const h = await crypto.subtle.digest('SHA-256', d); return Array.from(new Uint8Array(h), b => b.toString(16).padStart(2,'0')).join(''); },
     showToast(msg, type='info') {
@@ -861,7 +901,7 @@ const Buchungen = {
             preis: parseFloat(artikel.preis),
             steuer_prozent: artikel.steuer_prozent || 10, 
             menge: parseInt(menge),
-            datum: Utils.formatDate(new Date()), 
+            datum: Utils.getBuchungsDatum(), // 7:00-7:00 Periode
             uhrzeit: Utils.formatTime(new Date()),
             erstellt_am: new Date().toISOString(), 
             exportiert: false,
@@ -1151,9 +1191,8 @@ const FehlendeGetraenke = {
         const artikel = await Artikel.getById(artikel_id);
         if (!artikel) throw new Error('Artikel nicht gefunden');
         
-        const gestern = new Date();
-        gestern.setDate(gestern.getDate() - 1);
-        const datumVortag = Utils.formatDate(gestern);
+        // Vortag relativ zum aktuellen Buchungstag (7:00-7:00 Periode)
+        const datumVortag = Utils.getVortagBuchungsDatum();
         
         const items = [];
         for (let i = 0; i < menge; i++) {
@@ -1408,7 +1447,7 @@ const Umlage = {
         // Preis pro Gast berechnen (aufgerundet auf 2 Dezimalen)
         const preisProGast = Math.ceil((artikel.preis / alleGaeste.length) * 100) / 100;
         
-        const heute = Utils.formatDate(new Date());
+        const heute = Utils.getBuchungsDatum(); // 7:00-7:00 Periode
         const uhrzeit = Utils.formatTime(new Date());
         
         // Für jeden Gast eine Buchung erstellen
@@ -2159,7 +2198,7 @@ Router.register('admin-dashboard', async () => {
     const guests = await RegisteredGuests.getAll();
     const artCount = await db.artikel.count();
     const bs = await Buchungen.getAll();
-    const heute = Utils.formatDate(new Date());
+    const heute = Utils.getBuchungsDatum(); // 7:00-7:00 Periode
     const heuteB = bs.filter(b => b.datum === heute);
     const nichtExp = bs.filter(b => !b.exportiert);
     const auffuellListe = await Buchungen.getAuffuellliste();
@@ -2825,7 +2864,7 @@ window.bucheUmlageFuerAlle = async () => {
         return;
     }
     
-    const heute = Utils.formatDate(new Date());
+    const heute = Utils.getBuchungsDatum(); // 7:00-7:00 Periode
     const uhrzeit = Utils.formatTime(new Date());
     
     // Für jeden Gast eine Buchung erstellen
