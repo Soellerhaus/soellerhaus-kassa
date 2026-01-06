@@ -3009,13 +3009,13 @@ Router.register('login', async () => {
     }
     
     // Gast-spezifische Nachrichten laden (GastNachrichten - mehrere pro Gast möglich)
+    // Gast kann Nachricht NICHT löschen - nur Admin kann das
     const gastNachrichten = await GastNachrichten.getAlleAktiven();
     const gastNachrichtenHtml = gastNachrichten.length ? `
     <div style="max-width:600px;margin:0 auto 24px;">
         ${gastNachrichten.map(n => {
             const verbleibend = Math.ceil((new Date(n.gueltig_bis) - new Date()) / (1000 * 60 * 60));
             const istDringend = verbleibend <= 3;
-            const erstelltUm = new Date(n.erstellt_am).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
             return `
             <div id="gast-nachricht-${n.id}" style="
                 background: linear-gradient(135deg, ${istDringend ? '#e74c3c, #c0392b' : '#3498db, #2980b9'});
@@ -3024,37 +3024,16 @@ Router.register('login', async () => {
                 margin-bottom: 12px;
                 color: white;
                 box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-                animation: nachrichtPulse 2s ease-in-out infinite;
+                ${istDringend ? 'animation: nachrichtPulse 2s ease-in-out infinite;' : ''}
             ">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                    <div style="flex:1;">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="font-size:1.5rem;">📢</span>
-                            <span style="font-weight:700;font-size:1.1rem;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;">
-                                ${n.gast_name}
-                            </span>
-                        </div>
-                        <div style="font-size:1.15rem;font-weight:500;line-height:1.4;margin-bottom:8px;">
-                            ${n.nachricht}
-                        </div>
-                        <div style="font-size:0.8rem;opacity:0.85;display:flex;gap:12px;flex-wrap:wrap;">
-                            <span>📅 ${erstelltUm}</span>
-                            <span>⏳ ${t('hours_visible', {h: verbleibend})}</span>
-                        </div>
-                    </div>
-                    <button onclick="dismissGastNachricht(${n.id})" style="
-                        background:rgba(255,255,255,0.3);
-                        border:none;
-                        color:white;
-                        width:36px;
-                        height:36px;
-                        border-radius:50%;
-                        cursor:pointer;
-                        font-size:1.2rem;
-                        font-weight:bold;
-                        margin-left:12px;
-                        flex-shrink:0;
-                    " title="${t('read_close')}">✓</button>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <span style="font-size:1.5rem;">📢</span>
+                    <span style="font-weight:700;font-size:1.1rem;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;">
+                        ${n.gast_name}
+                    </span>
+                </div>
+                <div style="font-size:1.15rem;font-weight:500;line-height:1.4;">
+                    ${n.nachricht}
                 </div>
             </div>`;
         }).join('')}
