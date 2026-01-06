@@ -3370,18 +3370,6 @@ Router.register('admin-dashboard', async () => {
                         <button class="btn" onclick="DataProtection.selectRestoreFile()" style="background:white;color:#e74c3c;border:none;padding:8px 16px;">📤 Datei wählen</button>
                     </div>
                     <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
-                        <h3 style="font-weight:600;margin-bottom:8px;">📤 Buchungen CSV</h3>
-                        <button class="btn btn-secondary" onclick="handleExportBuchungen()">Exportieren</button>
-                    </div>
-                    <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
-                        <h3 style="font-weight:600;margin-bottom:8px;">👥 Gäste Export</h3>
-                        <button class="btn btn-secondary" onclick="DataProtection.exportGuestsCSV()">CSV</button>
-                    </div>
-                    <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
-                        <h3 style="font-weight:600;margin-bottom:8px;">📦 Artikel Export</h3>
-                        <button class="btn btn-secondary" onclick="DataProtection.exportArticlesCSV()">CSV</button>
-                    </div>
-                    <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
                         <h3 style="font-weight:600;margin-bottom:8px;">🔧 Kategorien</h3>
                         <button class="btn btn-secondary" onclick="repairCategories()">Reparieren</button>
                     </div>
