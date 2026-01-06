@@ -167,6 +167,165 @@ const DataProtection = {
             try { await navigator.storage.persist(); } catch(e) {}
         }
     },
+    
+    // Letztes Backup-Datum abrufen
+    getLastBackupDate() {
+        const timestamp = localStorage.getItem('last_full_backup');
+        return timestamp ? new Date(parseInt(timestamp)) : null;
+    },
+    
+    // Backup-Datum setzen
+    setLastBackupDate() {
+        localStorage.setItem('last_full_backup', Date.now().toString());
+    },
+    
+    // Prüfen ob Backup nötig (>24h)
+    isBackupNeeded() {
+        const lastBackup = this.getLastBackupDate();
+        if (!lastBackup) return true;
+        const hoursSinceBackup = (Date.now() - lastBackup.getTime()) / (1000 * 60 * 60);
+        return hoursSinceBackup >= 24;
+    },
+    
+    // Formatiertes Datum des letzten Backups
+    getLastBackupText() {
+        const lastBackup = this.getLastBackupDate();
+        if (!lastBackup) return 'Noch nie';
+        
+        const now = new Date();
+        const diff = now - lastBackup;
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const days = Math.floor(hours / 24);
+        
+        if (days > 0) {
+            return `Vor ${days} Tag${days > 1 ? 'en' : ''} (${lastBackup.toLocaleDateString('de-AT')}, ${lastBackup.toLocaleTimeString('de-AT', {hour:'2-digit', minute:'2-digit'})})`;
+        } else if (hours > 0) {
+            return `Vor ${hours} Stunde${hours > 1 ? 'n' : ''} (${lastBackup.toLocaleTimeString('de-AT', {hour:'2-digit', minute:'2-digit'})})`;
+        } else {
+            return `Gerade eben`;
+        }
+    },
+    
+    // Vollständiges Backup mit Supabase-Daten
+    async createFullBackup() {
+        try {
+            // Lokale Daten
+            let data = {
+                gaeste: await db.gaeste.toArray(),
+                buchungen: await db.buchungen.toArray(),
+                registeredGuests: await db.registeredGuests.toArray(),
+                artikel: await db.artikel.toArray(),
+                kategorien: await db.kategorien.toArray(),
+                fehlendeGetraenke: await db.fehlendeGetraenke.toArray(),
+                gruppen: await db.gruppen.toArray(),
+                settings: await db.settings.toArray(),
+                exportDatum: new Date().toISOString(),
+                version: '3.0',
+                quelle: 'lokal'
+            };
+            
+            // Wenn online, Supabase-Daten hinzufügen
+            if (supabaseClient && isOnline) {
+                try {
+                    const [profiles, buchungen, artikel, fehlende] = await Promise.all([
+                        supabaseClient.from('profiles').select('*'),
+                        supabaseClient.from('buchungen').select('*'),
+                        supabaseClient.from('artikel').select('*'),
+                        supabaseClient.from('fehlende_getraenke').select('*')
+                    ]);
+                    
+                    data.supabase = {
+                        profiles: profiles.data || [],
+                        buchungen: buchungen.data || [],
+                        artikel: artikel.data || [],
+                        fehlende_getraenke: fehlende.data || []
+                    };
+                    data.quelle = 'lokal+supabase';
+                    console.log('☁️ Supabase-Daten im Backup:', {
+                        profiles: data.supabase.profiles.length,
+                        buchungen: data.supabase.buchungen.length,
+                        artikel: data.supabase.artikel.length
+                    });
+                } catch(e) {
+                    console.warn('Supabase-Daten konnten nicht geladen werden:', e);
+                }
+            }
+            
+            // Statistiken hinzufügen
+            data.statistik = {
+                anzahlGaeste: data.registeredGuests.filter(g => !g.geloescht).length,
+                anzahlArtikel: data.artikel.filter(a => a.aktiv).length,
+                anzahlBuchungen: data.buchungen.filter(b => !b.storniert).length,
+                gesamtUmsatz: data.buchungen.filter(b => !b.storniert).reduce((s,b) => s + (b.preis * b.menge), 0)
+            };
+            
+            // JSON erstellen und herunterladen
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            
+            const heute = new Date();
+            const datumStr = `${heute.getFullYear()}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getDate().toString().padStart(2,'0')}`;
+            a.download = `Soellerhaus_Backup_${datumStr}.json`;
+            a.click();
+            
+            // Backup-Datum speichern
+            this.setLastBackupDate();
+            
+            Utils.showToast(`✅ Vollständiges Backup erstellt!\n${data.statistik.anzahlGaeste} Gäste, ${data.statistik.anzahlArtikel} Artikel, ${data.statistik.anzahlBuchungen} Buchungen`, 'success');
+            return true;
+        } catch (e) {
+            console.error('Backup Fehler:', e);
+            Utils.showToast('Backup fehlgeschlagen: ' + e.message, 'error');
+            return false;
+        }
+    },
+    
+    // Backup-Erinnerung Modal anzeigen
+    showBackupReminder() {
+        const lastBackupText = this.getLastBackupText();
+        
+        const modal = document.createElement('div');
+        modal.id = 'backup-reminder-modal';
+        modal.innerHTML = `
+            <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;">
+                <div style="background:white;border-radius:16px;padding:24px;max-width:450px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                    <div style="text-align:center;margin-bottom:20px;">
+                        <div style="font-size:4rem;margin-bottom:12px;">💾</div>
+                        <h2 style="color:#2C5F7C;margin-bottom:8px;">Backup empfohlen</h2>
+                        <p style="color:#666;font-size:0.95rem;">Ihr letztes Backup ist älter als 24 Stunden.</p>
+                    </div>
+                    
+                    <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin-bottom:20px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                            <span style="color:#666;">Letztes Backup:</span>
+                            <span style="font-weight:600;">${lastBackupText}</span>
+                        </div>
+                        <div style="font-size:0.85rem;color:#888;margin-top:12px;">
+                            ℹ️ Das Backup enthält alle Gäste, Artikel, Buchungen und Einstellungen 
+                            ${isOnline ? '(inkl. Cloud-Daten von Supabase)' : '(nur lokale Daten - offline)'}.
+                        </div>
+                    </div>
+                    
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                        <button onclick="DataProtection.createFullBackup();document.getElementById('backup-reminder-modal').remove();" 
+                                style="width:100%;padding:16px;background:#27ae60;color:white;border:none;border-radius:10px;font-size:1.1rem;font-weight:600;cursor:pointer;">
+                            📥 Jetzt Backup erstellen
+                        </button>
+                        <button onclick="document.getElementById('backup-reminder-modal').remove();" 
+                                style="width:100%;padding:12px;background:#f0f0f0;color:#666;border:none;border-radius:10px;font-size:1rem;cursor:pointer;">
+                            Später erinnern
+                        </button>
+                        <button onclick="DataProtection.setLastBackupDate();document.getElementById('backup-reminder-modal').remove();Utils.showToast('Erinnerung für 24h deaktiviert', 'info');" 
+                                style="width:100%;padding:10px;background:transparent;color:#999;border:none;font-size:0.9rem;cursor:pointer;">
+                            Heute nicht mehr erinnern
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
 
     async manualExport() {
         const data = {
@@ -2057,7 +2216,8 @@ Router.register('admin-dashboard', async () => {
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
                     <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
                         <h3 style="font-weight:600;margin-bottom:8px;">💾 Backup</h3>
-                        <button class="btn btn-secondary" onclick="DataProtection.manualExport()">JSON herunterladen</button>
+                        <div style="font-size:0.8rem;color:#666;margin-bottom:8px;">Letztes: ${DataProtection.getLastBackupText()}</div>
+                        <button class="btn btn-secondary" onclick="DataProtection.createFullBackup()">📥 Vollständig</button>
                     </div>
                     <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
                         <h3 style="font-weight:600;margin-bottom:8px;">📤 Buchungen CSV</h3>
@@ -2086,6 +2246,13 @@ Router.register('admin-dashboard', async () => {
             </a>
         </div>
     </div>`);
+    
+    // Backup-Erinnerung prüfen (nach 24h)
+    setTimeout(() => {
+        if (DataProtection.isBackupNeeded()) {
+            DataProtection.showBackupReminder();
+        }
+    }, 500);
 });
 
 // Kategorien reparieren
