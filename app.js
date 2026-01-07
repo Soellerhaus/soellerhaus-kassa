@@ -1030,14 +1030,14 @@ const Utils = {
         const jetzt = new Date();
         const stunde = jetzt.getHours();
         
-        // Vor 7 Uhr morgens? →’ Datum vom Vortag verwenden
+        // Vor 7 Uhr morgens? → Datum vom Vortag verwenden
         if (stunde < 7) {
             const gestern = new Date(jetzt);
             gestern.setDate(gestern.getDate() - 1);
             return this.formatDate(gestern);
         }
         
-        // Ab 7 Uhr →’ heutiges Datum
+        // Ab 7 Uhr → heutiges Datum
         return this.formatDate(jetzt);
     },
     
@@ -3250,7 +3250,7 @@ const UI = {
     },
     renderNameList(gaeste, onSelect) {
         if (!gaeste?.length) return `<div class="name-list-empty"><p>Keine Einträge</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">Zurück</button></div>`;
-        return `<div class="name-list-container"><div class="name-list-title">Wählen Sie Ihren Namen:</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="${onSelect}('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">Zurück</button></div>`;
+        return `<div class="name-list-container"><div class="name-list-title">Wählen Sie Ihren Namen:</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="${onSelect}('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">Zurück</button></div>`;
     }
 };
 
@@ -3358,7 +3358,7 @@ Router.register('register', () => {
             </div>
             <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">✓ ${t('register_btn')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">→ ${t('back')}</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← ${t('back')}</button>
     </div></div>`);
 });
 
@@ -3387,7 +3387,7 @@ Router.register('name-select', async () => {
     
     const nameListHtml = !gaeste?.length 
         ? `<div class="name-list-empty"><p>${t('no_entries')}</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">${t('back')}</button></div>`
-        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">${t('back')}</button></div>`;
+        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">${t('back')}</button></div>`;
     
     UI.render(`${langBtn}<div class="main-content"><div style="max-width:600px;margin:40px auto;"><h1 class="page-title" style="text-align:center;">${t('letter')}: ${window.currentLetter}</h1>${nameListHtml}</div></div>`);
 });
@@ -3411,7 +3411,7 @@ Router.register('pin-entry', () => {
             </div>
             <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;">✓ ${t('login')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">→ ${t('back')}</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">← ${t('back')}</button>
     </div></div>`);
 });
 
@@ -3521,7 +3521,7 @@ window.selectGruppe = async (gruppeId, gruppeName) => {
 };
 
 Router.register('admin-login', () => {
-    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;">🔐 Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">→ Zurück</button></div></div>`);
+    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;">🔐 Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← Zurück</button></div></div>`);
     setTimeout(() => document.getElementById('admin-password')?.focus(), 100);
 });
 
@@ -3606,7 +3606,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                     </div>
                 </div>
-                <span style="font-size: 1.5rem;">→’</span>
+                <span style="font-size: 1.5rem;">→</span>
             </div>
         </div>
         
@@ -3756,7 +3756,7 @@ Router.register('admin-auffuellliste', async () => {
     
     const total = liste.reduce((s, i) => s + i.menge, 0);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🍺 Auffüllliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🍺 Auffüllliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:20px;text-align:center;">
@@ -3779,7 +3779,7 @@ Router.register('admin-auffuellliste', async () => {
             <div style="padding:16px;">
                 <p style="margin:0;color:#666;font-size:0.9rem;">
                     💡 <strong>Hinweis:</strong> Die Auffüllliste ist UNABHÄNGIG vom Registrierkasse-Export.<br>
-                    Export für Registrierkasse →’ Im Admin Dashboard
+                    Export für Registrierkasse → Im Admin Dashboard
                 </p>
             </div>
         </div>
@@ -3910,7 +3910,7 @@ Router.register('admin-alle-buchungen', async () => {
     // Sortiert nach Datum (neueste zuerst)
     const sortedDates = Object.keys(byDatum).sort().reverse();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📋 Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📋 Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:16px;text-align:center;">
@@ -4085,7 +4085,7 @@ Router.register('admin-fehlende', async () => {
         if (byKat[a.kategorie_id]) byKat[a.kategorie_id].artikel.push(a);
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">⚠  Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">⚠  Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#f39c12;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -4170,7 +4170,7 @@ Router.register('admin-umlage', async () => {
     const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
     const preisProGast = totalGuests > 0 ? Math.ceil((gesamtPreis / totalGuests) * 100) / 100 : gesamtPreis;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">💰 Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">💰 Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-danger);color:white;">
             <div style="padding:20px;text-align:center;">
@@ -4332,7 +4332,7 @@ Router.register('admin-notfall-export', async () => {
     // Aktuelle letzte ID
     const lastExportId = ExportService.getLastExportId();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📧 Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📧 Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;">
@@ -4576,7 +4576,7 @@ Router.register('admin-gruppen', async () => {
     const gruppen = await Gruppen.getAll();
     const isAktiv = await Gruppen.isAbfrageAktiv();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <!-- TOGGLE: Gruppenabfrage aktiv -->
         <div class="card mb-3" style="background:${isAktiv ? 'var(--color-alpine-green)' : '#95a5a6'};color:white;">
@@ -4723,7 +4723,7 @@ Router.register('admin-preismodus', async () => {
     const currentModus = await PreisModus.getModus();
     const isHP = currentModus === PreisModus.HP;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">💰 Preismodus</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">💰 Preismodus</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- AKTUELLER STATUS -->
@@ -4813,7 +4813,7 @@ Router.register('admin-nachricht', async () => {
     const aktiveNachricht = await GastNachricht.getAktive();
     const verbleibendeZeit = aktiveNachricht ? GastNachricht.getVerbleibendeZeit(aktiveNachricht) : null;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📢 Gäste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📢 Gäste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- INFO BOX -->
@@ -5090,7 +5090,7 @@ Router.register('admin-guests', async () => {
     const gruppen = await db.gruppen.toArray();
     const gruppenAktiv = gruppen.filter(g => g.aktiv);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <style>
             .switch { position:relative; display:inline-block; width:50px; height:26px; }
@@ -5262,7 +5262,7 @@ Router.register('admin-guests-inaktiv', async () => {
         guests = all.filter(g => !g.geloescht && g.aktiv === false);
     }
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">→</button><div class="header-title">📋 Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">→</button><div class="header-title">📋 Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -5944,7 +5944,7 @@ Router.register('admin-articles', async () => {
         });
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <style>
         .switch { position:relative; display:inline-block; width:50px; height:26px; }
         .switch input { opacity:0; width:0; height:0; }
@@ -6140,7 +6140,7 @@ Router.register('buchen', async () => {
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--color-stone-light);border-radius:8px;margin-bottom:4px;">
                         <div>
                             <div style="font-weight:600;">${b.artikel_name}</div>
-                            <div style="font-size:0.8rem;color:var(--color-stone-dark);">🕐 ${b.uhrzeit?.substring(0,5) || ''} • ${b.menge}×</div>
+                            <div style="font-size:0.8rem;color:var(--color-stone-dark);">🕐 ${b.uhrzeit?.substring(0,5) || ''} • ${b.menge}×</div>
                         </div>
                         <div style="font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(b.preis * b.menge)}</div>
                     </div>
@@ -6706,7 +6706,7 @@ window.changeArtikelId = async (alteId) => {
         artikelCache = null;
         await DataProtection.createBackup();
         
-        Utils.showToast(`✅ Artikel-ID geändert: ${alteId} →’ ${neueId}`, 'success');
+        Utils.showToast(`✅ Artikel-ID geändert: ${alteId} → ${neueId}`, 'success');
         Router.navigate('admin-articles');
     } catch (e) {
         console.error('ID ändern Fehler:', e);
