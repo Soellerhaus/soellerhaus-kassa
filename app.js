@@ -960,24 +960,6 @@ const GastNachricht = {
                 }
             </style>
             
-            <button onclick="GastNachricht.schliessen()" style="
-                position: absolute;
-                top: 10px;
-                right: 10px;
-                background: rgba(255,255,255,0.3);
-                border: none;
-                color: white;
-                width: 32px;
-                height: 32px;
-                border-radius: 50%;
-                cursor: pointer;
-                font-size: 16px;
-                font-weight: bold;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            ">✕</button>
-            
             <div style="display: flex; align-items: flex-start; gap: 12px;">
                 <div class="nachricht-icon" style="font-size: ${isDringend ? '2.5rem' : '2rem'}; line-height: 1;">${icon}</div>
                 <div style="flex: 1;">
@@ -986,10 +968,6 @@ const GastNachricht = {
                     </div>
                     <div class="nachricht-text" style="font-size: ${isDringend ? '1.3rem' : '1.15rem'}; line-height: 1.4; font-weight: ${isDringend ? '600' : '400'};">
                         ${nachricht.text}
-                    </div>
-                    <div style="margin-top: 12px; font-size: 0.85rem; opacity: 0.9; display: flex; align-items: center; gap: 8px;">
-                        <span>⏱️ Noch ${verbleibend} sichtbar</span>
-                        <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;">Klicke ✕ zum Schließen</span>
                     </div>
                 </div>
             </div>
