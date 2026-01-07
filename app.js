@@ -30,7 +30,7 @@ function initSupabase() {
         console.log('✅ Supabase Client initialisiert');
         return true;
     }
-    console.warn('âš  Supabase nicht verfügbar - Offline-Modus');
+    console.warn('⚠  Supabase nicht verfügbar - Offline-Modus');
     return false;
 }
 
@@ -269,7 +269,7 @@ const DataProtection = {
                         fehlende_getraenke: fehlende.data || []
                     };
                     data.quelle = 'lokal+supabase';
-                    console.log('â˜ï¸ Supabase-Daten im Backup:', {
+                    console.log('☁️ Supabase-Daten im Backup:', {
                         profiles: data.supabase.profiles.length,
                         buchungen: data.supabase.buchungen.length,
                         artikel: data.supabase.artikel.length
@@ -330,7 +330,7 @@ const DataProtection = {
                             <span style="font-weight:600;">${lastBackupText}</span>
                         </div>
                         <div style="font-size:0.85rem;color:#888;margin-top:12px;">
-                            â„¹ï¸ Das Backup enthält alle Gäste, Artikel, Buchungen und Einstellungen 
+                            ℹï¸ Das Backup enthält alle Gäste, Artikel, Buchungen und Einstellungen 
                             ${isOnline ? '(inkl. Cloud-Daten von Supabase)' : '(nur lokale Daten - offline)'}.
                         </div>
                     </div>
@@ -471,7 +471,7 @@ const DataProtection = {
                             </label>
                             <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
                                 <input type="checkbox" id="restore-fehlende" ${stats.fehlendeGetraenke === 0 ? 'disabled' : ''}>
-                                <span>âš ï¸ Fehlende <strong>(${stats.fehlendeGetraenke})</strong></span>
+                                <span>⚠ ï¸ Fehlende <strong>(${stats.fehlendeGetraenke})</strong></span>
                             </label>
                         </div>
                     </div>
@@ -500,7 +500,7 @@ const DataProtection = {
                     <!-- Warnung -->
                     <div style="padding:0 20px 20px;">
                         <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;display:flex;align-items:flex-start;gap:10px;">
-                            <span style="font-size:1.5rem;">âš ï¸</span>
+                            <span style="font-size:1.5rem;">⚠ ï¸</span>
                             <div style="font-size:0.85rem;color:#856404;">
                                 <strong>Wichtig:</strong> Erstellen Sie vor der Wiederherstellung ein aktuelles Backup der bestehenden Daten!
                             </div>
@@ -560,7 +560,7 @@ const DataProtection = {
         document.getElementById('restore-modal')?.remove();
         
         // Fortschrittsanzeige
-        Utils.showToast('â³ Wiederherstellung läuft...', 'info');
+        Utils.showToast('⏳ Wiederherstellung läuft...', 'info');
         
         try {
             let restored = { gaeste: 0, artikel: 0, buchungen: 0, kategorien: 0, gruppen: 0, fehlende: 0 };
@@ -906,8 +906,8 @@ const GastNachricht = {
         };
         
         const icons = {
-            info: 'â„¹ï¸',
-            warnung: 'âš ï¸',
+            info: 'ℹï¸',
+            warnung: '⚠ ï¸',
             dringend: '🚨'
         };
         
@@ -1030,14 +1030,14 @@ const Utils = {
         const jetzt = new Date();
         const stunde = jetzt.getHours();
         
-        // Vor 7 Uhr morgens? â†’ Datum vom Vortag verwenden
+        // Vor 7 Uhr morgens? →’ Datum vom Vortag verwenden
         if (stunde < 7) {
             const gestern = new Date(jetzt);
             gestern.setDate(gestern.getDate() - 1);
             return this.formatDate(gestern);
         }
         
-        // Ab 7 Uhr â†’ heutiges Datum
+        // Ab 7 Uhr →’ heutiges Datum
         return this.formatDate(jetzt);
     },
     
@@ -1142,7 +1142,7 @@ const i18n = {
             'message_from_team': 'Nachricht vom Team',
             'important_message': 'WICHTIGE NACHRICHT!',
             'hours_visible': 'Noch {h}h sichtbar',
-            'click_to_close': 'Klicke âœ• zum Schließen',
+            'click_to_close': 'Klicke ✕ zum Schließen',
             'read_close': 'Gelesen & Schließen',
             
             // Name-Auswahl
@@ -1225,7 +1225,7 @@ const i18n = {
             'message_from_team': 'Message from the team',
             'important_message': 'IMPORTANT MESSAGE!',
             'hours_visible': 'Visible for {h}h',
-            'click_to_close': 'Click âœ• to close',
+            'click_to_close': 'Click ✕ to close',
             'read_close': 'Read & Close',
             
             // Name selection
@@ -1521,7 +1521,7 @@ const RegisteredGuests = {
             }
             
             if (!pinSaved) {
-                console.error('âŒ PIN konnte nicht in Supabase gespeichert werden!');
+                console.error('❌ PIN konnte nicht in Supabase gespeichert werden!');
             }
             
             // Profile laden zur Bestätigung
@@ -1706,7 +1706,7 @@ const RegisteredGuests = {
                     .order('display_name');
                 
                 if (error) {
-                    console.error('âŒ Supabase Fehler:', error);
+                    console.error('❌ Supabase Fehler:', error);
                 } else if (data) {
                     // Client-seitig filtern: Buchstabe + nicht gelöscht + aktiv
                     const filtered = data.filter(p => {
@@ -1736,7 +1736,7 @@ const RegisteredGuests = {
                     return [];
                 }
             } catch(e) {
-                console.error('âŒ Supabase error:', e);
+                console.error('❌ Supabase error:', e);
             }
         }
         
@@ -1919,7 +1919,7 @@ const Buchungen = {
         }
         
         if (!userId) {
-            console.error('âŒ KEINE USER ID GEFUNDEN!', State.currentUser);
+            console.error('❌ KEINE USER ID GEFUNDEN!', State.currentUser);
             throw new Error('Benutzer-ID nicht gefunden - bitte neu anmelden');
         }
         
@@ -1978,7 +1978,7 @@ const Buchungen = {
                 } else {
                     const { data, error } = await supabaseClient.from('buchungen').insert(b).select();
                 if (error) {
-                    console.error('âŒ Supabase insert error:', error.message, error.details, error.hint);
+                    console.error('❌ Supabase insert error:', error.message, error.details, error.hint);
                     await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
                 } else {
                     console.log('✅ Supabase insert OK:', data);
@@ -1986,11 +1986,11 @@ const Buchungen = {
                 }
                 }
             } catch(e) {
-                console.error('âŒ Buchung sync error:', e);
+                console.error('❌ Buchung sync error:', e);
                 await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
             }
         } else {
-            console.log('âš  Offline oder kein Supabase Client');
+            console.log('⚠  Offline oder kein Supabase Client');
         }
         
         await DataProtection.createBackup();
@@ -3250,7 +3250,7 @@ const UI = {
     },
     renderNameList(gaeste, onSelect) {
         if (!gaeste?.length) return `<div class="name-list-empty"><p>Keine Einträge</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">Zurück</button></div>`;
-        return `<div class="name-list-container"><div class="name-list-title">Wählen Sie Ihren Namen:</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="${onSelect}('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">â†’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">Zurück</button></div>`;
+        return `<div class="name-list-container"><div class="name-list-title">Wählen Sie Ihren Namen:</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="${onSelect}('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">Zurück</button></div>`;
     }
 };
 
@@ -3316,7 +3316,7 @@ Router.register('login', async () => {
     const fehlendeHtml = fehlendeList.length ? `
     <div style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:24px;color:white;max-width:600px;margin:0 auto 24px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <span style="font-size:1.3rem;">âš </span>
+            <span style="font-size:1.3rem;">⚠ </span>
             <div style="font-weight:700;">${t('missing_drinks')}</div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
@@ -3353,12 +3353,12 @@ Router.register('register', () => {
                     ${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pin-btn" onclick="handleRegisterPinInput('${n}')">${n}</button>`).join('')}
                     <button type="button" class="pin-btn" style="visibility:hidden;"></button>
                     <button type="button" class="pin-btn" onclick="handleRegisterPinInput('0')">0</button>
-                    <button type="button" class="pin-btn pin-btn-delete" onclick="handleRegisterPinDelete()">âŒ</button>
+                    <button type="button" class="pin-btn pin-btn-delete" onclick="handleRegisterPinDelete()">❌</button>
                 </div>
             </div>
-            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">âœ” ${t('register_btn')}</button>
+            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">✓ ${t('register_btn')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">â† ${t('back')}</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">→ ${t('back')}</button>
     </div></div>`);
 });
 
@@ -3387,7 +3387,7 @@ Router.register('name-select', async () => {
     
     const nameListHtml = !gaeste?.length 
         ? `<div class="name-list-empty"><p>${t('no_entries')}</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">${t('back')}</button></div>`
-        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">â†’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">${t('back')}</button></div>`;
+        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">${t('back')}</button></div>`;
     
     UI.render(`${langBtn}<div class="main-content"><div style="max-width:600px;margin:40px auto;"><h1 class="page-title" style="text-align:center;">${t('letter')}: ${window.currentLetter}</h1>${nameListHtml}</div></div>`);
 });
@@ -3407,11 +3407,11 @@ Router.register('pin-entry', () => {
                 ${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pin-btn" onclick="handleLoginPinInput('${n}')">${n}</button>`).join('')}
                 <button type="button" class="pin-btn" style="visibility:hidden;"></button>
                 <button type="button" class="pin-btn" onclick="handleLoginPinInput('0')">0</button>
-                <button type="button" class="pin-btn pin-btn-delete" onclick="handleLoginPinDelete()">âŒ</button>
+                <button type="button" class="pin-btn pin-btn-delete" onclick="handleLoginPinDelete()">❌</button>
             </div>
-            <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;">âœ” ${t('login')}</button>
+            <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;">✓ ${t('login')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">â† ${t('back')}</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">→ ${t('back')}</button>
     </div></div>`);
 });
 
@@ -3521,7 +3521,7 @@ window.selectGruppe = async (gruppeId, gruppeName) => {
 };
 
 Router.register('admin-login', () => {
-    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;">🔐 Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">â† Zurück</button></div></div>`);
+    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;">🔐 Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">→ Zurück</button></div></div>`);
     setTimeout(() => document.getElementById('admin-password')?.focus(), 100);
 });
 
@@ -3606,7 +3606,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                     </div>
                 </div>
-                <span style="font-size: 1.5rem;">â†’</span>
+                <span style="font-size: 1.5rem;">→’</span>
             </div>
         </div>
         
@@ -3632,7 +3632,7 @@ Router.register('admin-dashboard', async () => {
         
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
-                âš  Fehlende Getränke<br><small>(${fehlendeOffen.length} offen)</small>
+                ⚠  Fehlende Getränke<br><small>(${fehlendeOffen.length} offen)</small>
             </button>
             <button class="btn btn-danger" onclick="Router.navigate('admin-umlage')" style="padding:16px;">
                 💰 Umlage buchen<br><small>(auf alle Gäste)</small>
@@ -3756,7 +3756,7 @@ Router.register('admin-auffuellliste', async () => {
     
     const total = liste.reduce((s, i) => s + i.menge, 0);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">🍺 Auffüllliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🍺 Auffüllliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:20px;text-align:center;">
@@ -3779,7 +3779,7 @@ Router.register('admin-auffuellliste', async () => {
             <div style="padding:16px;">
                 <p style="margin:0;color:#666;font-size:0.9rem;">
                     💡 <strong>Hinweis:</strong> Die Auffüllliste ist UNABHÄNGIG vom Registrierkasse-Export.<br>
-                    Export für Registrierkasse â†’ Im Admin Dashboard
+                    Export für Registrierkasse →’ Im Admin Dashboard
                 </p>
             </div>
         </div>
@@ -3871,7 +3871,7 @@ window.printAuffuellliste = async () => {
             
             <div class="footer">
                 Seollerhaus Kassa<br>
-                âœ” = aufgefüllt
+                ✓ = aufgefüllt
             </div>
         </body>
         </html>
@@ -3910,7 +3910,7 @@ Router.register('admin-alle-buchungen', async () => {
     // Sortiert nach Datum (neueste zuerst)
     const sortedDates = Object.keys(byDatum).sort().reverse();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">📋 Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📋 Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:16px;text-align:center;">
@@ -3928,7 +3928,7 @@ Router.register('admin-alle-buchungen', async () => {
                     Danach werden nur noch neue Buchungen angezeigt.
                 </p>
                 <button class="btn" onclick="handleGruppeAbgereist()" style="background:white;color:#e74c3c;font-weight:700;padding:12px 24px;">
-                    âœˆ Gruppe abreisen & Alle Buchungen abschließen
+                    ✈ Gruppe abreisen & Alle Buchungen abschließen
                 </button>
             </div>
         </div>
@@ -3985,7 +3985,7 @@ Router.register('admin-alle-buchungen', async () => {
 
 // Gruppe abgereist - Alle Buchungen exportieren und abschließen
 window.handleGruppeAbgereist = async () => {
-    if (!confirm('âš  ACHTUNG: Gruppe abreisen?\n\nDies wird:\n1. Alle Buchungen für die Registrierkasse exportieren\n2. Alle Buchungen als exportiert markieren\n3. Auffüllliste zurücksetzen\n\nFortfahren?')) return;
+    if (!confirm('⚠  ACHTUNG: Gruppe abreisen?\n\nDies wird:\n1. Alle Buchungen für die Registrierkasse exportieren\n2. Alle Buchungen als exportiert markieren\n3. Auffüllliste zurücksetzen\n\nFortfahren?')) return;
     
     try {
         // 1. Excel Export
@@ -4025,7 +4025,7 @@ window.handleAdminDeleteBuchung = async (buchungId) => {
 
 // Alle Buchungen eines Tages ENDGÜLTIG löschen
 window.handleDeleteBuchungenByDate = async (datum) => {
-    if (!confirm(`âš ï¸ ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGÜLTIG gelöscht!\n\nDies kann nicht rückgängig gemacht werden.\n\nFortfahren?`)) return;
+    if (!confirm(`⚠ ï¸ ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGÜLTIG gelöscht!\n\nDies kann nicht rückgängig gemacht werden.\n\nFortfahren?`)) return;
     
     try {
         // Buchungen von diesem Datum laden
@@ -4085,7 +4085,7 @@ Router.register('admin-fehlende', async () => {
         if (byKat[a.kategorie_id]) byKat[a.kategorie_id].artikel.push(a);
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">âš  Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">⚠  Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#f39c12;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -4170,7 +4170,7 @@ Router.register('admin-umlage', async () => {
     const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
     const preisProGast = totalGuests > 0 ? Math.ceil((gesamtPreis / totalGuests) * 100) / 100 : gesamtPreis;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">💰 Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">💰 Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-danger);color:white;">
             <div style="padding:20px;text-align:center;">
@@ -4182,7 +4182,7 @@ Router.register('admin-umlage', async () => {
         ${fehlendeOffen.length ? `
         <div class="card mb-3">
             <div class="card-header" style="background:#f39c12;color:white;">
-                <h3 style="margin:0;">âš  Fehlende Getränke (${fehlendeOffen.length})</h3>
+                <h3 style="margin:0;">⚠  Fehlende Getränke (${fehlendeOffen.length})</h3>
             </div>
             <div class="card-body">
                 ${fehlendeOffen.map(f => `
@@ -4332,11 +4332,11 @@ Router.register('admin-notfall-export', async () => {
     // Aktuelle letzte ID
     const lastExportId = ExportService.getLastExportId();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">📧 Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📧 Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;">
-                <div style="font-weight:700;">âš  Nur im Notfall verwenden</div>
+                <div style="font-weight:700;">⚠  Nur im Notfall verwenden</div>
                 <div style="font-size:0.9rem;opacity:0.9;">Exportiert Buchungen nach Datum (auch bereits exportierte)</div>
             </div>
         </div>
@@ -4390,7 +4390,7 @@ Router.register('admin-notfall-export', async () => {
         
         <div class="card" style="background:#f8f9fa;">
             <div style="padding:16px;">
-                <strong>â„¹ Info:</strong><br>
+                <strong>ℹ Info:</strong><br>
                 <small style="color:#888;">
                     • Verfügbare Tage: ${alleDaten.length}<br>
                     • Ältestes Datum: ${alleDaten[alleDaten.length-1] || '-'}<br>
@@ -4576,7 +4576,7 @@ Router.register('admin-gruppen', async () => {
     const gruppen = await Gruppen.getAll();
     const isAktiv = await Gruppen.isAbfrageAktiv();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <!-- TOGGLE: Gruppenabfrage aktiv -->
         <div class="card mb-3" style="background:${isAktiv ? 'var(--color-alpine-green)' : '#95a5a6'};color:white;">
@@ -4607,7 +4607,7 @@ Router.register('admin-gruppen', async () => {
                             <tr style="border-bottom:1px solid var(--color-stone-medium);">
                                 <td style="padding:16px;font-weight:600;font-size:1.1rem;">🏫 ${g.name}</td>
                                 <td style="padding:16px;text-align:right;">
-                                    <button class="btn btn-secondary" onclick="showEditGruppeModal(${g.id}, '${g.name}')" style="margin-right:8px;">âœ”</button>
+                                    <button class="btn btn-secondary" onclick="showEditGruppeModal(${g.id}, '${g.name}')" style="margin-right:8px;">✓</button>
                                     <button class="btn btn-danger" onclick="deleteGruppe(${g.id})">🗑</button>
                                 </td>
                             </tr>
@@ -4626,7 +4626,7 @@ Router.register('admin-gruppen', async () => {
         ${isAktiv && gruppen.length === 0 ? `
             <div class="card" style="background:#e74c3c;color:white;">
                 <div style="padding:16px;">
-                    âš  <strong>Achtung:</strong> Gruppenabfrage ist aktiv, aber keine Gruppen hinterlegt!
+                    ⚠  <strong>Achtung:</strong> Gruppenabfrage ist aktiv, aber keine Gruppen hinterlegt!
                     <br>Gäste können sich nicht anmelden, bis mindestens eine Gruppe existiert.
                 </div>
             </div>
@@ -4723,7 +4723,7 @@ Router.register('admin-preismodus', async () => {
     const currentModus = await PreisModus.getModus();
     const isHP = currentModus === PreisModus.HP;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">💰 Preismodus</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">💰 Preismodus</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- AKTUELLER STATUS -->
@@ -4760,7 +4760,7 @@ Router.register('admin-preismodus', async () => {
                         <div style="font-size:2.5rem;margin-bottom:8px;">🏠 </div>
                         <div style="font-weight:700;font-size:1.1rem;">Selbstversorger</div>
                         <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">Standard-Preise</div>
-                        ${!isHP ? '<div style="margin-top:8px;font-weight:bold;">âœ” AKTIV</div>' : ''}
+                        ${!isHP ? '<div style="margin-top:8px;font-weight:bold;">✓ AKTIV</div>' : ''}
                     </button>
                     
                     <button onclick="setPreismodus('hp')" style="
@@ -4775,7 +4775,7 @@ Router.register('admin-preismodus', async () => {
                         <div style="font-size:2.5rem;margin-bottom:8px;">🍽️</div>
                         <div style="font-weight:700;font-size:1.1rem;">Halbpension (HP)</div>
                         <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">HP-Preise</div>
-                        ${isHP ? '<div style="margin-top:8px;font-weight:bold;">âœ” AKTIV</div>' : ''}
+                        ${isHP ? '<div style="margin-top:8px;font-weight:bold;">✓ AKTIV</div>' : ''}
                     </button>
                 </div>
             </div>
@@ -4813,7 +4813,7 @@ Router.register('admin-nachricht', async () => {
     const aktiveNachricht = await GastNachricht.getAktive();
     const verbleibendeZeit = aktiveNachricht ? GastNachricht.getVerbleibendeZeit(aktiveNachricht) : null;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">📢 Gäste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📢 Gäste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- INFO BOX -->
@@ -4846,7 +4846,7 @@ Router.register('admin-nachricht', async () => {
             <div class="card-body">
                 <div style="background:var(--color-stone-light);padding:16px;border-radius:8px;margin-bottom:16px;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '🚨' : aktiveNachricht.typ === 'warnung' ? 'âš ï¸' : 'â„¹ï¸'}</span>
+                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '🚨' : aktiveNachricht.typ === 'warnung' ? '⚠ ï¸' : 'ℹï¸'}</span>
                         <span style="background:${aktiveNachricht.typ === 'dringend' ? '#e74c3c' : aktiveNachricht.typ === 'warnung' ? '#f39c12' : '#3498db'};color:white;padding:2px 10px;border-radius:12px;font-size:0.85rem;font-weight:600;">
                             ${aktiveNachricht.typ === 'dringend' ? 'DRINGEND' : aktiveNachricht.typ === 'warnung' ? 'Warnung' : 'Info'}
                         </span>
@@ -4862,13 +4862,13 @@ Router.register('admin-nachricht', async () => {
                         <div style="font-weight:600;">${new Date(aktiveNachricht.erstellt_am).toLocaleString('de-AT')}</div>
                     </div>
                     <div style="text-align:center;padding:12px;background:#fff3cd;border-radius:8px;">
-                        <div style="font-size:0.85rem;color:#856404;">â±ï¸ Verbleibend</div>
+                        <div style="font-size:0.85rem;color:#856404;">⏱️ Verbleibend</div>
                         <div style="font-weight:700;color:#856404;font-size:1.1rem;">${verbleibendeZeit}</div>
                     </div>
                 </div>
                 
                 <button class="btn btn-danger btn-block" onclick="deaktiviereNachricht()" style="padding:16px;font-size:1.1rem;">
-                    âŒ Nachricht jetzt deaktivieren
+                    ❌ Nachricht jetzt deaktivieren
                 </button>
             </div>
         </div>
@@ -4890,7 +4890,7 @@ Router.register('admin-nachricht', async () => {
         <!-- NEUE NACHRICHT ERSTELLEN -->
         <div class="card">
             <div class="card-header" style="background:var(--color-alpine-green);color:white;">
-                <h2 class="card-title" style="margin:0;color:white;">âœï¸ Neue Nachricht erstellen</h2>
+                <h2 class="card-title" style="margin:0;color:white;">✏️ Neue Nachricht erstellen</h2>
             </div>
             <div class="card-body">
                 <div class="form-group">
@@ -4904,13 +4904,13 @@ Router.register('admin-nachricht', async () => {
                     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
                         <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('info')">
                             <input type="radio" name="nachricht-typ" value="info" checked style="display:none;">
-                            <span style="font-size:2rem;margin-bottom:8px;">â„¹ï¸</span>
+                            <span style="font-size:2rem;margin-bottom:8px;">ℹï¸</span>
                             <span style="font-weight:600;">Info</span>
                             <span style="font-size:0.8rem;color:var(--color-stone-dark);">Normal</span>
                         </label>
                         <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('warnung')">
                             <input type="radio" name="nachricht-typ" value="warnung" style="display:none;">
-                            <span style="font-size:2rem;margin-bottom:8px;">âš ï¸</span>
+                            <span style="font-size:2rem;margin-bottom:8px;">⚠ ï¸</span>
                             <span style="font-weight:600;">Warnung</span>
                             <span style="font-size:0.8rem;color:var(--color-stone-dark);">Auffällig</span>
                         </label>
@@ -4929,7 +4929,7 @@ Router.register('admin-nachricht', async () => {
                 
                 ${aktiveNachricht ? `
                 <p style="text-align:center;margin-top:12px;color:#e74c3c;font-size:0.9rem;">
-                    âš ï¸ Die aktuelle Nachricht wird ersetzt!
+                    ⚠ ï¸ Die aktuelle Nachricht wird ersetzt!
                 </p>
                 ` : ''}
             </div>
@@ -5065,7 +5065,7 @@ Router.register('admin-guests', async () => {
     if (guests.length === 0) {
         guests = await db.registeredGuests.toArray();
         guests = guests.filter(g => !g.geloescht && g.aktiv !== false);
-        console.log('âš ï¸ Gäste von lokalem Cache geladen:', guests.length);
+        console.log('⚠ ï¸ Gäste von lokalem Cache geladen:', guests.length);
     }
     
     // Inaktive Gäste zählen (für Button)
@@ -5090,7 +5090,7 @@ Router.register('admin-guests', async () => {
     const gruppen = await db.gruppen.toArray();
     const gruppenAktiv = gruppen.filter(g => g.aktiv);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <style>
             .switch { position:relative; display:inline-block; width:50px; height:26px; }
@@ -5153,7 +5153,7 @@ Router.register('admin-guests', async () => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
                             const pw = g.passwort || g.passwordHash || g.pin_hash;
-                            const pwDisplay = pw ? pw : '<span style="color:#e74c3c;">âš  KEINE</span>';
+                            const pwDisplay = pw ? pw : '<span style="color:#e74c3c;">⚠  KEINE</span>';
                             const pwStyle = pw ? 'color:#2c3e50;' : 'color:#e74c3c;';
                             const ausnahme = g.ausnahmeumlage || false;
                             const createdAt = g.created_at || g.createdAt;
@@ -5175,7 +5175,7 @@ Router.register('admin-guests', async () => {
                                 </td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;white-space:nowrap;">
                                     <button class="btn btn-primary" onclick="adminBuchenFuerGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="Für diesen Gast buchen">🍺</button>
-                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">âœï¸</button>
+                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
                                     <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Löschen">🗑</button>
                                 </td>
                             </tr>`;
@@ -5262,7 +5262,7 @@ Router.register('admin-guests-inaktiv', async () => {
         guests = all.filter(g => !g.geloescht && g.aktiv === false);
     }
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">â†</button><div class="header-title">📋 Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">→</button><div class="header-title">📋 Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -5925,7 +5925,7 @@ Router.register('admin-articles', async () => {
                 </label>
             </td>
             <td style="text-align:right;white-space:nowrap;">
-                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">âœï¸</button>
+                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✏️</button>
                 <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">🗑</button>
             </td>
         </tr>`;
@@ -5944,7 +5944,7 @@ Router.register('admin-articles', async () => {
         });
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <style>
         .switch { position:relative; display:inline-block; width:50px; height:26px; }
         .switch input { opacity:0; width:0; height:0; }
@@ -6127,7 +6127,7 @@ Router.register('buchen', async () => {
                 </div>
                 <div style="text-align:right;color:white;">
                     <div style="font-size:1.5rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
-                    <div id="buchungen-arrow" style="font-size:1.2rem;">â–¼</div>
+                    <div id="buchungen-arrow" style="font-size:1.2rem;">▼</div>
                 </div>
             </div>
             <div id="buchungen-details" style="display:none;background:white;padding:16px;max-height:300px;overflow-y:auto;">
@@ -6154,7 +6154,7 @@ Router.register('buchen', async () => {
         ${fehlendeOffen.length ? `
         <div class="fehlende-box" style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:20px;color:white;">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                <span style="font-size:1.5rem;">âš </span>
+                <span style="font-size:1.5rem;">⚠ </span>
                 <div>
                     <div style="font-weight:700;font-size:1.1rem;">${t('missing_drinks_yesterday')}</div>
                     <div style="font-size:0.9rem;opacity:0.9;">${t('please_take_if_forgot')}</div>
@@ -6199,13 +6199,13 @@ Router.register('buchen', async () => {
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span style="font-weight:600;">${Utils.formatCurrency(b.preis * b.menge)}</span>
-                        <button class="btn btn-danger" onclick="stornoBuchung('${b.buchung_id}')" style="padding:4px 10px;font-size:0.85rem;">âœ•</button>
+                        <button class="btn btn-danger" onclick="stornoBuchung('${b.buchung_id}')" style="padding:4px 10px;font-size:0.85rem;">✕</button>
                     </div>
                 </div>
                 `).join('')}
             </div>
             <div style="display:flex;gap:10px;margin-top:12px;">
-                <button class="btn btn-primary" onclick="handleGastAbmelden()" style="flex:1;padding:14px;font-size:1rem;">âœ” ${t('done_logout')}</button>
+                <button class="btn btn-primary" onclick="handleGastAbmelden()" style="flex:1;padding:14px;font-size:1rem;">✓ ${t('done_logout')}</button>
             </div>
         </div>
     </div>
@@ -6218,10 +6218,10 @@ window.toggleBuchungsDetails = () => {
     const arrow = document.getElementById('buchungen-arrow');
     if (details.style.display === 'none') {
         details.style.display = 'block';
-        arrow.textContent = 'â–²';
+        arrow.textContent = '▲';
     } else {
         details.style.display = 'none';
-        arrow.textContent = 'â–¼';
+        arrow.textContent = '▼';
     }
 };
 
@@ -6354,7 +6354,7 @@ window.showMengenModal = async (artikelId) => {
             <div style="color:var(--color-alpine-green);font-size:1.2rem;font-weight:600;margin-bottom:20px;">${Utils.formatCurrency(artikel.preis)} / ${t('per_piece')}</div>
             
             <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:20px;">
-                <button onclick="adjustMenge(-1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">âˆ’</button>
+                <button onclick="adjustMenge(-1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">−</button>
                 <div id="menge-display" style="font-size:2.5rem;font-weight:700;min-width:60px;">1</div>
                 <button onclick="adjustMenge(1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">+</button>
             </div>
@@ -6367,7 +6367,7 @@ window.showMengenModal = async (artikelId) => {
             
             <div style="display:flex;gap:12px;">
                 <button onclick="closeMengenModal()" style="flex:1;padding:14px;border:2px solid var(--color-stone-medium);border-radius:12px;background:white;font-weight:600;cursor:pointer;">${t('cancel')}</button>
-                <button onclick="bucheMitMenge(${artikelId})" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--color-alpine-green);color:white;font-weight:700;font-size:1.1rem;cursor:pointer;">âœ” ${t('book')}</button>
+                <button onclick="bucheMitMenge(${artikelId})" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--color-alpine-green);color:white;font-weight:700;font-size:1.1rem;cursor:pointer;">✓ ${t('book')}</button>
             </div>
         </div>
     </div>`;
@@ -6486,7 +6486,7 @@ window.syncFromCloud = async (silent = false) => {
             .order('display_name');
         
         if (error) {
-            console.error('âŒ Supabase Fehler:', error);
+            console.error('❌ Supabase Fehler:', error);
             if (!silent) Utils.showToast('Sync fehlgeschlagen: ' + error.message, 'error');
             return;
         }
@@ -6521,7 +6521,7 @@ window.syncFromCloud = async (silent = false) => {
         if (!silent) Router.navigate('login');
         
     } catch(e) {
-        console.error('âŒ Sync Fehler:', e);
+        console.error('❌ Sync Fehler:', e);
         if (!silent) Utils.showToast('Sync fehlgeschlagen: ' + e.message, 'error');
     }
 };
@@ -6662,7 +6662,7 @@ window.changeArtikelId = async (alteId) => {
         return;
     }
     
-    const neueIdStr = prompt(`âš ï¸ ACHTUNG: Artikel-ID ändern\n\nDiese ID wird für die Registrierkasse verwendet!\nNur ändern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
+    const neueIdStr = prompt(`⚠ ï¸ ACHTUNG: Artikel-ID ändern\n\nDiese ID wird für die Registrierkasse verwendet!\nNur ändern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
     
     if (neueIdStr === null) return; // Abgebrochen
     
@@ -6685,7 +6685,7 @@ window.changeArtikelId = async (alteId) => {
     }
     
     // Bestätigung einholen
-    if (!confirm(`âš ï¸ LETZTE WARNUNG!\n\nArtikel-ID wirklich ändern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
+    if (!confirm(`⚠ ï¸ LETZTE WARNUNG!\n\nArtikel-ID wirklich ändern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
         return;
     }
     
@@ -6706,7 +6706,7 @@ window.changeArtikelId = async (alteId) => {
         artikelCache = null;
         await DataProtection.createBackup();
         
-        Utils.showToast(`✅ Artikel-ID geändert: ${alteId} â†’ ${neueId}`, 'success');
+        Utils.showToast(`✅ Artikel-ID geändert: ${alteId} →’ ${neueId}`, 'success');
         Router.navigate('admin-articles');
     } catch (e) {
         console.error('ID ändern Fehler:', e);
@@ -6792,7 +6792,7 @@ window.showAddArticleModal = () => {
         <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;">📦</div>
         <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
         <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;">📷 Foto wählen</button>
-        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">âœ•</button>
+        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✕</button>
     </div>
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" placeholder="z.B. Cola 0.5l"></div>
     <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" placeholder="z.B. Cola"></div>
@@ -6835,7 +6835,7 @@ window.showEditArticleModal = async id => {
         <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;">${previewContent}</div>
         <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
         <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;">📷 Foto wählen</button>
-        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">âœ•</button>
+        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✕</button>
     </div>
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" value="${a.name}"></div>
     <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" value="${a.name_kurz||''}"></div>
@@ -7032,7 +7032,7 @@ window.saveEditArticle = async () => {
                 console.error('Profile laden Fehler:', e);
             }
         } else {
-            console.log('âš  Offline-Modus - Lokale Daten');
+            console.log('⚠  Offline-Modus - Lokale Daten');
         }
     
         // Seed Artikel falls nötig
@@ -7091,7 +7091,7 @@ window.saveEditArticle = async () => {
         
     } catch(e) {
         // Bei JEDEM Fehler: App trotzdem zeigen!
-        console.error('âŒ KRITISCHER INIT FEHLER:', e);
+        console.error('❌ KRITISCHER INIT FEHLER:', e);
         showApp();
         Router.init();
         Utils.showToast('Ladefehler - bitte neu laden', 'error');
