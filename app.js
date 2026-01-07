@@ -1411,12 +1411,14 @@ const RegisteredGuests = {
             throw new Error('Name darf nur Buchstaben und Bindestriche enthalten!');
         }
         
-        // Prüfen ob Name schon vergeben (von Supabase wenn online)
+        // Prüfen ob Name schon vergeben - NUR bei AKTIVEN Gästen!
+        // Ausgecheckte Gäste (aktiv=false) blockieren den Namen NICHT
         if (supabaseClient && isOnline) {
             const { data: existing } = await supabaseClient
                 .from('profiles')
                 .select('vorname')
                 .eq('geloescht', false)
+                .eq('aktiv', true)  // Nur aktive Gäste prüfen!
                 .ilike('vorname', cleanName);
             if (existing && existing.length > 0) {
                 throw new Error('Dieser Name ist bereits vergeben! Bitte wähle einen anderen.');
@@ -1424,7 +1426,9 @@ const RegisteredGuests = {
         } else {
             const alleGaeste = await db.registeredGuests.toArray();
             const nameExists = alleGaeste.find(g => 
-                ((g.nachname || g.firstName || '').toUpperCase() === cleanName) && !g.geloescht
+                ((g.nachname || g.firstName || '').toUpperCase() === cleanName) && 
+                !g.geloescht && 
+                g.aktiv !== false  // Nur aktive Gäste prüfen!
             );
             if (nameExists) {
                 throw new Error('Dieser Name ist bereits vergeben! Bitte wähle einen anderen.');
@@ -1583,7 +1587,7 @@ const RegisteredGuests = {
             
             if (!profile) throw new Error('Gast nicht gefunden');
             if (profile.geloescht) throw new Error('Account deaktiviert');
-            if (profile.checked_out_at) throw new Error('Du hast bereits ausgecheckt. Bitte wende dich an die Rezeption.');
+            if (profile.aktiv === false) throw new Error('Du hast bereits ausgecheckt. Bitte wende dich an die Rezeption.');
             
             // Login mit Email und erweitertem Passwort
             const { data, error } = await supabaseClient.auth.signInWithPassword({
@@ -1608,7 +1612,7 @@ const RegisteredGuests = {
             const g = await db.registeredGuests.get(id);
             if (!g) throw new Error('Gast nicht gefunden');
             if (g.geloescht) throw new Error('Account deaktiviert');
-            if (g.checked_out_at) throw new Error('Du hast bereits ausgecheckt. Bitte wende dich an die Rezeption.');
+            if (g.aktiv === false) throw new Error('Du hast bereits ausgecheckt. Bitte wende dich an die Rezeption.');
             
             // Passwort-Check: Unterstützt sowohl Hash als auch Klartext
             let passwortOk = false;
@@ -1648,13 +1652,13 @@ const RegisteredGuests = {
                 if (error) {
                     console.error('❌ Supabase Fehler:', error);
                 } else if (data) {
-                    // Client-seitig filtern: Buchstabe + nicht gelöscht + nicht ausgecheckt
+                    // Client-seitig filtern: Buchstabe + nicht gelöscht + aktiv
                     const filtered = data.filter(p => {
                         const name = (p.display_name || p.first_name || '').toUpperCase();
                         const startsWithLetter = name.startsWith(letter.toUpperCase());
                         const isNotDeleted = p.geloescht !== true;
-                        const isNotCheckedOut = !p.checked_out_at;  // Nur aktive Gäste
-                        return startsWithLetter && isNotDeleted && isNotCheckedOut;
+                        const isActive = p.aktiv !== false;  // Nur aktive Gäste
+                        return startsWithLetter && isNotDeleted && isActive;
                     });
                     
                     console.log('✅ Gefunden für', letter + ':', filtered.length);
@@ -1684,7 +1688,7 @@ const RegisteredGuests = {
         const local = await db.registeredGuests.toArray();
         const filtered = local.filter(g => {
             if (g.geloescht === true) return false;
-            if (g.checked_out_at) return false;  // Nur aktive Gäste
+            if (g.aktiv === false) return false;  // Nur aktive Gäste
             const name = (g.nachname || g.firstName || '').toUpperCase();
             return name.startsWith(letter.toUpperCase());
         });
@@ -1699,11 +1703,11 @@ const RegisteredGuests = {
     
     async getAll() { 
         if (supabaseClient && isOnline) {
-            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false).is('checked_out_at', null).order('first_name');
+            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false).eq('aktiv', true).order('first_name');
             return (data || []).map(g => ({ ...g, firstName: g.first_name }));
         }
         const all = await db.registeredGuests.toArray();
-        return all.filter(g => !g.geloescht && !g.checked_out_at);
+        return all.filter(g => !g.geloescht && g.aktiv !== false);
     },
     
     async getGeloeschte() {
@@ -4950,7 +4954,7 @@ Router.register('admin-guests', async () => {
                 .from('profiles')
                 .select('*')
                 .eq('geloescht', false)
-                .is('checked_out_at', null)  // Nur NICHT ausgecheckte Gäste
+                .eq('aktiv', true)  // Nur AKTIVE Gäste (nicht ausgecheckt)
                 .order('vorname');
             
             if (error) {
@@ -4977,22 +4981,22 @@ Router.register('admin-guests', async () => {
         }
     }
     
-    // Fallback: Lokale Daten - nur aktive (nicht ausgecheckte)
+    // Fallback: Lokale Daten - nur aktive
     if (guests.length === 0) {
         guests = await db.registeredGuests.toArray();
-        guests = guests.filter(g => !g.geloescht && !g.checked_out_at);
+        guests = guests.filter(g => !g.geloescht && g.aktiv !== false);
         console.log('⚠️ Gäste von lokalem Cache geladen:', guests.length);
     }
     
-    // Ausgecheckte Gäste zählen
-    let checkedOutCount = 0;
+    // Inaktive Gäste zählen (für Button)
+    let inaktivCount = 0;
     if (supabaseClient && isOnline) {
         const { count } = await supabaseClient
             .from('profiles')
             .select('*', { count: 'exact', head: true })
             .eq('geloescht', false)
-            .not('checked_out_at', 'is', null);
-        checkedOutCount = count || 0;
+            .eq('aktiv', false);
+        inaktivCount = count || 0;
     }
     
     // Nach Nachname sortieren
@@ -5090,7 +5094,6 @@ Router.register('admin-guests', async () => {
                                     </label>
                                 </td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;white-space:nowrap;">
-                                    <button class="btn btn-success" onclick="checkoutGast('${g.id}', '${name}')" style="padding:6px 10px;margin-right:4px;background:#27ae60;" title="Bezahlt & Auschecken">💰</button>
                                     <button class="btn btn-primary" onclick="adminBuchenFuerGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="Für diesen Gast buchen">🍺</button>
                                     <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
                                     <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Löschen">🗑</button>
@@ -5103,7 +5106,7 @@ Router.register('admin-guests', async () => {
             <div style="padding:12px;background:#f8f9fa;border-top:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                 <small>Gesamt: ${guests.length} aktive Gäste | Ausgenommen von Umlage: ${guests.filter(g => g.ausnahmeumlage).length}</small>
                 <div style="display:flex;gap:8px;">
-                    ${checkedOutCount > 0 ? `<button class="btn btn-secondary" onclick="Router.navigate('admin-guests-checkout')" style="padding:6px 12px;font-size:0.85rem;">📋 Ausgecheckte (${checkedOutCount})</button>` : ''}
+                    ${inaktivCount > 0 ? `<button class="btn btn-secondary" onclick="Router.navigate('admin-guests-inaktiv')" style="padding:6px 12px;font-size:0.85rem;">📋 Inaktive (${inaktivCount})</button>` : ''}
                     <button class="btn btn-secondary" onclick="syncPinsToSupabase()" style="padding:6px 12px;font-size:0.85rem;">🔄 Sync</button>
                 </div>
             </div>
@@ -5143,11 +5146,11 @@ Router.register('admin-guests', async () => {
     </div>`);
 });
 
-// ============ AUSGECHECKTE GÄSTE (Bezahlt) ============
-Router.register('admin-guests-checkout', async () => {
+// ============ INAKTIVE GÄSTE (ausgecheckt) ============
+Router.register('admin-guests-inaktiv', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Ausgecheckte Gäste laden
+    // Inaktive Gäste laden (aktiv = false)
     let guests = [];
     
     if (supabaseClient && isOnline) {
@@ -5156,8 +5159,8 @@ Router.register('admin-guests-checkout', async () => {
                 .from('profiles')
                 .select('*')
                 .eq('geloescht', false)
-                .not('checked_out_at', 'is', null)
-                .order('checked_out_at', { ascending: false });
+                .eq('aktiv', false)
+                .order('vorname');
             
             if (!error && data) {
                 guests = data.map(g => ({
@@ -5169,22 +5172,22 @@ Router.register('admin-guests-checkout', async () => {
                 }));
             }
         } catch(e) {
-            console.error('Ausgecheckte Gäste laden Fehler:', e);
+            console.error('Inaktive Gäste laden Fehler:', e);
         }
     }
     
     // Fallback lokal
     if (guests.length === 0) {
         const all = await db.registeredGuests.toArray();
-        guests = all.filter(g => !g.geloescht && g.checked_out_at);
+        guests = all.filter(g => !g.geloescht && g.aktiv === false);
     }
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">←</button><div class="header-title">📋 Ausgecheckte Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">←</button><div class="header-title">📋 Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
-        <div class="card mb-3" style="background:#27ae60;color:white;">
+        <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;text-align:center;">
-                <div style="font-size:1.5rem;font-weight:700;">${guests.length} ausgecheckte Gäste</div>
-                <div style="opacity:0.9;">Diese Gäste haben bezahlt und sind nicht mehr aktiv</div>
+                <div style="font-size:1.5rem;font-weight:700;">${guests.length} inaktive Gäste</div>
+                <div style="opacity:0.9;">Diese Gäste haben ausgecheckt und sind nicht mehr aktiv</div>
             </div>
         </div>
         
@@ -5195,20 +5198,17 @@ Router.register('admin-guests-checkout', async () => {
                         <tr style="background:#f8f9fa;">
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;">Nachname</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;">Gruppenname</th>
-                            <th style="padding:10px;border:1px solid #ddd;text-align:center;">Ausgecheckt am</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;">Aktionen</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${guests.length === 0 ? '<tr><td colspan="4" style="padding:20px;text-align:center;color:#666;">Keine ausgecheckten Gäste</td></tr>' : guests.map(g => {
+                        ${guests.length === 0 ? '<tr><td colspan="3" style="padding:20px;text-align:center;color:#666;">Keine inaktiven Gäste</td></tr>' : guests.map(g => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || '-';
-                            const checkoutDate = g.checked_out_at ? new Date(g.checked_out_at).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-';
                             return `
                             <tr>
                                 <td style="padding:10px;border:1px solid #ddd;font-weight:600;">${name}</td>
                                 <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
-                                <td style="padding:10px;border:1px solid #ddd;text-align:center;color:#27ae60;">${checkoutDate}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;">
                                     <button class="btn btn-primary" onclick="reactivateGast('${g.id}', '${name}')" style="padding:6px 12px;" title="Wieder aktivieren">🔄 Reaktivieren</button>
                                     <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;margin-left:4px;" title="Endgültig löschen">🗑</button>
@@ -5298,47 +5298,7 @@ window.syncPinsToSupabase = async () => {
     Router.navigate('admin-guests');
 };
 
-// Gast auschecken (bezahlt)
-window.checkoutGast = async (id, name) => {
-    if (!confirm(`Gast "${name}" als BEZAHLT auschecken?\n\nDer Gast wird aus der aktiven Liste entfernt und kann sich nicht mehr anmelden.`)) return;
-    
-    const checkoutTime = new Date().toISOString();
-    
-    // Supabase updaten
-    if (supabaseClient && isOnline) {
-        try {
-            const { error } = await supabaseClient
-                .from('profiles')
-                .update({ 
-                    checked_out_at: checkoutTime,
-                    aktiv: false
-                })
-                .eq('id', id);
-            
-            if (error) {
-                console.error('Checkout Supabase Fehler:', error);
-                Utils.showToast('Fehler beim Auschecken', 'error');
-                return;
-            }
-        } catch(e) {
-            console.error('Checkout Exception:', e);
-        }
-    }
-    
-    // Lokal updaten
-    try {
-        await db.registeredGuests.update(id, { 
-            checked_out_at: checkoutTime,
-            aktiv: false
-        });
-    } catch(e) {}
-    
-    await DataProtection.createBackup();
-    Utils.showToast(`✅ ${name} ausgecheckt (bezahlt)`, 'success');
-    Router.navigate('admin-guests');
-};
-
-// Gast wieder aktivieren (reaktivieren)
+// Gast wieder aktivieren (reaktivieren) - falls versehentlich inaktiv
 window.reactivateGast = async (id, name) => {
     if (!confirm(`Gast "${name}" wieder AKTIVIEREN?`)) return;
     
@@ -5348,7 +5308,6 @@ window.reactivateGast = async (id, name) => {
             await supabaseClient
                 .from('profiles')
                 .update({ 
-                    checked_out_at: null,
                     aktiv: true
                 })
                 .eq('id', id);
@@ -5360,14 +5319,13 @@ window.reactivateGast = async (id, name) => {
     // Lokal updaten
     try {
         await db.registeredGuests.update(id, { 
-            checked_out_at: null,
             aktiv: true
         });
     } catch(e) {}
     
     await DataProtection.createBackup();
     Utils.showToast(`✅ ${name} wieder aktiviert`, 'success');
-    Router.navigate('admin-guests-checkout');
+    Router.navigate('admin-guests-inaktiv');
 };
 
 window.filterGaesteTabelle = () => {
@@ -5510,19 +5468,20 @@ window.saveGast = async () => {
     let alleGaeste = [];
     if (supabaseClient && isOnline) {
         try {
-            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false);
+            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false).eq('aktiv', true);
             if (data) alleGaeste = data.map(g => ({ ...g, nachname: g.vorname, passwort: g.pin_hash }));
         } catch(e) {}
     }
     if (alleGaeste.length === 0) {
         alleGaeste = await db.registeredGuests.toArray();
+        alleGaeste = alleGaeste.filter(g => !g.geloescht && g.aktiv !== false);
     }
     
-    // Prüfen ob Name schon vergeben (außer beim Bearbeiten des eigenen)
+    // Prüfen ob Name schon vergeben - NUR bei AKTIVEN Gästen!
+    // Ausgecheckte Gäste (aktiv=false) blockieren den Namen NICHT
     const nameExists = alleGaeste.find(g => 
         ((g.nachname || g.vorname || g.firstName || '').toUpperCase() === nachname) && 
-        String(g.id) !== String(editId) && 
-        !g.geloescht
+        String(g.id) !== String(editId)
     );
     if (nameExists) {
         Utils.showToast('Dieser Name ist bereits vergeben!', 'error');
