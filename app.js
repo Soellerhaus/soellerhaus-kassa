@@ -6753,86 +6753,127 @@ window.saveEditArticle = async () => {
 (async function initApp() {
     console.log('🚀 Seollerhaus Kassa v3.0 (Supabase) startet...');
     
-    // Supabase initialisieren
-    const supabaseReady = initSupabase();
-    if (supabaseReady) {
-        console.log('✅ Supabase bereit - Multi-Device Modus');
-        // Artikel von Supabase laden
-        await Artikel.loadFromSupabase();
-        // Pending Buchungen synchronisieren
-        syncPendingData();
-        
-        // Gäste-Daten von Supabase laden
-        try {
-            const { data: profiles, error } = await supabaseClient
-                .from('profiles')
-                .select('*')
-                .order('display_name');
+    // Funktion um Loading Screen zu verstecken und App zu zeigen
+    const showApp = () => {
+        const loadingScreen = document.getElementById('loading-screen');
+        const appContainer = document.getElementById('app');
+        if (loadingScreen) loadingScreen.style.display = 'none';
+        if (appContainer) appContainer.style.display = 'block';
+    };
+    
+    try {
+        // Supabase initialisieren
+        const supabaseReady = initSupabase();
+        if (supabaseReady) {
+            console.log('✅ Supabase bereit - Multi-Device Modus');
+            // Artikel von Supabase laden
+            try {
+                await Artikel.loadFromSupabase();
+            } catch(e) {
+                console.error('Artikel laden Fehler:', e);
+            }
+            // Pending Buchungen synchronisieren
+            try {
+                syncPendingData();
+            } catch(e) {
+                console.error('Sync Fehler:', e);
+            }
             
-            if (!error && profiles) {
-                // Nur nicht-gelöschte Profile cachen
-                const aktive = profiles.filter(p => p.geloescht !== true);
-                console.log('✅ Profile geladen:', aktive.length, 'aktiv von', profiles.length, 'gesamt');
+            // Gäste-Daten von Supabase laden
+            try {
+                const { data: profiles, error } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .order('display_name');
                 
-                for (const p of aktive) {
-                    const name = p.display_name || p.first_name;
-                    try {
-                        await db.registeredGuests.put({
-                            id: p.id,
-                            firstName: name,
-                            nachname: name,
-                            passwort: p.pin_hash,
-                            passwordHash: p.pin_hash,
-                            gruppenname: p.group_name,
-                            group_name: p.group_name,
-                            geloescht: false,
-                            email: p.email
-                        });
-                    } catch(e) {}
+                if (!error && profiles) {
+                    // Nur nicht-gelöschte Profile cachen
+                    const aktive = profiles.filter(p => p.geloescht !== true);
+                    console.log('✅ Profile geladen:', aktive.length, 'aktiv von', profiles.length, 'gesamt');
+                    
+                    for (const p of aktive) {
+                        const name = p.display_name || p.first_name;
+                        try {
+                            await db.registeredGuests.put({
+                                id: p.id,
+                                firstName: name,
+                                nachname: name,
+                                passwort: p.pin_hash,
+                                passwordHash: p.pin_hash,
+                                gruppenname: p.group_name,
+                                group_name: p.group_name,
+                                geloescht: false,
+                                email: p.email
+                            });
+                        } catch(e) {}
+                    }
                 }
+            } catch(e) {
+                console.error('Profile laden Fehler:', e);
+            }
+        } else {
+            console.log('⚠ Offline-Modus - Lokale Daten');
+        }
+    
+        // Seed Artikel falls nötig
+        try {
+            await Artikel.seed();
+        } catch(e) {
+            console.error('Artikel seed Fehler:', e);
+        }
+        
+        // Kategorien initialisieren (lokal)
+        try {
+            if (await db.kategorien.count() === 0) {
+                await db.kategorien.bulkAdd([
+                    {kategorie_id:1, name:'Alkoholfreie Getränke', sortierung:10},
+                    {kategorie_id:2, name:'Biere', sortierung:20},
+                    {kategorie_id:3, name:'Weine', sortierung:30},
+                    {kategorie_id:4, name:'Schnäpse & Spirituosen', sortierung:40},
+                    {kategorie_id:5, name:'Heiße Getränke', sortierung:50},
+                    {kategorie_id:6, name:'Süßes & Salziges', sortierung:60},
+                    {kategorie_id:7, name:'Sonstiges', sortierung:70}
+                ]);
             }
         } catch(e) {
-            console.error('Profile laden Fehler:', e);
+            console.error('Kategorien init Fehler:', e);
         }
-    } else {
-        console.log('⚠ Offline-Modus - Lokale Daten');
-    }
-    
-    // Loading Screen ausblenden
-    setTimeout(() => { 
-        document.getElementById('loading-screen').style.display = 'none'; 
-        document.getElementById('app').style.display = 'block'; 
-    }, 1500);
-    
-    // Seed Artikel falls nötig
-    await Artikel.seed();
-    
-    // Kategorien initialisieren (lokal)
-    if (await db.kategorien.count() === 0) {
-        await db.kategorien.bulkAdd([
-            {kategorie_id:1, name:'Alkoholfreie Getränke', sortierung:10},
-            {kategorie_id:2, name:'Biere', sortierung:20},
-            {kategorie_id:3, name:'Weine', sortierung:30},
-            {kategorie_id:4, name:'Schnäpse & Spirituosen', sortierung:40},
-            {kategorie_id:5, name:'Heiße Getränke', sortierung:50},
-            {kategorie_id:6, name:'Süßes & Salziges', sortierung:60},
-            {kategorie_id:7, name:'Sonstiges', sortierung:70}
-        ]);
-    }
-    
-    // Preismodus laden (HP oder Selbstversorger)
-    await State.loadPreisModus();
-    
-    // KEIN Auto-Login - immer zur Startseite
-    // Supabase Session ausloggen damit frisch gestartet wird
-    if (supabaseClient) {
-        await supabaseClient.auth.signOut();
-    }
-    State.currentUser = null;
-    Router.init();
-    
-    // Online-Status anzeigen
-    if (!isOnline) {
-        Utils.showToast('Offline-Modus aktiv', 'info');
+        
+        // Preismodus laden (HP oder Selbstversorger)
+        try {
+            await State.loadPreisModus();
+        } catch(e) {
+            console.error('Preismodus laden Fehler:', e);
+        }
+        
+        // KEIN Auto-Login - immer zur Startseite
+        // Supabase Session ausloggen damit frisch gestartet wird
+        try {
+            if (supabaseClient) {
+                await supabaseClient.auth.signOut();
+            }
+        } catch(e) {
+            console.error('Supabase signOut Fehler:', e);
+        }
+        
+        State.currentUser = null;
+        
+        // Loading Screen ausblenden und App zeigen
+        setTimeout(() => {
+            showApp();
+            Router.init();
+            
+            // Online-Status anzeigen
+            if (!isOnline) {
+                Utils.showToast('Offline-Modus aktiv', 'info');
+            }
+        }, 1500);
+        
+    } catch(e) {
+        // Bei JEDEM Fehler: App trotzdem zeigen!
+        console.error('❌ KRITISCHER INIT FEHLER:', e);
+        showApp();
+        Router.init();
+        Utils.showToast('Ladefehler - bitte neu laden', 'error');
     }
 })();
