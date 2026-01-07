@@ -2278,7 +2278,7 @@ const FehlendeGetraenke = {
         }
         
         await DataProtection.createBackup();
-        Utils.showToast(`${menge}Ã— ${artikel.name} als fehlend markiert`, 'success');
+        Utils.showToast(`${menge}× ${artikel.name} als fehlend markiert`, 'success');
     },
     
     async getOffene() {
@@ -3320,9 +3320,9 @@ Router.register('login', async () => {
             <div style="font-weight:700;">${t('missing_drinks')}</div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-            ${fehlendeList.map(f => `<span style="background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:20px;font-size:0.9rem;">${f.menge}Ã— ${f.name}</span>`).join('')}
+            ${fehlendeList.map(f => `<span style="background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:20px;font-size:0.9rem;">${f.menge}× ${f.name}</span>`).join('')}
         </div>
-        <div style="font-size:0.85rem;opacity:0.9;">${t('total')}: ${Utils.formatCurrency(gesamtPreis)} â€¢ ${t('please_take_after_login')}</div>
+        <div style="font-size:0.85rem;opacity:0.9;">${t('total')}: ${Utils.formatCurrency(gesamtPreis)} "¢ ${t('please_take_after_login')}</div>
     </div>
     ` : '';
     
@@ -3601,7 +3601,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                         <div style="font-size: 0.9rem; opacity: 0.9;">
                             ${aktiveNachricht 
-                                ? `"${aktiveNachricht.text.substring(0, 40)}${aktiveNachricht.text.length > 40 ? '...' : ''}" â€¢ Noch ${verbleibendeZeit}`
+                                ? `"${aktiveNachricht.text.substring(0, 40)}${aktiveNachricht.text.length > 40 ? '...' : ''}" "¢ Noch ${verbleibendeZeit}`
                                 : 'Wichtige Info an alle Gäste senden'}
                         </div>
                     </div>
@@ -3627,7 +3627,7 @@ Router.register('admin-dashboard', async () => {
         <!-- ALLE BUCHUNGEN ANSEHEN -->
         <button class="btn btn-block" onclick="Router.navigate('admin-alle-buchungen')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;background:#6c5ce7;color:white;border:none;">
             📋 Alle Buchungen ansehen<br>
-            <small style="opacity:0.9;">(${bs.length} gesamt â€¢ bearbeiten/löschen)</small>
+            <small style="opacity:0.9;">(${bs.length} gesamt "¢ bearbeiten/löschen)</small>
         </button>
         
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
@@ -3796,7 +3796,7 @@ Router.register('admin-auffuellliste', async () => {
                                 <tr style="border-bottom:1px solid var(--color-stone-medium);">
                                     <td style="padding:12px;font-weight:500;">${item.name}</td>
                                     <td style="padding:12px;text-align:center;color:#888;">__:__</td>
-                                    <td style="padding:12px;text-align:right;font-size:1.3rem;font-weight:700;color:var(--color-alpine-green);">${item.menge}Ã—</td>
+                                    <td style="padding:12px;text-align:right;font-size:1.3rem;font-weight:700;color:var(--color-alpine-green);">${item.menge}×</td>
                                 </tr>
                             `).join('')}
                         </table>
@@ -3862,7 +3862,7 @@ window.printAuffuellliste = async () => {
                     <div class="item">
                         <span class="item-name">${item.name}</span>
                         <span class="item-check">__:__</span>
-                        <span class="item-menge">${item.menge}Ã—</span>
+                        <span class="item-menge">${item.menge}×</span>
                     </div>
                 `).join('')}
             `).join('')}
@@ -3941,7 +3941,7 @@ Router.register('admin-alle-buchungen', async () => {
                 <div class="card-header" style="background:var(--color-stone-light);display:flex;justify-content:space-between;align-items:center;">
                     <h3 style="font-weight:700;margin:0;">📅 ${datum}</h3>
                     <div style="display:flex;align-items:center;gap:12px;">
-                        <span style="font-weight:600;color:var(--color-alpine-green);">${buchungen.length} Buchungen â€¢ ${Utils.formatCurrency(tagesUmsatz)}</span>
+                        <span style="font-weight:600;color:var(--color-alpine-green);">${buchungen.length} Buchungen "¢ ${Utils.formatCurrency(tagesUmsatz)}</span>
                         <button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="handleDeleteBuchungenByDate('${datum}')" title="Alle Buchungen dieses Tages löschen">🗑 Tag löschen</button>
                     </div>
                 </div>
@@ -3965,7 +3965,7 @@ Router.register('admin-alle-buchungen', async () => {
                                     <td style="padding:10px;font-weight:500;">${b.gast_vorname || 'Unbekannt'}</td>
                                     <td style="padding:10px;font-size:0.85rem;color:#666;">${b.group_name || '-'}</td>
                                     <td style="padding:10px;">${b.artikel_name}</td>
-                                    <td style="padding:10px;text-align:right;">${b.menge}Ã—</td>
+                                    <td style="padding:10px;text-align:right;">${b.menge}×</td>
                                     <td style="padding:10px;text-align:right;font-weight:600;">${Utils.formatCurrency(b.preis * b.menge)}</td>
                                     <td style="padding:10px;text-align:center;">
                                         ${b.storniert 
@@ -4213,7 +4213,7 @@ Router.register('admin-umlage', async () => {
                     💰 UMLAGE BUCHEN
                 </button>
                 <p style="text-align:center;margin-top:8px;color:var(--color-stone-dark);font-size:0.9rem;">
-                    ${Utils.formatCurrency(preisProGast)} Ã— ${totalGuests} Gäste = ${Utils.formatCurrency(preisProGast * totalGuests)}
+                    ${Utils.formatCurrency(preisProGast)} × ${totalGuests} Gäste = ${Utils.formatCurrency(preisProGast * totalGuests)}
                 </p>
             </div>
         </div>
@@ -4249,7 +4249,7 @@ window.bucheUmlageFuerAlle = async () => {
     const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
     const preisProGast = Math.ceil((gesamtPreis / totalGuests) * 100) / 100;
     
-    if (!confirm(`UMLAGE durchführen?\n\n${fehlendeOffen.length} fehlende Getränke\nGesamtwert: ${Utils.formatCurrency(gesamtPreis)}\n\n${Utils.formatCurrency(preisProGast)} Ã— ${totalGuests} Gäste`)) {
+    if (!confirm(`UMLAGE durchführen?\n\n${fehlendeOffen.length} fehlende Getränke\nGesamtwert: ${Utils.formatCurrency(gesamtPreis)}\n\n${Utils.formatCurrency(preisProGast)} × ${totalGuests} Gäste`)) {
         return;
     }
     
@@ -4392,10 +4392,10 @@ Router.register('admin-notfall-export', async () => {
             <div style="padding:16px;">
                 <strong>ℹ Info:</strong><br>
                 <small style="color:#888;">
-                    â€¢ Verfügbare Tage: ${alleDaten.length}<br>
-                    â€¢ Ältestes Datum: ${alleDaten[alleDaten.length-1] || '-'}<br>
-                    â€¢ Neuestes Datum: ${alleDaten[0] || '-'}<br>
-                    â€¢ Export-Format: Exakt wie Access-Tabelle "Buchenungsdetail"
+                    "¢ Verfügbare Tage: ${alleDaten.length}<br>
+                    "¢ Ältestes Datum: ${alleDaten[alleDaten.length-1] || '-'}<br>
+                    "¢ Neuestes Datum: ${alleDaten[0] || '-'}<br>
+                    "¢ Export-Format: Exakt wie Access-Tabelle "Buchenungsdetail"
                 </small>
             </div>
         </div>
@@ -4635,9 +4635,9 @@ Router.register('admin-gruppen', async () => {
         <div class="card mt-3" style="background:var(--color-stone-light);">
             <div style="padding:16px;">
                 <strong>💡 Hinweis:</strong><br>
-                â€¢ Wenn aktiv, müssen Gäste nach dem Login eine Gruppe wählen<br>
-                â€¢ Die Gruppe wird bei jeder Buchung gespeichert<br>
-                â€¢ Max. 3 Gruppen möglich (z.B. verschiedene Unis)
+                "¢ Wenn aktiv, müssen Gäste nach dem Login eine Gruppe wählen<br>
+                "¢ Die Gruppe wird bei jeder Buchung gespeichert<br>
+                "¢ Max. 3 Gruppen möglich (z.B. verschiedene Unis)
             </div>
         </div>
     </div>`);
@@ -6123,7 +6123,7 @@ Router.register('buchen', async () => {
             <div onclick="toggleBuchungsDetails()" style="padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
                 <div style="color:white;">
                     <div style="font-weight:700;font-size:1.1rem;">📋 ${t('my_bookings')}</div>
-                    <div style="font-size:0.9rem;opacity:0.9;">${meineBuchungen.length} ${t('items')} â€¢ ${t('total_sum')}</div>
+                    <div style="font-size:0.9rem;opacity:0.9;">${meineBuchungen.length} ${t('items')} "¢ ${t('total_sum')}</div>
                 </div>
                 <div style="text-align:right;color:white;">
                     <div style="font-size:1.5rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
@@ -6140,7 +6140,7 @@ Router.register('buchen', async () => {
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--color-stone-light);border-radius:8px;margin-bottom:4px;">
                         <div>
                             <div style="font-weight:600;">${b.artikel_name}</div>
-                            <div style="font-size:0.8rem;color:var(--color-stone-dark);">🕐 ${b.uhrzeit?.substring(0,5) || ''} â€¢ ${b.menge}Ã—</div>
+                            <div style="font-size:0.8rem;color:var(--color-stone-dark);">🕐 ${b.uhrzeit?.substring(0,5) || ''} "¢ ${b.menge}×</div>
                         </div>
                         <div style="font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(b.preis * b.menge)}</div>
                     </div>
@@ -6166,7 +6166,7 @@ Router.register('buchen', async () => {
                     <span style="font-size:1.2rem;">${f.icon || '🍺'}</span>
                     <div style="text-align:left;">
                         <div style="font-weight:600;font-size:0.9rem;">${f.artikel_name}</div>
-                        <div style="font-size:0.75rem;color:#666;">${f.datum} â€¢ ${Utils.formatCurrency(f.artikel_preis)}</div>
+                        <div style="font-size:0.75rem;color:#666;">${f.datum} "¢ ${Utils.formatCurrency(f.artikel_preis)}</div>
                     </div>
                 </button>
                 `).join('')}
@@ -6195,7 +6195,7 @@ Router.register('buchen', async () => {
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--color-stone-light);border-radius:8px;margin-bottom:6px;">
                     <div>
                         <span style="font-weight:600;">${b.artikel_name}</span>
-                        <span style="color:var(--color-stone-dark);margin-left:8px;">Ã— ${b.menge}</span>
+                        <span style="color:var(--color-stone-dark);margin-left:8px;">× ${b.menge}</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span style="font-weight:600;">${Utils.formatCurrency(b.preis * b.menge)}</span>
@@ -6306,7 +6306,7 @@ window.showMengenModal = async (artikelId) => {
             </div>
             
             <div style="display:flex;gap:8px;margin-bottom:16px;">
-                ${[2,3,5,10].map(n => `<button onclick="setMenge(${n})" style="flex:1;padding:10px;border:2px solid var(--color-stone-medium);border-radius:10px;background:white;font-weight:600;cursor:pointer;">${n}Ã—</button>`).join('')}
+                ${[2,3,5,10].map(n => `<button onclick="setMenge(${n})" style="flex:1;padding:10px;border:2px solid var(--color-stone-medium);border-radius:10px;background:white;font-weight:600;cursor:pointer;">${n}×</button>`).join('')}
             </div>
             
             <div id="menge-total" style="font-size:1.1rem;color:#666;margin-bottom:16px;">${t('total')}: <strong>${Utils.formatCurrency(artikel.preis)}</strong></div>
@@ -6353,7 +6353,7 @@ window.bucheMitMenge = async (artikelId) => {
         await Buchungen.create(artikel, menge);
         
         closeMengenModal();
-        Utils.showToast(`${menge}Ã— ${artikel.name_kurz||artikel.name} ${i18n.t('booked')}`, 'success');
+        Utils.showToast(`${menge}× ${artikel.name_kurz||artikel.name} ${i18n.t('booked')}`, 'success');
         Router.navigate('buchen');
     } catch (e) {
         Utils.showToast(e.message || i18n.t('booking_error'), 'error');
