@@ -1411,13 +1411,24 @@ const RegisteredGuests = {
             throw new Error('Name darf nur Buchstaben und Bindestriche enthalten!');
         }
         
-        // Prüfen ob Name schon vergeben
-        const alleGaeste = await db.registeredGuests.toArray();
-        const nameExists = alleGaeste.find(g => 
-            ((g.nachname || g.firstName || '').toUpperCase() === cleanName) && !g.geloescht
-        );
-        if (nameExists) {
-            throw new Error('Dieser Name ist bereits vergeben! Bitte wähle einen anderen.');
+        // Prüfen ob Name schon vergeben (von Supabase wenn online)
+        if (supabaseClient && isOnline) {
+            const { data: existing } = await supabaseClient
+                .from('profiles')
+                .select('vorname')
+                .eq('geloescht', false)
+                .ilike('vorname', cleanName);
+            if (existing && existing.length > 0) {
+                throw new Error('Dieser Name ist bereits vergeben! Bitte wähle einen anderen.');
+            }
+        } else {
+            const alleGaeste = await db.registeredGuests.toArray();
+            const nameExists = alleGaeste.find(g => 
+                ((g.nachname || g.firstName || '').toUpperCase() === cleanName) && !g.geloescht
+            );
+            if (nameExists) {
+                throw new Error('Dieser Name ist bereits vergeben! Bitte wähle einen anderen.');
+            }
         }
         
         // PIN-Duplikate sind erlaubt - keine Prüfung nötig
@@ -1442,27 +1453,87 @@ const RegisteredGuests = {
                 throw new Error('Registrierung fehlgeschlagen: ' + authError.message);
             }
             
-            // Warte kurz auf Trigger (Profile wird automatisch erstellt)
-            await new Promise(r => setTimeout(r, 500));
+            const userId = authData.user.id;
+            console.log('✅ Auth SignUp OK, User ID:', userId);
             
-            // Profile mit PIN updaten
-            await supabaseClient.from('profiles').update({ 
-                pin_hash: password,
-                vorname: firstName.trim()
-            }).eq('id', authData.user.id);
+            // Warte auf Trigger (Profile wird automatisch erstellt)
+            await new Promise(r => setTimeout(r, 1000));
             
-            // Profile laden
+            // Profile mit PIN updaten - mehrere Versuche
+            let pinSaved = false;
+            for (let i = 0; i < 3; i++) {
+                try {
+                    // Erst prüfen ob Profile existiert
+                    const { data: existingProfile } = await supabaseClient
+                        .from('profiles')
+                        .select('id')
+                        .eq('id', userId)
+                        .single();
+                    
+                    if (existingProfile) {
+                        // Update
+                        const { error: updateError } = await supabaseClient
+                            .from('profiles')
+                            .update({ 
+                                pin_hash: password,
+                                vorname: cleanName,
+                                group_name: 'keiner Gruppe zugehörig',
+                                aktiv: true,
+                                geloescht: false
+                            })
+                            .eq('id', userId);
+                        
+                        if (!updateError) {
+                            console.log('✅ PIN in Profile gespeichert (Update)');
+                            pinSaved = true;
+                            break;
+                        }
+                    } else {
+                        // Insert falls Profile noch nicht existiert
+                        const { error: insertError } = await supabaseClient
+                            .from('profiles')
+                            .insert({ 
+                                id: userId,
+                                email: email,
+                                pin_hash: password,
+                                vorname: cleanName,
+                                first_name: cleanName,
+                                group_name: 'keiner Gruppe zugehörig',
+                                aktiv: true,
+                                geloescht: false,
+                                created_at: new Date().toISOString()
+                            });
+                        
+                        if (!insertError) {
+                            console.log('✅ PIN in Profile gespeichert (Insert)');
+                            pinSaved = true;
+                            break;
+                        }
+                    }
+                } catch(e) {
+                    console.log(`Versuch ${i+1} fehlgeschlagen:`, e);
+                }
+                await new Promise(r => setTimeout(r, 500));
+            }
+            
+            if (!pinSaved) {
+                console.error('❌ PIN konnte nicht in Supabase gespeichert werden!');
+            }
+            
+            // Profile laden zur Bestätigung
             const { data: profile } = await supabaseClient
                 .from('profiles')
                 .select('*')
-                .eq('id', authData.user.id)
+                .eq('id', userId)
                 .single();
+            
+            console.log('Profile nach Speichern:', profile?.vorname, 'PIN:', profile?.pin_hash ? 'JA' : 'NEIN');
             
             // Lokalen Cache aktualisieren - MIT PIN als Klartext!
             const localGuest = { 
-                id: authData.user.id, 
-                firstName: firstName.trim().toUpperCase(),
-                nachname: firstName.trim().toUpperCase(),
+                id: userId, 
+                firstName: cleanName,
+                nachname: cleanName,
                 email: email,
                 passwort: password,  // PIN als Klartext!
                 passwordHash: password,
@@ -1475,13 +1546,14 @@ const RegisteredGuests = {
             try { await db.registeredGuests.add(localGuest); } catch(e) {}
             
             Utils.showToast('Registrierung erfolgreich!', 'success');
-            State.setUser({ ...authData.user, ...profile, firstName: firstName.trim().toUpperCase() });
+            State.setUser({ ...authData.user, ...profile, firstName: cleanName });
             return localGuest;
         } else {
             // Offline-Modus: Lokal speichern MIT PIN als Klartext!
             const guest = { 
-                firstName: firstName.trim().toUpperCase(), 
-                nachname: firstName.trim().toUpperCase(),
+                id: Utils.uuid(),
+                firstName: cleanName, 
+                nachname: cleanName,
                 passwort: password,  // PIN als Klartext!
                 passwordHash: password,
                 gruppenname: 'keiner Gruppe zugehörig',
@@ -1491,7 +1563,7 @@ const RegisteredGuests = {
                 geloescht: false, 
                 pendingSync: true 
             };
-            guest.id = await db.registeredGuests.add(guest);
+            await db.registeredGuests.add(guest);
             Utils.showToast('Registrierung erfolgreich!', 'success');
             return guest;
         }
@@ -4864,8 +4936,9 @@ window.deaktiviereNachricht = async () => {
 Router.register('admin-guests', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Alle Gäste laden - von Supabase wenn online (enthält pin_hash)
+    // Alle Gäste laden - IMMER von Supabase wenn online (enthält pin_hash)
     let guests = [];
+    let loadedFrom = 'lokal';
     
     if (supabaseClient && isOnline) {
         try {
@@ -4875,21 +4948,27 @@ Router.register('admin-guests', async () => {
                 .eq('geloescht', false)
                 .order('vorname');
             
-            if (!error && data) {
+            if (error) {
+                console.error('Supabase Gäste laden Fehler:', error);
+            } else if (data && data.length > 0) {
+                loadedFrom = 'Supabase';
                 // Supabase Daten mit korrekten Feldnamen mappen
-                guests = data.map(g => ({
-                    ...g,
-                    nachname: g.vorname || g.first_name,
-                    firstName: g.vorname || g.first_name,
-                    passwort: g.pin_hash,  // PIN aus Supabase
-                    passwordHash: g.pin_hash,
-                    gruppenname: g.group_name || 'keiner Gruppe zugehörig',
-                    ausnahmeumlage: g.ausnahmeumlage || false
-                }));
-                console.log('Gäste von Supabase geladen:', guests.length);
+                guests = data.map(g => {
+                    console.log('Gast:', g.vorname, '| PIN in DB:', g.pin_hash || 'KEINE');
+                    return {
+                        ...g,
+                        nachname: g.vorname || g.first_name,
+                        firstName: g.vorname || g.first_name,
+                        passwort: g.pin_hash,  // PIN aus Supabase
+                        passwordHash: g.pin_hash,
+                        gruppenname: g.group_name || 'keiner Gruppe zugehörig',
+                        ausnahmeumlage: g.ausnahmeumlage || false
+                    };
+                });
+                console.log('✅ Gäste von Supabase geladen:', guests.length);
             }
         } catch(e) {
-            console.error('Supabase Gäste laden Fehler:', e);
+            console.error('Supabase Gäste laden Exception:', e);
         }
     }
     
@@ -4897,6 +4976,7 @@ Router.register('admin-guests', async () => {
     if (guests.length === 0) {
         guests = await db.registeredGuests.toArray();
         guests = guests.filter(g => !g.geloescht);
+        console.log('⚠️ Gäste von lokalem Cache geladen:', guests.length);
     }
     
     // Nach Nachname sortieren
@@ -4972,7 +5052,9 @@ Router.register('admin-guests', async () => {
                         ${guests.length === 0 ? '<tr><td colspan="7" style="padding:20px;text-align:center;color:#666;">Keine Gäste vorhanden</td></tr>' : guests.map(g => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
-                            const pw = g.passwort || g.passwordHash || '-';
+                            const pw = g.passwort || g.passwordHash || g.pin_hash;
+                            const pwDisplay = pw ? pw : '<span style="color:#e74c3c;">⚠ KEINE</span>';
+                            const pwStyle = pw ? 'color:#2c3e50;' : 'color:#e74c3c;';
                             const ausnahme = g.ausnahmeumlage || false;
                             const createdAt = g.created_at || g.createdAt;
                             const createdFormatted = createdAt ? new Date(createdAt).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-';
@@ -4982,7 +5064,7 @@ Router.register('admin-guests', async () => {
                             <tr class="gaeste-row" data-name="${name.toLowerCase()}" data-gruppe="${grpName.toLowerCase()}" data-id="${g.id}">
                                 <td style="padding:10px;border:1px solid #ddd;font-weight:600;">${name}</td>
                                 <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
-                                <td style="padding:10px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:1.2rem;font-weight:bold;color:#2c3e50;">${pw}</td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:1.2rem;font-weight:bold;${pwStyle}">${pwDisplay}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;font-size:0.85rem;color:#27ae60;">${createdFormatted}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;font-size:0.85rem;color:#666;">${lastLoginFormatted}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;">
@@ -5001,8 +5083,9 @@ Router.register('admin-guests', async () => {
                     </tbody>
                 </table>
             </div>
-            <div style="padding:12px;background:#f8f9fa;border-top:1px solid #ddd;">
+            <div style="padding:12px;background:#f8f9fa;border-top:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;">
                 <small>Gesamt: ${guests.length} Gäste | Ausgenommen von Umlage: ${guests.filter(g => g.ausnahmeumlage).length}</small>
+                <button class="btn btn-secondary" onclick="syncPinsToSupabase()" style="padding:6px 12px;font-size:0.85rem;">🔄 PINs nach Supabase sync</button>
             </div>
         </div>
     </div>
@@ -5041,6 +5124,74 @@ Router.register('admin-guests', async () => {
 });
 
 // Filter Funktionen
+// Sync alle lokalen PINs nach Supabase
+window.syncPinsToSupabase = async () => {
+    if (!supabaseClient || !isOnline) {
+        Utils.showToast('Offline - Sync nicht möglich', 'error');
+        return;
+    }
+    
+    Utils.showToast('Synchronisiere PINs...', 'info');
+    
+    const localGuests = await db.registeredGuests.toArray();
+    let synced = 0;
+    let errors = 0;
+    
+    for (const g of localGuests) {
+        if (!g.id || g.geloescht) continue;
+        
+        const pin = g.passwort || g.passwordHash;
+        if (!pin) continue;
+        
+        try {
+            // Versuche Update
+            const { error } = await supabaseClient
+                .from('profiles')
+                .update({ 
+                    pin_hash: pin,
+                    vorname: g.nachname || g.firstName,
+                    group_name: g.gruppenname || g.group_name || 'keiner Gruppe zugehörig'
+                })
+                .eq('id', g.id);
+            
+            if (error) {
+                // Falls nicht existiert, Insert versuchen
+                const { error: insertError } = await supabaseClient
+                    .from('profiles')
+                    .insert({ 
+                        id: g.id,
+                        pin_hash: pin,
+                        vorname: g.nachname || g.firstName,
+                        group_name: g.gruppenname || g.group_name || 'keiner Gruppe zugehörig',
+                        aktiv: true,
+                        geloescht: false
+                    });
+                
+                if (insertError) {
+                    console.error('Sync Fehler für', g.id, insertError);
+                    errors++;
+                } else {
+                    synced++;
+                }
+            } else {
+                synced++;
+            }
+        } catch (e) {
+            console.error('Sync Exception für', g.id, e);
+            errors++;
+        }
+    }
+    
+    if (errors > 0) {
+        Utils.showToast(`Sync: ${synced} OK, ${errors} Fehler`, 'warning');
+    } else {
+        Utils.showToast(`${synced} PINs synchronisiert!`, 'success');
+    }
+    
+    // Seite neu laden
+    Router.navigate('admin-guests');
+};
+
 window.filterGaesteTabelle = () => {
     const suchName = (document.getElementById('search-nachname')?.value || '').toLowerCase();
     const suchGruppe = (document.getElementById('search-gruppe')?.value || '').toLowerCase();
@@ -5076,9 +5227,38 @@ window.openNeuerGastModal = async () => {
 window.editGast = async (id) => {
     console.log('editGast called with id:', id);
     
-    // ID kann String oder Nummer sein - suche in allen Gästen
-    const alleGaeste = await db.registeredGuests.toArray();
-    const gast = alleGaeste.find(g => String(g.id) === String(id));
+    let gast = null;
+    
+    // Zuerst von Supabase laden (hat aktuellste Daten)
+    if (supabaseClient && isOnline) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('id', id)
+                .single();
+            
+            if (!error && data) {
+                gast = {
+                    ...data,
+                    nachname: data.vorname || data.first_name,
+                    firstName: data.vorname || data.first_name,
+                    passwort: data.pin_hash,
+                    passwordHash: data.pin_hash,
+                    gruppenname: data.group_name || 'keiner Gruppe zugehörig'
+                };
+                console.log('Gast von Supabase geladen:', gast.nachname, 'PIN:', gast.passwort);
+            }
+        } catch(e) {
+            console.error('Supabase Fehler:', e);
+        }
+    }
+    
+    // Fallback: Lokaler Cache
+    if (!gast) {
+        const alleGaeste = await db.registeredGuests.toArray();
+        gast = alleGaeste.find(g => String(g.id) === String(id));
+    }
     
     if (!gast) {
         Utils.showToast('Gast nicht gefunden!', 'error');
@@ -5102,14 +5282,24 @@ window.closeGastModal = () => {
 // Toggle Ausnahme direkt in Tabelle
 window.toggleAusnahme = async (id, checked) => {
     try {
+        // Supabase updaten
+        if (supabaseClient && isOnline) {
+            await supabaseClient
+                .from('profiles')
+                .update({ ausnahmeumlage: checked })
+                .eq('id', id);
+        }
+        
+        // Lokal updaten
         const alleGaeste = await db.registeredGuests.toArray();
         const gast = alleGaeste.find(g => String(g.id) === String(id));
         
         if (gast) {
             await db.registeredGuests.update(gast.id, { ausnahmeumlage: checked });
-            await DataProtection.createBackup();
-            Utils.showToast(checked ? 'Ausnahme aktiviert' : 'Ausnahme deaktiviert', 'success');
         }
+        
+        await DataProtection.createBackup();
+        Utils.showToast(checked ? 'Ausnahme aktiviert' : 'Ausnahme deaktiviert', 'success');
     } catch (e) {
         console.error('Toggle Ausnahme Error:', e);
         Utils.showToast('Fehler beim Speichern', 'error');
@@ -5138,12 +5328,21 @@ window.saveGast = async () => {
         return;
     }
     
-    // Alle Gäste laden
-    const alleGaeste = await db.registeredGuests.toArray();
+    // Alle Gäste laden (von Supabase wenn online)
+    let alleGaeste = [];
+    if (supabaseClient && isOnline) {
+        try {
+            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false);
+            if (data) alleGaeste = data.map(g => ({ ...g, nachname: g.vorname, passwort: g.pin_hash }));
+        } catch(e) {}
+    }
+    if (alleGaeste.length === 0) {
+        alleGaeste = await db.registeredGuests.toArray();
+    }
     
     // Prüfen ob Name schon vergeben (außer beim Bearbeiten des eigenen)
     const nameExists = alleGaeste.find(g => 
-        ((g.nachname || g.firstName || '').toUpperCase() === nachname) && 
+        ((g.nachname || g.vorname || g.firstName || '').toUpperCase() === nachname) && 
         String(g.id) !== String(editId) && 
         !g.geloescht
     );
@@ -5154,45 +5353,111 @@ window.saveGast = async () => {
     
     // PIN-Duplikate sind erlaubt - keine Prüfung nötig
     
-    const gastData = {
-        nachname: nachname,
-        firstName: nachname,
-        gruppenname: gruppenname,
-        group_name: gruppenname,
-        passwort: passwort,
-        passwordHash: passwort,
-        aktiv: true,
-        geloescht: false
-    };
-    
     if (editId) {
-        // Bearbeiten - finde Gast mit dieser ID
-        const gast = alleGaeste.find(g => String(g.id) === String(editId));
-        if (gast) {
-            await db.registeredGuests.update(gast.id, gastData);
+        // === BEARBEITEN ===
+        console.log('Bearbeite Gast:', editId);
+        
+        // Supabase zuerst updaten
+        if (supabaseClient && isOnline) {
+            try {
+                const { error } = await supabaseClient
+                    .from('profiles')
+                    .update({ 
+                        vorname: nachname,
+                        pin_hash: passwort,
+                        group_name: gruppenname,
+                        aktiv: true,
+                        geloescht: false
+                    })
+                    .eq('id', editId);
+                
+                if (error) {
+                    console.error('Supabase Update Fehler:', error);
+                } else {
+                    console.log('✅ Gast in Supabase aktualisiert');
+                }
+            } catch (e) {
+                console.error('Supabase Update Exception:', e);
+            }
         }
-        Utils.showToast('Gast aktualisiert!', 'success');
-    } else {
-        // Neu anlegen
-        gastData.createdAt = new Date().toISOString();
-        await db.registeredGuests.add(gastData);
-        Utils.showToast('Gast angelegt!', 'success');
-    }
-    
-    // Zu Supabase synchronisieren
-    if (supabaseClient && isOnline) {
+        
+        // Lokal auch updaten
         try {
-            const profileData = {
-                vorname: nachname,
-                pin_hash: passwort,
-                aktiv: true,
+            await db.registeredGuests.update(editId, {
+                nachname: nachname,
+                firstName: nachname,
+                gruppenname: gruppenname,
                 group_name: gruppenname,
+                passwort: passwort,
+                passwordHash: passwort,
+                aktiv: true,
                 geloescht: false
-            };
-            await supabaseClient.from('profiles').insert(profileData);
-        } catch (e) {
-            console.log('Supabase sync optional:', e);
+            });
+        } catch(e) {
+            // Falls ID nicht als Key existiert, versuche mit where
+            const local = await db.registeredGuests.toArray();
+            const found = local.find(g => String(g.id) === String(editId));
+            if (found) {
+                await db.registeredGuests.update(found.id, {
+                    nachname: nachname,
+                    firstName: nachname,
+                    gruppenname: gruppenname,
+                    group_name: gruppenname,
+                    passwort: passwort,
+                    passwordHash: passwort
+                });
+            }
         }
+        
+        Utils.showToast('Gast aktualisiert!', 'success');
+        
+    } else {
+        // === NEU ANLEGEN ===
+        console.log('Neuer Gast:', nachname);
+        
+        const newId = Utils.uuid();
+        const now = new Date().toISOString();
+        
+        // Supabase zuerst - MIT ID!
+        if (supabaseClient && isOnline) {
+            try {
+                const { error } = await supabaseClient
+                    .from('profiles')
+                    .insert({ 
+                        id: newId,
+                        vorname: nachname,
+                        pin_hash: passwort,
+                        group_name: gruppenname,
+                        aktiv: true,
+                        geloescht: false,
+                        created_at: now
+                    });
+                
+                if (error) {
+                    console.error('Supabase Insert Fehler:', error);
+                } else {
+                    console.log('✅ Gast in Supabase angelegt');
+                }
+            } catch (e) {
+                console.error('Supabase Insert Exception:', e);
+            }
+        }
+        
+        // Lokal speichern
+        await db.registeredGuests.add({
+            id: newId,
+            nachname: nachname,
+            firstName: nachname,
+            gruppenname: gruppenname,
+            group_name: gruppenname,
+            passwort: passwort,
+            passwordHash: passwort,
+            aktiv: true,
+            geloescht: false,
+            createdAt: now
+        });
+        
+        Utils.showToast('Gast angelegt!', 'success');
     }
     
     await DataProtection.createBackup();
