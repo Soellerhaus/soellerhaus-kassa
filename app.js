@@ -4742,21 +4742,29 @@ Router.register('admin-guests', async () => {
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:120px;">Nachname</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:150px;">Gruppenname</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:100px;">Passwort (PIN)</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:120px;">Registriert</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:140px;">Letzter Login</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:100px;">Ausnahme Umlage</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:180px;">Aktionen</th>
                         </tr>
                     </thead>
                     <tbody id="gaeste-tbody">
-                        ${guests.length === 0 ? '<tr><td colspan="5" style="padding:20px;text-align:center;color:#666;">Keine Gäste vorhanden</td></tr>' : guests.map(g => {
+                        ${guests.length === 0 ? '<tr><td colspan="7" style="padding:20px;text-align:center;color:#666;">Keine Gäste vorhanden</td></tr>' : guests.map(g => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
                             const pw = g.passwort || g.passwordHash || '-';
                             const ausnahme = g.ausnahmeumlage || false;
+                            const createdAt = g.created_at || g.createdAt;
+                            const createdFormatted = createdAt ? new Date(createdAt).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-';
+                            const lastLogin = g.last_login_at || g.lastLoginAt;
+                            const lastLoginFormatted = lastLogin ? new Date(lastLogin).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-';
                             return `
                             <tr class="gaeste-row" data-name="${name.toLowerCase()}" data-gruppe="${grpName.toLowerCase()}" data-id="${g.id}">
                                 <td style="padding:10px;border:1px solid #ddd;font-weight:600;">${name}</td>
                                 <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:1.2rem;font-weight:bold;color:#2c3e50;">${pw}</td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;font-size:0.85rem;color:#27ae60;">${createdFormatted}</td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;font-size:0.85rem;color:#666;">${lastLoginFormatted}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;">
                                     <label class="switch">
                                         <input type="checkbox" ${ausnahme ? 'checked' : ''} onchange="toggleAusnahme('${g.id}', this.checked)">
