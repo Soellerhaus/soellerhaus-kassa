@@ -136,6 +136,20 @@ db.version(7).stores({
     gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
 });
 
+// Version 8: Dual-Pricing (HP / Selbstversorger)
+db.version(8).stores({
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
+    artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
+    kategorien: 'kategorie_id, name, sortierung',
+    settings: 'key',
+    exports: '++id, timestamp, anzahl_buchungen',
+    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, geloescht, geloeschtAm, group_name, firstName, passwordHash',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
+    gruppen: '++id, name, aktiv',
+    gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
+});
+
 const DataProtection = {
     async createBackup() {
         try {
@@ -1353,7 +1367,12 @@ const State = {
     currentUser: null, currentPage: 'login', selectedCategory: null,
     isAdmin: false, currentPin: '', inactivityTimer: null, inactivityTimeout: 20000,
     sessionId: null,
-    selectedGroup: null, // NEU: Ausgewählte Gruppe für aktuelle Session
+    selectedGroup: null, // Ausgewählte Gruppe für aktuelle Session
+    currentPreisModus: 'sv', // 'sv' = Selbstversorger, 'hp' = Halbpension
+    async loadPreisModus() {
+        this.currentPreisModus = await PreisModus.getModus();
+        console.log('💰 Preismodus geladen:', this.currentPreisModus === 'hp' ? 'Halbpension' : 'Selbstversorger');
+    },
     setUser(u) { 
         this.currentUser = u; 
         this.sessionId = Utils.uuid(); // Neue Session starten
@@ -1759,6 +1778,9 @@ const Buchungen = {
         console.log('📝 Buchung erstellen für User:', userId);
         console.log('📝 CurrentUser:', State.currentUser);
         
+        // Preis basierend auf aktivem Preismodus
+        const preis = PreisModus.getPreis(artikel, State.currentPreisModus);
+        
         const b = {
             buchung_id: Utils.uuid(),
             user_id: userId, // Für Supabase
@@ -1769,7 +1791,8 @@ const Buchungen = {
             group_name: State.selectedGroup || State.currentUser.group_name || '', // NEU: Gruppe
             artikel_id: artikel.artikel_id, 
             artikel_name: artikel.name, 
-            preis: parseFloat(artikel.preis),
+            preis: parseFloat(preis),
+            preis_modus: State.currentPreisModus, // Speichern welcher Modus verwendet wurde
             steuer_prozent: artikel.steuer_prozent || 10, 
             menge: parseInt(menge),
             datum: Utils.getBuchungsDatum(), // 7:00-7:00 Periode
@@ -1785,7 +1808,7 @@ const Buchungen = {
             ist_umlage: false
         };
         
-        console.log('📝 Buchung Objekt:', b);
+        console.log('📝 Buchung Objekt (Preismodus:', State.currentPreisModus, '):', b);
         
         // Immer lokal speichern (Cache)
         await db.buchungen.add({...b, sync_status: isOnline ? 'synced' : 'pending'});
@@ -2427,6 +2450,52 @@ const GastNachrichten = {
         if (abgelaufen.length > 0) {
             console.log('🧹 ' + abgelaufen.length + ' abgelaufene Nachrichten gelöscht');
         }
+    }
+};
+
+// ============ PREISMODUS-VERWALTUNG (HP / Selbstversorger) ============
+const PreisModus = {
+    SELBSTVERSORGER: 'sv',
+    HP: 'hp',
+    
+    // Aktuellen Modus laden
+    async getModus() {
+        const setting = await db.settings.get('preismodus');
+        return setting?.value || this.SELBSTVERSORGER; // Default: Selbstversorger
+    },
+    
+    // Modus setzen
+    async setModus(modus) {
+        await db.settings.put({ key: 'preismodus', value: modus });
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('settings').upsert({ 
+                key: 'preismodus', 
+                value: modus 
+            });
+        }
+        console.log('💰 Preismodus geändert auf:', modus === this.HP ? 'Halbpension' : 'Selbstversorger');
+    },
+    
+    // Modus-Namen für Anzeige
+    getModusName(modus) {
+        return modus === this.HP ? 'Halbpension (HP)' : 'Selbstversorger';
+    },
+    
+    // Preis für Artikel basierend auf Modus
+    getPreis(artikel, modus = null) {
+        const m = modus || State.currentPreisModus || this.SELBSTVERSORGER;
+        if (m === this.HP) {
+            return artikel.preis_hp ?? artikel.preis ?? 0;
+        }
+        return artikel.preis ?? 0;
+    },
+    
+    // Beide Preise für Anzeige
+    getBeidePreise(artikel) {
+        return {
+            sv: artikel.preis ?? 0,
+            hp: artikel.preis_hp ?? artikel.preis ?? 0
+        };
     }
 };
 
@@ -3268,8 +3337,39 @@ Router.register('admin-dashboard', async () => {
     const aktiveNachricht = await GastNachricht.getAktive();
     const verbleibendeZeit = aktiveNachricht ? GastNachricht.getVerbleibendeZeit(aktiveNachricht) : null;
     
+    // Aktueller Preismodus
+    const preismodus = await PreisModus.getModus();
+    const isHP = preismodus === PreisModus.HP;
+    
     UI.render(`<div class="app-header"><div class="header-left"><div class="header-title">🔧 Admin Dashboard</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
+        <!-- PREISMODUS SWITCH - PROMINENT -->
+        <div onclick="Router.navigate('admin-preismodus')" style="
+            background: ${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 2rem;">${isHP ? '🍽️' : '🏠'}</span>
+                    <div>
+                        <div style="font-weight: 700; font-size: 1.2rem;">
+                            Preismodus: ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
+                        </div>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">
+                            ${isHP ? 'HP-Preise werden für neue Buchungen verwendet' : 'Standard-Preise werden für neue Buchungen verwendet'}
+                        </div>
+                    </div>
+                </div>
+                <span style="font-size: 1.5rem;">⚙️</span>
+            </div>
+        </div>
+        
         <div class="stats-grid">
             <div class="stat-card"><div class="stat-value">${guests.length}</div><div class="stat-label">Gäste</div></div>
             <div class="stat-card"><div class="stat-value">${artCount}</div><div class="stat-label">Artikel</div></div>
@@ -4412,6 +4512,96 @@ window.deleteGruppe = async (id) => {
     }
 };
 
+// ============ PREISMODUS VERWALTUNG ============
+Router.register('admin-preismodus', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    
+    const currentModus = await PreisModus.getModus();
+    const isHP = currentModus === PreisModus.HP;
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">💰 Preismodus</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        
+        <!-- AKTUELLER STATUS -->
+        <div class="card mb-3" style="background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};color:white;">
+            <div style="padding:24px;text-align:center;">
+                <div style="font-size:4rem;margin-bottom:16px;">${isHP ? '🍽️' : '🏠'}</div>
+                <div style="font-size:1.8rem;font-weight:700;margin-bottom:8px;">
+                    ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
+                </div>
+                <div style="font-size:1rem;opacity:0.9;">
+                    ${isHP ? 'HP-Preise werden für alle neuen Buchungen verwendet' : 'Standard-Preise werden für alle neuen Buchungen verwendet'}
+                </div>
+            </div>
+        </div>
+        
+        <!-- UMSCHALTEN -->
+        <div class="card mb-3">
+            <div class="card-header"><h3 style="margin:0;">Preismodus wechseln</h3></div>
+            <div class="card-body">
+                <p style="color:#666;margin-bottom:20px;">
+                    Wähle den Preismodus für neue Gäste-Logins. Bereits getätigte Buchungen sind davon nicht betroffen.
+                </p>
+                
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <button onclick="setPreismodus('sv')" style="
+                        padding:24px;
+                        border-radius:16px;
+                        border:3px solid ${!isHP ? '#3498db' : '#ddd'};
+                        background:${!isHP ? 'linear-gradient(135deg, #3498db, #2980b9)' : 'white'};
+                        color:${!isHP ? 'white' : '#333'};
+                        cursor:pointer;
+                        transition:all 0.2s;
+                    ">
+                        <div style="font-size:2.5rem;margin-bottom:8px;">🏠</div>
+                        <div style="font-weight:700;font-size:1.1rem;">Selbstversorger</div>
+                        <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">Standard-Preise</div>
+                        ${!isHP ? '<div style="margin-top:8px;font-weight:bold;">✓ AKTIV</div>' : ''}
+                    </button>
+                    
+                    <button onclick="setPreismodus('hp')" style="
+                        padding:24px;
+                        border-radius:16px;
+                        border:3px solid ${isHP ? '#9b59b6' : '#ddd'};
+                        background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'white'};
+                        color:${isHP ? 'white' : '#333'};
+                        cursor:pointer;
+                        transition:all 0.2s;
+                    ">
+                        <div style="font-size:2.5rem;margin-bottom:8px;">🍽️</div>
+                        <div style="font-weight:700;font-size:1.1rem;">Halbpension (HP)</div>
+                        <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">HP-Preise</div>
+                        ${isHP ? '<div style="margin-top:8px;font-weight:bold;">✓ AKTIV</div>' : ''}
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- INFO -->
+        <div class="card" style="background:#f8f9fa;">
+            <div style="padding:16px;">
+                <h4 style="margin:0 0 12px 0;">💡 Hinweise</h4>
+                <ul style="margin:0;padding-left:20px;color:#666;font-size:0.9rem;">
+                    <li style="margin-bottom:8px;">Der Preismodus gilt für <strong>alle neuen Buchungen</strong> nach dem Wechsel</li>
+                    <li style="margin-bottom:8px;">Bereits getätigte Buchungen behalten ihren ursprünglichen Preis</li>
+                    <li style="margin-bottom:8px;">HP-Preise werden in der <strong>Artikelverwaltung</strong> gepflegt</li>
+                    <li>Der Export enthält immer den tatsächlich gebuchten Preis</li>
+                </ul>
+            </div>
+        </div>
+    </div>`);
+});
+
+// Preismodus setzen
+window.setPreismodus = async (modus) => {
+    await PreisModus.setModus(modus);
+    State.currentPreisModus = modus;
+    
+    const name = modus === 'hp' ? 'Halbpension (HP)' : 'Selbstversorger';
+    Utils.showToast(`Preismodus auf "${name}" geändert`, 'success');
+    Router.navigate('admin-preismodus');
+};
+
 // ============ GÄSTE-NACHRICHT VERWALTUNG ============
 Router.register('admin-nachricht', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
@@ -5084,6 +5274,10 @@ Router.register('admin-articles', async () => {
             `<option value="${k.kategorie_id}" ${a.kategorie_id === k.kategorie_id ? 'selected' : ''}>${k.name}</option>`
         ).join('');
         
+        // Beide Preise
+        const preisSV = a.preis ?? 0;
+        const preisHP = a.preis_hp ?? a.preis ?? 0;
+        
         return `<tr class="article-row" data-name="${a.name.toLowerCase()}" data-sku="${(a.sku||'').toLowerCase()}" data-id="${a.artikel_id}">
             <td style="width:50px;text-align:center;font-family:monospace;font-size:0.85rem;">
                 <span onclick="changeArtikelId(${a.artikel_id})" style="cursor:pointer;padding:4px 8px;background:#f0f0f0;border-radius:4px;border:1px solid #ddd;" title="Klicken zum Ändern der ID">${a.artikel_id}</span>
@@ -5091,7 +5285,22 @@ Router.register('admin-articles', async () => {
             <td style="width:40px;text-align:center;font-weight:700;color:var(--color-alpine-green);">${pos}</td>
             <td style="width:50px;text-align:center;">${img}</td>
             <td><strong>${a.name}</strong>${a.sku?` <small style="color:var(--color-stone-dark);">(${a.sku})</small>`:''}</td>
-            <td style="text-align:right;font-weight:600;">${Utils.formatCurrency(a.preis)}</td>
+            <td style="text-align:center;">
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                    <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;">
+                        <span style="font-size:0.7rem;color:#3498db;font-weight:600;">SV:</span>
+                        <input type="number" value="${preisSV.toFixed(2)}" step="0.10" min="0" 
+                            onchange="quickUpdatePreis(${a.artikel_id}, 'sv', this.value)"
+                            style="width:70px;padding:4px;border:1px solid #3498db;border-radius:4px;text-align:right;font-weight:600;font-size:0.9rem;">
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;">
+                        <span style="font-size:0.7rem;color:#9b59b6;font-weight:600;">HP:</span>
+                        <input type="number" value="${preisHP.toFixed(2)}" step="0.10" min="0" 
+                            onchange="quickUpdatePreis(${a.artikel_id}, 'hp', this.value)"
+                            style="width:70px;padding:4px;border:1px solid #9b59b6;border-radius:4px;text-align:right;font-weight:600;font-size:0.9rem;">
+                    </div>
+                </div>
+            </td>
             <td style="min-width:150px;">
                 <select onchange="changeArtikelKategorie(${a.artikel_id}, parseInt(this.value))" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;background:white;cursor:pointer;">
                     ${katOptions}
@@ -5157,7 +5366,13 @@ Router.register('admin-articles', async () => {
                                 <th style="padding:12px 8px;width:40px;">Pos.</th>
                                 <th style="padding:12px 8px;width:50px;">Foto</th>
                                 <th style="padding:12px 8px;">Name</th>
-                                <th style="padding:12px 8px;text-align:right;">Preis</th>
+                                <th style="padding:12px 8px;text-align:center;">
+                                    <div>Preise</div>
+                                    <div style="display:flex;gap:8px;justify-content:center;font-size:0.7rem;font-weight:normal;">
+                                        <span style="color:#3498db;">🏠 SV</span>
+                                        <span style="color:#9b59b6;">🍽️ HP</span>
+                                    </div>
+                                </th>
                                 <th style="padding:12px 8px;">Kategorie</th>
                                 <th style="padding:12px 8px;text-align:center;">Aktiv</th>
                                 <th style="padding:12px 8px;"></th>
@@ -5723,6 +5938,27 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
     }
 };
 
+// Preis direkt in Tabelle ändern (SV oder HP)
+window.quickUpdatePreis = async (id, typ, wert) => {
+    try {
+        const preis = parseFloat(wert) || 0;
+        const update = typ === 'hp' ? { preis_hp: preis } : { preis: preis };
+        
+        await db.artikel.update(id, update);
+        
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('artikel').update(update).eq('artikel_id', id);
+        }
+        
+        artikelCache = null;
+        
+        const label = typ === 'hp' ? 'HP-Preis' : 'SV-Preis';
+        Utils.showToast(`${label} auf ${Utils.formatCurrency(preis)} geändert`, 'success');
+    } catch (e) {
+        Utils.showToast('Fehler: ' + e.message, 'error');
+    }
+};
+
 // Kategorie direkt ändern
 window.changeArtikelKategorie = async (id, neueKategorieId) => {
     try {
@@ -5895,11 +6131,26 @@ window.showAddArticleModal = () => {
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" placeholder="z.B. Cola 0.5l"></div>
     <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" placeholder="z.B. Cola"></div>
     <div class="form-group"><label class="form-label">SKU</label><input type="text" id="article-sku" class="form-input" placeholder="z.B. COL-05"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" placeholder="0.00" step="0.01" min="0"></div>
-        <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" placeholder="1" min="1" value="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
+    
+    <!-- BEIDE PREISE -->
+    <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin-bottom:16px;">
+        <div style="font-weight:600;margin-bottom:12px;">💰 Preise</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="color:#3498db;font-weight:600;">🏠 Selbstversorger (€)</label>
+                <input type="number" id="article-price-sv" class="form-input" placeholder="0.00" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="color:#9b59b6;font-weight:600;">🍽️ Halbpension (€)</label>
+                <input type="number" id="article-price-hp" class="form-input" placeholder="0.00" step="0.10" min="0" style="border-color:#9b59b6;font-size:1.2rem;font-weight:bold;">
+            </div>
+        </div>
     </div>
-    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Weine</option><option value="4">Schnäpse & Spirituosen</option><option value="5">Heiße Getränke</option><option value="6">Süßes & Salziges</option><option value="7">Sonstiges</option></select></div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" placeholder="1" min="1" value="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
+        <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Weine</option><option value="4">Schnäpse & Spirituosen</option><option value="5">Heiße Getränke</option><option value="6">Süßes & Salziges</option><option value="7">Sonstiges</option></select></div>
+    </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" checked><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveNewArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = null;
@@ -5910,6 +6161,8 @@ window.showEditArticleModal = async id => {
     const c = document.getElementById('article-modal-container');
     const hasImage = a.bild && a.bild.startsWith('data:');
     const previewContent = hasImage ? `<img src="${a.bild}" style="width:100%;height:100%;object-fit:cover;">` : (a.icon || '📦');
+    const preisSV = a.preis ?? 0;
+    const preisHP = a.preis_hp ?? a.preis ?? 0;
     c.innerHTML = `<div class="modal-container active"><div class="modal-backdrop" onclick="closeArticleModal()"></div><div class="modal-content" style="max-width:500px;max-height:90vh;overflow-y:auto;"><h2 style="margin-bottom:24px;">Artikel bearbeiten</h2>
     <input type="hidden" id="article-id" value="${a.artikel_id}">
     <div class="form-group" style="text-align:center;">
@@ -5921,11 +6174,26 @@ window.showEditArticleModal = async id => {
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" value="${a.name}"></div>
     <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" value="${a.name_kurz||''}"></div>
     <div class="form-group"><label class="form-label">SKU</label><input type="text" id="article-sku" class="form-input" value="${a.sku||''}"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <div class="form-group"><label class="form-label">Preis (€) *</label><input type="number" id="article-price" class="form-input" value="${a.preis}" step="0.01" min="0"></div>
-        <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" value="${a.sortierung||1}" min="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
+    
+    <!-- BEIDE PREISE -->
+    <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin-bottom:16px;">
+        <div style="font-weight:600;margin-bottom:12px;">💰 Preise</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="color:#3498db;font-weight:600;">🏠 Selbstversorger (€)</label>
+                <input type="number" id="article-price-sv" class="form-input" value="${preisSV.toFixed(2)}" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="color:#9b59b6;font-weight:600;">🍽️ Halbpension (€)</label>
+                <input type="number" id="article-price-hp" class="form-input" value="${preisHP.toFixed(2)}" step="0.10" min="0" style="border-color:#9b59b6;font-size:1.2rem;font-weight:bold;">
+            </div>
+        </div>
     </div>
-    <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'}[i]}</option>`).join('')}</select></div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" value="${a.sortierung||1}" min="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
+        <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'}[i]}</option>`).join('')}</select></div>
+    </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = a.bild || null;
@@ -5961,11 +6229,17 @@ window.saveNewArticle = async () => {
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
     const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'};
     const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
+    
+    // Beide Preise lesen
+    const preisSV = parseFloat(document.getElementById('article-price-sv')?.value) || 0;
+    const preisHP = parseFloat(document.getElementById('article-price-hp')?.value) || preisSV; // Falls HP leer, gleich wie SV
+    
     await Artikel.create({ 
         name: name.trim(), 
         name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
         sku: document.getElementById('article-sku')?.value?.trim() || null, 
-        preis: parseFloat(document.getElementById('article-price')?.value) || 0, 
+        preis: preisSV,
+        preis_hp: preisHP,
         steuer_prozent: 10, 
         kategorie_id: katId, 
         kategorie_name: katMap[katId] || 'Sonstiges', 
@@ -5986,6 +6260,10 @@ window.saveEditArticle = async () => {
     const newPos = parseInt(document.getElementById('article-sort')?.value) || 1;
     const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'};
     const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
+    
+    // Beide Preise lesen
+    const preisSV = parseFloat(document.getElementById('article-price-sv')?.value) || 0;
+    const preisHP = parseFloat(document.getElementById('article-price-hp')?.value) || 0;
     
     // Alten Artikel holen für Positions-Tausch
     const oldArticle = await Artikel.getById(id);
@@ -6012,7 +6290,8 @@ window.saveEditArticle = async () => {
         name: name.trim(), 
         name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
         sku: document.getElementById('article-sku')?.value?.trim() || null, 
-        preis: parseFloat(document.getElementById('article-price')?.value) || 0, 
+        preis: preisSV,
+        preis_hp: preisHP,
         kategorie_id: katId, 
         kategorie_name: katMap[katId], 
         aktiv: document.getElementById('article-active')?.checked, 
@@ -6094,6 +6373,9 @@ window.saveEditArticle = async () => {
             {kategorie_id:7, name:'Sonstiges', sortierung:70}
         ]);
     }
+    
+    // Preismodus laden (HP oder Selbstversorger)
+    await State.loadPreisModus();
     
     // KEIN Auto-Login - immer zur Startseite
     // Supabase Session ausloggen damit frisch gestartet wird
