@@ -31,10 +31,10 @@
     <!-- Dexie.js for IndexedDB (lokaler Cache) -->
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
     
-    <!-- SheetJS fÃƒÂ¼r Excel Export -->
+    <!-- SheetJS fÃƒÆ’Ã‚Â¼r Excel Export -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     
-    <!-- Supabase Client fÃƒÂ¼r Multi-Device Sync -->
+    <!-- Supabase Client fÃƒÆ’Ã‚Â¼r Multi-Device Sync -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -81,11 +81,11 @@
             var loadingScreen = document.getElementById('loading-screen');
             var appContainer = document.getElementById('app');
             if (loadingScreen && loadingScreen.style.display !== 'none') {
-                console.warn('âš ï¸ App-Start dauert zu lange - Loading Screen wird ausgeblendet');
+                console.warn('Ã¢Å¡Â Ã¯Â¸Â App-Start dauert zu lange - Loading Screen wird ausgeblendet');
                 loadingScreen.style.display = 'none';
                 if (appContainer) {
                     appContainer.style.display = 'block';
-                    appContainer.innerHTML = '<div style="padding:40px;text-align:center;"><h2 style="color:#c0392b;">âš ï¸ Ladefehler</h2><p style="margin:20px 0;">Die App konnte nicht vollständig geladen werden.</p><button onclick="location.reload(true)" style="padding:15px 30px;font-size:16px;background:#2C5F7C;color:white;border:none;border-radius:8px;cursor:pointer;">ðŸ”„ Neu laden</button><p style="margin-top:20px;font-size:12px;color:#888;">Tipp: Cache leeren (Strg+Shift+R) oder Browser-Daten löschen</p></div>';
+                    appContainer.innerHTML = '<div style="padding:40px;text-align:center;"><h2 style="color:#c0392b;">Ã¢Å¡Â Ã¯Â¸Â Ladefehler</h2><p style="margin:20px 0;">Die App konnte nicht vollständig geladen werden.</p><button onclick="location.reload(true)" style="padding:15px 30px;font-size:16px;background:#2C5F7C;color:white;border:none;border-radius:8px;cursor:pointer;">Ã°Å¸â€â€ž Neu laden</button><p style="margin-top:20px;font-size:12px;color:#888;">Tipp: Cache leeren (Strg+Shift+R) oder Browser-Daten löschen</p></div>';
                 }
             }
         }, 10000);
