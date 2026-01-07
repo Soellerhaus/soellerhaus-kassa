@@ -1160,6 +1160,10 @@ const i18n = {
             'booked': 'gebucht!',
             'cancel_booking': 'Buchung stornieren?',
             'cancel': 'Abbrechen',
+            'book': 'Buchen',
+            'quantity': 'Menge',
+            'total': 'Gesamt',
+            'per_piece': 'Stück',
             'article_not_found': 'Artikel nicht gefunden',
             'booking_error': 'Fehler beim Buchen',
             
@@ -1239,6 +1243,10 @@ const i18n = {
             'booked': 'booked!',
             'cancel_booking': 'Cancel booking?',
             'cancel': 'Cancel',
+            'book': 'Book',
+            'quantity': 'Quantity',
+            'total': 'Total',
+            'per_piece': 'piece',
             'article_not_found': 'Article not found',
             'booking_error': 'Error while booking',
             
@@ -5345,7 +5353,7 @@ Router.register('buchen', async () => {
             <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')">${t('cat_all')}</div>
         </div>
         <div class="artikel-grid">
-            ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" onclick="bucheArtikelDirekt(${a.artikel_id})">${renderTileContent(a)}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
+            ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchend="artikelPressEnd(event)">${renderTileContent(a)}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
         </div>
     </div>
     ${sessionBuchungen.length ? `
@@ -5411,6 +5419,114 @@ window.bucheArtikelDirekt = async (id) => {
         if (!a) { Utils.showToast(i18n.t('article_not_found'), 'error'); return; }
         await Buchungen.create(a, 1);
         Utils.showToast(`${a.name_kurz||a.name} ${i18n.t('booked')}`, 'success');
+        Router.navigate('buchen');
+    } catch (e) {
+        Utils.showToast(e.message || i18n.t('booking_error'), 'error');
+    }
+};
+
+// Long-Press für Mengenauswahl
+let artikelPressTimer = null;
+let artikelPressId = null;
+let artikelLongPressed = false;
+
+window.artikelPressStart = (event, artikelId) => {
+    event.preventDefault();
+    artikelPressId = artikelId;
+    artikelLongPressed = false;
+    
+    // Nach 500ms Long-Press -> Mengen-Modal zeigen
+    artikelPressTimer = setTimeout(async () => {
+        artikelLongPressed = true;
+        // Vibration feedback wenn verfügbar
+        if (navigator.vibrate) navigator.vibrate(50);
+        await showMengenModal(artikelId);
+    }, 500);
+};
+
+window.artikelPressEnd = (event) => {
+    if (artikelPressTimer) {
+        clearTimeout(artikelPressTimer);
+        artikelPressTimer = null;
+    }
+    
+    // Wenn kein Long-Press, dann normaler Klick (1 Stück buchen)
+    if (!artikelLongPressed && artikelPressId) {
+        bucheArtikelDirekt(artikelPressId);
+    }
+    
+    artikelPressId = null;
+};
+
+// Mengen-Modal anzeigen
+window.showMengenModal = async (artikelId) => {
+    const artikel = await Artikel.getById(artikelId);
+    if (!artikel) return;
+    
+    const t = i18n.t.bind(i18n);
+    
+    const modalHtml = `
+    <div id="mengen-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:2000;display:flex;align-items:center;justify-content:center;" onclick="if(event.target.id==='mengen-modal')closeMengenModal()">
+        <div style="background:white;border-radius:20px;padding:24px;width:90%;max-width:350px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+            <div style="font-size:3rem;margin-bottom:8px;">${artikel.icon || '🥤'}</div>
+            <div style="font-weight:700;font-size:1.3rem;margin-bottom:4px;">${artikel.name}</div>
+            <div style="color:var(--color-alpine-green);font-size:1.2rem;font-weight:600;margin-bottom:20px;">${Utils.formatCurrency(artikel.preis)} / ${t('per_piece')}</div>
+            
+            <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:20px;">
+                <button onclick="adjustMenge(-1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">−</button>
+                <div id="menge-display" style="font-size:2.5rem;font-weight:700;min-width:60px;">1</div>
+                <button onclick="adjustMenge(1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">+</button>
+            </div>
+            
+            <div style="display:flex;gap:8px;margin-bottom:16px;">
+                ${[2,3,5,10].map(n => `<button onclick="setMenge(${n})" style="flex:1;padding:10px;border:2px solid var(--color-stone-medium);border-radius:10px;background:white;font-weight:600;cursor:pointer;">${n}×</button>`).join('')}
+            </div>
+            
+            <div id="menge-total" style="font-size:1.1rem;color:#666;margin-bottom:16px;">${t('total')}: <strong>${Utils.formatCurrency(artikel.preis)}</strong></div>
+            
+            <div style="display:flex;gap:12px;">
+                <button onclick="closeMengenModal()" style="flex:1;padding:14px;border:2px solid var(--color-stone-medium);border-radius:12px;background:white;font-weight:600;cursor:pointer;">${t('cancel')}</button>
+                <button onclick="bucheMitMenge(${artikelId})" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--color-alpine-green);color:white;font-weight:700;font-size:1.1rem;cursor:pointer;">✓ ${t('book')}</button>
+            </div>
+        </div>
+    </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    window.currentMenge = 1;
+    window.currentArtikelPreis = artikel.preis;
+};
+
+window.adjustMenge = (delta) => {
+    window.currentMenge = Math.max(1, Math.min(99, (window.currentMenge || 1) + delta));
+    updateMengeDisplay();
+};
+
+window.setMenge = (menge) => {
+    window.currentMenge = menge;
+    updateMengeDisplay();
+};
+
+window.updateMengeDisplay = () => {
+    const t = i18n.t.bind(i18n);
+    document.getElementById('menge-display').textContent = window.currentMenge;
+    document.getElementById('menge-total').innerHTML = `${t('total')}: <strong>${Utils.formatCurrency(window.currentArtikelPreis * window.currentMenge)}</strong>`;
+};
+
+window.closeMengenModal = () => {
+    const modal = document.getElementById('mengen-modal');
+    if (modal) modal.remove();
+};
+
+window.bucheMitMenge = async (artikelId) => {
+    try {
+        const artikel = await Artikel.getById(artikelId);
+        if (!artikel) return;
+        
+        const menge = window.currentMenge || 1;
+        await Buchungen.create(artikel, menge);
+        
+        closeMengenModal();
+        Utils.showToast(`${menge}× ${artikel.name_kurz||artikel.name} ${i18n.t('booked')}`, 'success');
         Router.navigate('buchen');
     } catch (e) {
         Utils.showToast(e.message || i18n.t('booking_error'), 'error');
@@ -5762,7 +5878,7 @@ window.searchArtikel = Utils.debounce(async q => {
         const content = (a.bild && a.bild.startsWith('data:')) 
             ? `<img src="${a.bild}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">`
             : `<div class="artikel-icon">${a.icon||'📦'}</div>`;
-        return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" onclick="bucheArtikelDirekt(${a.artikel_id})">${content}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`;
+        return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchend="artikelPressEnd(event)">${content}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`;
     };
     if (grid) grid.innerHTML = arts.map(renderTile).join('') || '<p class="text-muted" style="grid-column:1/-1;text-align:center;">Keine Ergebnisse</p>';
 }, 300);
