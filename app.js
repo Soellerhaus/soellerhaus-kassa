@@ -2458,20 +2458,64 @@ const PreisModus = {
     SELBSTVERSORGER: 'sv',
     HP: 'hp',
     
-    // Aktuellen Modus laden
+    // Aktuellen Modus laden - ZUERST von Supabase!
     async getModus() {
+        // Supabase hat Priorität (zentrale Einstellung)
+        if (supabaseClient && isOnline) {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('settings')
+                    .select('value')
+                    .eq('key', 'preismodus')
+                    .single();
+                
+                if (!error && data?.value) {
+                    // Lokal synchronisieren
+                    await db.settings.put({ key: 'preismodus', value: data.value });
+                    console.log('💰 Preismodus von Supabase geladen:', data.value);
+                    return data.value;
+                }
+            } catch(e) {
+                console.log('Preismodus Supabase Fehler, nutze lokal:', e);
+            }
+        }
+        
+        // Fallback: Lokal
         const setting = await db.settings.get('preismodus');
         return setting?.value || this.SELBSTVERSORGER; // Default: Selbstversorger
     },
     
     // Modus setzen
     async setModus(modus) {
+        // Zuerst lokal speichern
         await db.settings.put({ key: 'preismodus', value: modus });
+        
+        // Dann Supabase (zentral)
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('settings').upsert({ 
-                key: 'preismodus', 
-                value: modus 
-            });
+            try {
+                // Erst prüfen ob existiert, dann update oder insert
+                const { data: existing } = await supabaseClient
+                    .from('settings')
+                    .select('key')
+                    .eq('key', 'preismodus')
+                    .single();
+                
+                if (existing) {
+                    // Update
+                    await supabaseClient
+                        .from('settings')
+                        .update({ value: modus })
+                        .eq('key', 'preismodus');
+                } else {
+                    // Insert
+                    await supabaseClient
+                        .from('settings')
+                        .insert({ key: 'preismodus', value: modus });
+                }
+                console.log('💰 Preismodus in Supabase gespeichert:', modus);
+            } catch(e) {
+                console.error('Preismodus Supabase Speichern Fehler:', e);
+            }
         }
         console.log('💰 Preismodus geändert auf:', modus === this.HP ? 'Halbpension' : 'Selbstversorger');
     },
