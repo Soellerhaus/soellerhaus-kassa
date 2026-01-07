@@ -269,7 +269,7 @@ const DataProtection = {
                         fehlende_getraenke: fehlende.data || []
                     };
                     data.quelle = 'lokal+supabase';
-                    console.log('â˜ï¸ Supabase-Daten im Backup:', {
+                    console.log('☁️ Supabase-Daten im Backup:', {
                         profiles: data.supabase.profiles.length,
                         buchungen: data.supabase.buchungen.length,
                         artikel: data.supabase.artikel.length
@@ -330,7 +330,7 @@ const DataProtection = {
                             <span style="font-weight:600;">${lastBackupText}</span>
                         </div>
                         <div style="font-size:0.85rem;color:#888;margin-top:12px;">
-                            ℹï¸ Das Backup enthält alle Gäste, Artikel, Buchungen und Einstellungen 
+                            ℹ️ Das Backup enthält alle Gäste, Artikel, Buchungen und Einstellungen 
                             ${isOnline ? '(inkl. Cloud-Daten von Supabase)' : '(nur lokale Daten - offline)'}.
                         </div>
                     </div>
@@ -471,14 +471,14 @@ const DataProtection = {
                             </label>
                             <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
                                 <input type="checkbox" id="restore-fehlende" ${stats.fehlendeGetraenke === 0 ? 'disabled' : ''}>
-                                <span>⚠ï¸ Fehlende <strong>(${stats.fehlendeGetraenke})</strong></span>
+                                <span>⚠️ Fehlende <strong>(${stats.fehlendeGetraenke})</strong></span>
                             </label>
                         </div>
                     </div>
                     
                     <!-- Modus -->
                     <div style="padding:0 20px 20px;">
-                        <h3 style="margin:0 0 12px 0;color:#2C5F7C;">âš™ï¸ Wiederherstellungs-Modus</h3>
+                        <h3 style="margin:0 0 12px 0;color:#2C5F7C;">⚙️ Wiederherstellungs-Modus</h3>
                         <div style="display:flex;flex-direction:column;gap:8px;">
                             <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fff3cd;border:2px solid #ffc107;border-radius:8px;cursor:pointer;">
                                 <input type="radio" name="restore-mode" value="merge" checked style="margin-top:3px;">
@@ -490,7 +490,7 @@ const DataProtection = {
                             <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#f8d7da;border:2px solid #dc3545;border-radius:8px;cursor:pointer;">
                                 <input type="radio" name="restore-mode" value="replace" style="margin-top:3px;">
                                 <div>
-                                    <strong>🗑ï¸ Ersetzen (Vorsicht!)</strong>
+                                    <strong>🗑️ Ersetzen (Vorsicht!)</strong>
                                     <div style="font-size:0.85rem;color:#666;">ALLE bestehenden Daten werden gelöscht und durch Backup ersetzt</div>
                                 </div>
                             </label>
@@ -500,7 +500,7 @@ const DataProtection = {
                     <!-- Warnung -->
                     <div style="padding:0 20px 20px;">
                         <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;display:flex;align-items:flex-start;gap:10px;">
-                            <span style="font-size:1.5rem;">⚠ï¸</span>
+                            <span style="font-size:1.5rem;">⚠️</span>
                             <div style="font-size:0.85rem;color:#856404;">
                                 <strong>Wichtig:</strong> Erstellen Sie vor der Wiederherstellung ein aktuelles Backup der bestehenden Daten!
                             </div>
@@ -560,7 +560,7 @@ const DataProtection = {
         document.getElementById('restore-modal')?.remove();
         
         // Fortschrittsanzeige
-        Utils.showToast('â³ Wiederherstellung läuft...', 'info');
+        Utils.showToast('⏳ Wiederherstellung läuft...', 'info');
         
         try {
             let restored = { gaeste: 0, artikel: 0, buchungen: 0, kategorien: 0, gruppen: 0, fehlende: 0 };
@@ -906,8 +906,8 @@ const GastNachricht = {
         };
         
         const icons = {
-            info: 'ℹï¸',
-            warnung: '⚠ï¸',
+            info: 'ℹ️',
+            warnung: '⚠️',
             dringend: '🚨'
         };
         
@@ -1030,14 +1030,14 @@ const Utils = {
         const jetzt = new Date();
         const stunde = jetzt.getHours();
         
-        // Vor 7 Uhr morgens? â†’ Datum vom Vortag verwenden
+        // Vor 7 Uhr morgens? → Datum vom Vortag verwenden
         if (stunde < 7) {
             const gestern = new Date(jetzt);
             gestern.setDate(gestern.getDate() - 1);
             return this.formatDate(gestern);
         }
         
-        // Ab 7 Uhr â†’ heutiges Datum
+        // Ab 7 Uhr → heutiges Datum
         return this.formatDate(jetzt);
     },
     
@@ -1142,7 +1142,7 @@ const i18n = {
             'message_from_team': 'Nachricht vom Team',
             'important_message': 'WICHTIGE NACHRICHT!',
             'hours_visible': 'Noch {h}h sichtbar',
-            'click_to_close': 'Klicke âœ• zum Schließen',
+            'click_to_close': 'Klicke ✕ zum Schließen',
             'read_close': 'Gelesen & Schließen',
             
             // Name-Auswahl
@@ -1225,7 +1225,7 @@ const i18n = {
             'message_from_team': 'Message from the team',
             'important_message': 'IMPORTANT MESSAGE!',
             'hours_visible': 'Visible for {h}h',
-            'click_to_close': 'Click âœ• to close',
+            'click_to_close': 'Click ✕ to close',
             'read_close': 'Read & Close',
             
             // Name selection
@@ -1328,7 +1328,7 @@ const i18n = {
     
     // Button HTML rendern - oben mitte mit Flaggen
     renderLangButton() {
-        const flag = this.currentLang === 'de' ? '🇬‡§' : '🇩‡ª';
+        const flag = this.currentLang === 'de' ? '🇬🇧' : '🇩🇪';
         const label = this.currentLang === 'de' ? 'English' : 'Deutsch';
         return `<button onclick="toggleLanguage()" style="
             position:fixed;
@@ -1358,7 +1358,7 @@ window.i18n = i18n;
 // Sprache umschalten und Seite neu laden
 window.toggleLanguage = () => {
     const newLang = i18n.toggle();
-    Utils.showToast(newLang === 'en' ? '🇬‡§ English' : '🇩‡ª Deutsch', 'info');
+    Utils.showToast(newLang === 'en' ? '🇬🇧 English' : '🇩🇪 Deutsch', 'info');
     // Aktuelle Seite neu laden
     Router.handleRoute();
 };
@@ -1521,7 +1521,7 @@ const RegisteredGuests = {
             }
             
             if (!pinSaved) {
-                console.error('âŒ PIN konnte nicht in Supabase gespeichert werden!');
+                console.error('❌ PIN konnte nicht in Supabase gespeichert werden!');
             }
             
             // Profile laden zur Bestätigung
@@ -1706,7 +1706,7 @@ const RegisteredGuests = {
                     .order('display_name');
                 
                 if (error) {
-                    console.error('âŒ Supabase Fehler:', error);
+                    console.error('❌ Supabase Fehler:', error);
                 } else if (data) {
                     // Client-seitig filtern: Buchstabe + nicht gelöscht + aktiv
                     const filtered = data.filter(p => {
@@ -1736,7 +1736,7 @@ const RegisteredGuests = {
                     return [];
                 }
             } catch(e) {
-                console.error('âŒ Supabase error:', e);
+                console.error('❌ Supabase error:', e);
             }
         }
         
@@ -1919,7 +1919,7 @@ const Buchungen = {
         }
         
         if (!userId) {
-            console.error('âŒ KEINE USER ID GEFUNDEN!', State.currentUser);
+            console.error('❌ KEINE USER ID GEFUNDEN!', State.currentUser);
             throw new Error('Benutzer-ID nicht gefunden - bitte neu anmelden');
         }
         
@@ -1978,7 +1978,7 @@ const Buchungen = {
                 } else {
                     const { data, error } = await supabaseClient.from('buchungen').insert(b).select();
                 if (error) {
-                    console.error('âŒ Supabase insert error:', error.message, error.details, error.hint);
+                    console.error('❌ Supabase insert error:', error.message, error.details, error.hint);
                     await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
                 } else {
                     console.log('✅ Supabase insert OK:', data);
@@ -1986,7 +1986,7 @@ const Buchungen = {
                 }
                 }
             } catch(e) {
-                console.error('âŒ Buchung sync error:', e);
+                console.error('❌ Buchung sync error:', e);
                 await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
             }
         } else {
@@ -3250,7 +3250,7 @@ const UI = {
     },
     renderNameList(gaeste, onSelect) {
         if (!gaeste?.length) return `<div class="name-list-empty"><p>Keine Einträge</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">Zurück</button></div>`;
-        return `<div class="name-list-container"><div class="name-list-title">Wählen Sie Ihren Namen:</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="${onSelect}('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">â†’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">Zurück</button></div>`;
+        return `<div class="name-list-container"><div class="name-list-title">Wählen Sie Ihren Namen:</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="${onSelect}('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">Zurück</button></div>`;
     }
 };
 
@@ -3329,7 +3329,7 @@ Router.register('login', async () => {
     // Sprachauswahl Button
     const langBtn = i18n.renderLangButton();
     
-    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">âš™ï¸</a></div></div></div></div>`);
+    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">⚙️</a></div></div></div></div>`);
 });
 
 Router.register('register', () => {
@@ -3358,7 +3358,7 @@ Router.register('register', () => {
             </div>
             <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">✔ ${t('register_btn')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">â† ${t('back')}</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← ${t('back')}</button>
     </div></div>`);
 });
 
@@ -3387,7 +3387,7 @@ Router.register('name-select', async () => {
     
     const nameListHtml = !gaeste?.length 
         ? `<div class="name-list-empty"><p>${t('no_entries')}</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">${t('back')}</button></div>`
-        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">â†’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">${t('back')}</button></div>`;
+        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">${t('back')}</button></div>`;
     
     UI.render(`${langBtn}<div class="main-content"><div style="max-width:600px;margin:40px auto;"><h1 class="page-title" style="text-align:center;">${t('letter')}: ${window.currentLetter}</h1>${nameListHtml}</div></div>`);
 });
@@ -3411,7 +3411,7 @@ Router.register('pin-entry', () => {
             </div>
             <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;">✔ ${t('login')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">â† ${t('back')}</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">← ${t('back')}</button>
     </div></div>`);
 });
 
@@ -3521,7 +3521,7 @@ window.selectGruppe = async (gruppeId, gruppeName) => {
 };
 
 Router.register('admin-login', () => {
-    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;">🔐 Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">â† Zurück</button></div></div>`);
+    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;">🔐 Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← Zurück</button></div></div>`);
     setTimeout(() => document.getElementById('admin-password')?.focus(), 100);
 });
 
@@ -3560,7 +3560,7 @@ Router.register('admin-dashboard', async () => {
         " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
             <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 2rem;">${isHP ? '🍽ï¸' : '🏠'}</span>
+                    <span style="font-size: 2rem;">${isHP ? '🍽️' : '🏠'}</span>
                     <div>
                         <div style="font-weight: 700; font-size: 1.2rem;">
                             Preismodus: ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
@@ -3570,7 +3570,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                     </div>
                 </div>
-                <span style="font-size: 1.5rem;">âš™ï¸</span>
+                <span style="font-size: 1.5rem;">⚙️</span>
             </div>
         </div>
         
@@ -3606,7 +3606,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                     </div>
                 </div>
-                <span style="font-size: 1.5rem;">â†’</span>
+                <span style="font-size: 1.5rem;">→</span>
             </div>
         </div>
         
@@ -3756,7 +3756,7 @@ Router.register('admin-auffuellliste', async () => {
     
     const total = liste.reduce((s, i) => s + i.menge, 0);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">🍺 Auffüllliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🍺 Auffüllliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:20px;text-align:center;">
@@ -3779,7 +3779,7 @@ Router.register('admin-auffuellliste', async () => {
             <div style="padding:16px;">
                 <p style="margin:0;color:#666;font-size:0.9rem;">
                     💡 <strong>Hinweis:</strong> Die Auffüllliste ist UNABHÄNGIG vom Registrierkasse-Export.<br>
-                    Export für Registrierkasse â†’ Im Admin Dashboard
+                    Export für Registrierkasse → Im Admin Dashboard
                 </p>
             </div>
         </div>
@@ -3910,7 +3910,7 @@ Router.register('admin-alle-buchungen', async () => {
     // Sortiert nach Datum (neueste zuerst)
     const sortedDates = Object.keys(byDatum).sort().reverse();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">📋 Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📋 Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:16px;text-align:center;">
@@ -3928,7 +3928,7 @@ Router.register('admin-alle-buchungen', async () => {
                     Danach werden nur noch neue Buchungen angezeigt.
                 </p>
                 <button class="btn" onclick="handleGruppeAbgereist()" style="background:white;color:#e74c3c;font-weight:700;padding:12px 24px;">
-                    âœˆ Gruppe abreisen & Alle Buchungen abschließen
+                    ✈ Gruppe abreisen & Alle Buchungen abschließen
                 </button>
             </div>
         </div>
@@ -4025,7 +4025,7 @@ window.handleAdminDeleteBuchung = async (buchungId) => {
 
 // Alle Buchungen eines Tages ENDGÜLTIG löschen
 window.handleDeleteBuchungenByDate = async (datum) => {
-    if (!confirm(`⚠ï¸ ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGÜLTIG gelöscht!\n\nDies kann nicht rückgängig gemacht werden.\n\nFortfahren?`)) return;
+    if (!confirm(`⚠️ ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGÜLTIG gelöscht!\n\nDies kann nicht rückgängig gemacht werden.\n\nFortfahren?`)) return;
     
     try {
         // Buchungen von diesem Datum laden
@@ -4085,7 +4085,7 @@ Router.register('admin-fehlende', async () => {
         if (byKat[a.kategorie_id]) byKat[a.kategorie_id].artikel.push(a);
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">⚠ Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">⚠ Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#f39c12;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -4170,7 +4170,7 @@ Router.register('admin-umlage', async () => {
     const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
     const preisProGast = totalGuests > 0 ? Math.ceil((gesamtPreis / totalGuests) * 100) / 100 : gesamtPreis;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">💰 Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">💰 Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-danger);color:white;">
             <div style="padding:20px;text-align:center;">
@@ -4332,7 +4332,7 @@ Router.register('admin-notfall-export', async () => {
     // Aktuelle letzte ID
     const lastExportId = ExportService.getLastExportId();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">🔧 Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🔧 Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;">
@@ -4576,7 +4576,7 @@ Router.register('admin-gruppen', async () => {
     const gruppen = await Gruppen.getAll();
     const isAktiv = await Gruppen.isAbfrageAktiv();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <!-- TOGGLE: Gruppenabfrage aktiv -->
         <div class="card mb-3" style="background:${isAktiv ? 'var(--color-alpine-green)' : '#95a5a6'};color:white;">
@@ -4723,13 +4723,13 @@ Router.register('admin-preismodus', async () => {
     const currentModus = await PreisModus.getModus();
     const isHP = currentModus === PreisModus.HP;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">💰 Preismodus</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">💰 Preismodus</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- AKTUELLER STATUS -->
         <div class="card mb-3" style="background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};color:white;">
             <div style="padding:24px;text-align:center;">
-                <div style="font-size:4rem;margin-bottom:16px;">${isHP ? '🍽ï¸' : '🏠'}</div>
+                <div style="font-size:4rem;margin-bottom:16px;">${isHP ? '🍽️' : '🏠'}</div>
                 <div style="font-size:1.8rem;font-weight:700;margin-bottom:8px;">
                     ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
                 </div>
@@ -4760,7 +4760,7 @@ Router.register('admin-preismodus', async () => {
                         <div style="font-size:2.5rem;margin-bottom:8px;">🏠</div>
                         <div style="font-weight:700;font-size:1.1rem;">Selbstversorger</div>
                         <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">Standard-Preise</div>
-                        ${!isHP ? '<div style="margin-top:8px;font-weight:bold;">âœ“ AKTIV</div>' : ''}
+                        ${!isHP ? '<div style="margin-top:8px;font-weight:bold;">✔ AKTIV</div>' : ''}
                     </button>
                     
                     <button onclick="setPreismodus('hp')" style="
@@ -4772,10 +4772,10 @@ Router.register('admin-preismodus', async () => {
                         cursor:pointer;
                         transition:all 0.2s;
                     ">
-                        <div style="font-size:2.5rem;margin-bottom:8px;">🍽ï¸</div>
+                        <div style="font-size:2.5rem;margin-bottom:8px;">🍽️</div>
                         <div style="font-weight:700;font-size:1.1rem;">Halbpension (HP)</div>
                         <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">HP-Preise</div>
-                        ${isHP ? '<div style="margin-top:8px;font-weight:bold;">âœ“ AKTIV</div>' : ''}
+                        ${isHP ? '<div style="margin-top:8px;font-weight:bold;">✔ AKTIV</div>' : ''}
                     </button>
                 </div>
             </div>
@@ -4813,7 +4813,7 @@ Router.register('admin-nachricht', async () => {
     const aktiveNachricht = await GastNachricht.getAktive();
     const verbleibendeZeit = aktiveNachricht ? GastNachricht.getVerbleibendeZeit(aktiveNachricht) : null;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">📢 Gäste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📢 Gäste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- INFO BOX -->
@@ -4846,7 +4846,7 @@ Router.register('admin-nachricht', async () => {
             <div class="card-body">
                 <div style="background:var(--color-stone-light);padding:16px;border-radius:8px;margin-bottom:16px;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '🚨' : aktiveNachricht.typ === 'warnung' ? '⚠ï¸' : 'ℹï¸'}</span>
+                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '🚨' : aktiveNachricht.typ === 'warnung' ? '⚠️' : 'ℹ️'}</span>
                         <span style="background:${aktiveNachricht.typ === 'dringend' ? '#e74c3c' : aktiveNachricht.typ === 'warnung' ? '#f39c12' : '#3498db'};color:white;padding:2px 10px;border-radius:12px;font-size:0.85rem;font-weight:600;">
                             ${aktiveNachricht.typ === 'dringend' ? 'DRINGEND' : aktiveNachricht.typ === 'warnung' ? 'Warnung' : 'Info'}
                         </span>
@@ -4862,13 +4862,13 @@ Router.register('admin-nachricht', async () => {
                         <div style="font-weight:600;">${new Date(aktiveNachricht.erstellt_am).toLocaleString('de-AT')}</div>
                     </div>
                     <div style="text-align:center;padding:12px;background:#fff3cd;border-radius:8px;">
-                        <div style="font-size:0.85rem;color:#856404;">â±ï¸ Verbleibend</div>
+                        <div style="font-size:0.85rem;color:#856404;">⏱️ Verbleibend</div>
                         <div style="font-weight:700;color:#856404;font-size:1.1rem;">${verbleibendeZeit}</div>
                     </div>
                 </div>
                 
                 <button class="btn btn-danger btn-block" onclick="deaktiviereNachricht()" style="padding:16px;font-size:1.1rem;">
-                    âŒ Nachricht jetzt deaktivieren
+                    ❌ Nachricht jetzt deaktivieren
                 </button>
             </div>
         </div>
@@ -4890,7 +4890,7 @@ Router.register('admin-nachricht', async () => {
         <!-- NEUE NACHRICHT ERSTELLEN -->
         <div class="card">
             <div class="card-header" style="background:var(--color-alpine-green);color:white;">
-                <h2 class="card-title" style="margin:0;color:white;">âœï¸ Neue Nachricht erstellen</h2>
+                <h2 class="card-title" style="margin:0;color:white;">✏️ Neue Nachricht erstellen</h2>
             </div>
             <div class="card-body">
                 <div class="form-group">
@@ -4904,13 +4904,13 @@ Router.register('admin-nachricht', async () => {
                     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
                         <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('info')">
                             <input type="radio" name="nachricht-typ" value="info" checked style="display:none;">
-                            <span style="font-size:2rem;margin-bottom:8px;">ℹï¸</span>
+                            <span style="font-size:2rem;margin-bottom:8px;">ℹ️</span>
                             <span style="font-weight:600;">Info</span>
                             <span style="font-size:0.8rem;color:var(--color-stone-dark);">Normal</span>
                         </label>
                         <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('warnung')">
                             <input type="radio" name="nachricht-typ" value="warnung" style="display:none;">
-                            <span style="font-size:2rem;margin-bottom:8px;">⚠ï¸</span>
+                            <span style="font-size:2rem;margin-bottom:8px;">⚠️</span>
                             <span style="font-weight:600;">Warnung</span>
                             <span style="font-size:0.8rem;color:var(--color-stone-dark);">Auffällig</span>
                         </label>
@@ -4929,7 +4929,7 @@ Router.register('admin-nachricht', async () => {
                 
                 ${aktiveNachricht ? `
                 <p style="text-align:center;margin-top:12px;color:#e74c3c;font-size:0.9rem;">
-                    ⚠ï¸ Die aktuelle Nachricht wird ersetzt!
+                    ⚠️ Die aktuelle Nachricht wird ersetzt!
                 </p>
                 ` : ''}
             </div>
@@ -5043,7 +5043,7 @@ Router.register('admin-guests', async () => {
                 loadedFrom = 'Supabase';
                 // Supabase Daten mit korrekten Feldnamen mappen
                 guests = data.map(g => {
-                    console.log('Gast:', g.vorname, '| PIN in DB:', g.pin_hash || 'KEINE');
+                    console.log('Gast:', g.vorname);
                     return {
                         ...g,
                         nachname: g.vorname || g.first_name,
@@ -5065,7 +5065,7 @@ Router.register('admin-guests', async () => {
     if (guests.length === 0) {
         guests = await db.registeredGuests.toArray();
         guests = guests.filter(g => !g.geloescht && g.aktiv !== false);
-        console.log('⚠ï¸ Gäste von lokalem Cache geladen:', guests.length);
+        console.log('⚠️ Gäste von lokalem Cache geladen:', guests.length);
     }
     
     // Inaktive Gäste zählen (für Button)
@@ -5090,7 +5090,7 @@ Router.register('admin-guests', async () => {
     const gruppen = await db.gruppen.toArray();
     const gruppenAktiv = gruppen.filter(g => g.aktiv);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <style>
             .switch { position:relative; display:inline-block; width:50px; height:26px; }
@@ -5175,7 +5175,7 @@ Router.register('admin-guests', async () => {
                                 </td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;white-space:nowrap;">
                                     <button class="btn btn-primary" onclick="adminBuchenFuerGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="Für diesen Gast buchen">🍺</button>
-                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">âœï¸</button>
+                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
                                     <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Löschen">🗑</button>
                                 </td>
                             </tr>`;
@@ -5262,7 +5262,7 @@ Router.register('admin-guests-inaktiv', async () => {
         guests = all.filter(g => !g.geloescht && g.aktiv === false);
     }
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">â†</button><div class="header-title">📋 Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">←</button><div class="header-title">📋 Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -5463,7 +5463,7 @@ window.editGast = async (id) => {
                     passwordHash: data.pin_hash,
                     gruppenname: data.group_name || 'keiner Gruppe zugehörig'
                 };
-                console.log('Gast von Supabase geladen:', gast.nachname, 'PIN:', gast.passwort);
+                console.log('Gast von Supabase geladen:', gast.nachname);
             }
         } catch(e) {
             console.error('Supabase Fehler:', e);
@@ -5925,7 +5925,7 @@ Router.register('admin-articles', async () => {
                 </label>
             </td>
             <td style="text-align:right;white-space:nowrap;">
-                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">âœï¸</button>
+                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✏️</button>
                 <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">🗑</button>
             </td>
         </tr>`;
@@ -5944,7 +5944,7 @@ Router.register('admin-articles', async () => {
         });
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <style>
         .switch { position:relative; display:inline-block; width:50px; height:26px; }
         .switch input { opacity:0; width:0; height:0; }
@@ -5982,7 +5982,7 @@ Router.register('admin-articles', async () => {
                                     <div>Preise</div>
                                     <div style="display:flex;gap:8px;justify-content:center;font-size:0.7rem;font-weight:normal;">
                                         <span style="color:#3498db;">🏠 SV</span>
-                                        <span style="color:#9b59b6;">🍽ï¸ HP</span>
+                                        <span style="color:#9b59b6;">🍽️ HP</span>
                                     </div>
                                 </th>
                                 <th style="padding:12px 8px;">Kategorie</th>
@@ -6127,7 +6127,7 @@ Router.register('buchen', async () => {
                 </div>
                 <div style="text-align:right;color:white;">
                     <div style="font-size:1.5rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
-                    <div id="buchungen-arrow" style="font-size:1.2rem;">â–¼</div>
+                    <div id="buchungen-arrow" style="font-size:1.2rem;">▼</div>
                 </div>
             </div>
             <div id="buchungen-details" style="display:none;background:white;padding:16px;max-height:300px;overflow-y:auto;">
@@ -6199,7 +6199,7 @@ Router.register('buchen', async () => {
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span style="font-weight:600;">${Utils.formatCurrency(b.preis * b.menge)}</span>
-                        <button class="btn btn-danger" onclick="stornoBuchung('${b.buchung_id}')" style="padding:4px 10px;font-size:0.85rem;">âœ•</button>
+                        <button class="btn btn-danger" onclick="stornoBuchung('${b.buchung_id}')" style="padding:4px 10px;font-size:0.85rem;">✕</button>
                     </div>
                 </div>
                 `).join('')}
@@ -6218,10 +6218,10 @@ window.toggleBuchungsDetails = () => {
     const arrow = document.getElementById('buchungen-arrow');
     if (details.style.display === 'none') {
         details.style.display = 'block';
-        arrow.textContent = 'â–²';
+        arrow.textContent = '▲';
     } else {
         details.style.display = 'none';
-        arrow.textContent = 'â–¼';
+        arrow.textContent = '▼';
     }
 };
 
@@ -6300,7 +6300,7 @@ window.showMengenModal = async (artikelId) => {
             <div style="color:var(--color-alpine-green);font-size:1.2rem;font-weight:600;margin-bottom:20px;">${Utils.formatCurrency(artikel.preis)} / ${t('per_piece')}</div>
             
             <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:20px;">
-                <button onclick="adjustMenge(-1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">âˆ’</button>
+                <button onclick="adjustMenge(-1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">−</button>
                 <div id="menge-display" style="font-size:2.5rem;font-weight:700;min-width:60px;">1</div>
                 <button onclick="adjustMenge(1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">+</button>
             </div>
@@ -6313,7 +6313,7 @@ window.showMengenModal = async (artikelId) => {
             
             <div style="display:flex;gap:12px;">
                 <button onclick="closeMengenModal()" style="flex:1;padding:14px;border:2px solid var(--color-stone-medium);border-radius:12px;background:white;font-weight:600;cursor:pointer;">${t('cancel')}</button>
-                <button onclick="bucheMitMenge(${artikelId})" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--color-alpine-green);color:white;font-weight:700;font-size:1.1rem;cursor:pointer;">âœ“ ${t('book')}</button>
+                <button onclick="bucheMitMenge(${artikelId})" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--color-alpine-green);color:white;font-weight:700;font-size:1.1rem;cursor:pointer;">✔ ${t('book')}</button>
             </div>
         </div>
     </div>`;
@@ -6432,7 +6432,7 @@ window.syncFromCloud = async (silent = false) => {
             .order('display_name');
         
         if (error) {
-            console.error('âŒ Supabase Fehler:', error);
+            console.error('❌ Supabase Fehler:', error);
             if (!silent) Utils.showToast('Sync fehlgeschlagen: ' + error.message, 'error');
             return;
         }
@@ -6467,7 +6467,7 @@ window.syncFromCloud = async (silent = false) => {
         if (!silent) Router.navigate('login');
         
     } catch(e) {
-        console.error('âŒ Sync Fehler:', e);
+        console.error('❌ Sync Fehler:', e);
         if (!silent) Utils.showToast('Sync fehlgeschlagen: ' + e.message, 'error');
     }
 };
@@ -6608,7 +6608,7 @@ window.changeArtikelId = async (alteId) => {
         return;
     }
     
-    const neueIdStr = prompt(`⚠ï¸ ACHTUNG: Artikel-ID ändern\n\nDiese ID wird für die Registrierkasse verwendet!\nNur ändern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
+    const neueIdStr = prompt(`⚠️ ACHTUNG: Artikel-ID ändern\n\nDiese ID wird für die Registrierkasse verwendet!\nNur ändern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
     
     if (neueIdStr === null) return; // Abgebrochen
     
@@ -6631,7 +6631,7 @@ window.changeArtikelId = async (alteId) => {
     }
     
     // Bestätigung einholen
-    if (!confirm(`⚠ï¸ LETZTE WARNUNG!\n\nArtikel-ID wirklich ändern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
+    if (!confirm(`⚠️ LETZTE WARNUNG!\n\nArtikel-ID wirklich ändern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
         return;
     }
     
@@ -6652,7 +6652,7 @@ window.changeArtikelId = async (alteId) => {
         artikelCache = null;
         await DataProtection.createBackup();
         
-        Utils.showToast(`✅ Artikel-ID geändert: ${alteId} â†’ ${neueId}`, 'success');
+        Utils.showToast(`✅ Artikel-ID geändert: ${alteId} → ${neueId}`, 'success');
         Router.navigate('admin-articles');
     } catch (e) {
         console.error('ID ändern Fehler:', e);
@@ -6738,7 +6738,7 @@ window.showAddArticleModal = () => {
         <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;">📦</div>
         <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
         <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;">📷 Foto wählen</button>
-        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">âœ•</button>
+        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✕</button>
     </div>
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" placeholder="z.B. Cola 0.5l"></div>
     <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" placeholder="z.B. Cola"></div>
@@ -6753,7 +6753,7 @@ window.showAddArticleModal = () => {
                 <input type="number" id="article-price-sv" class="form-input" placeholder="0.00" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
             </div>
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#9b59b6;font-weight:600;">🍽ï¸ Halbpension (€)</label>
+                <label class="form-label" style="color:#9b59b6;font-weight:600;">🍽️ Halbpension (€)</label>
                 <input type="number" id="article-price-hp" class="form-input" placeholder="0.00" step="0.10" min="0" style="border-color:#9b59b6;font-size:1.2rem;font-weight:bold;">
             </div>
         </div>
@@ -6781,7 +6781,7 @@ window.showEditArticleModal = async id => {
         <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;">${previewContent}</div>
         <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
         <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;">📷 Foto wählen</button>
-        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">âœ•</button>
+        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✕</button>
     </div>
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" value="${a.name}"></div>
     <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" value="${a.name_kurz||''}"></div>
@@ -6796,7 +6796,7 @@ window.showEditArticleModal = async id => {
                 <input type="number" id="article-price-sv" class="form-input" value="${preisSV.toFixed(2)}" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
             </div>
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#9b59b6;font-weight:600;">🍽ï¸ Halbpension (€)</label>
+                <label class="form-label" style="color:#9b59b6;font-weight:600;">🍽️ Halbpension (€)</label>
                 <input type="number" id="article-price-hp" class="form-input" value="${preisHP.toFixed(2)}" step="0.10" min="0" style="border-color:#9b59b6;font-size:1.2rem;font-weight:bold;">
             </div>
         </div>
@@ -7037,7 +7037,7 @@ window.saveEditArticle = async () => {
         
     } catch(e) {
         // Bei JEDEM Fehler: App trotzdem zeigen!
-        console.error('âŒ KRITISCHER INIT FEHLER:', e);
+        console.error('❌ KRITISCHER INIT FEHLER:', e);
         showApp();
         Router.init();
         Utils.showToast('Ladefehler - bitte neu laden', 'error');
