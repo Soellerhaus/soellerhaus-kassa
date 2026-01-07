@@ -1549,8 +1549,36 @@ const RegisteredGuests = {
             };
             try { await db.registeredGuests.add(localGuest); } catch(e) {}
             
+            // WICHTIG: Nach Registrierung explizit einloggen für aktive Session!
+            // (sonst funktionieren Buchungen nicht wegen RLS)
+            try {
+                console.log('🔐 Expliziter Login nach Registrierung...');
+                const { data: loginData, error: loginError } = await supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: supabasePassword
+                });
+                if (loginError) {
+                    console.warn('Login nach Registrierung fehlgeschlagen:', loginError);
+                } else {
+                    console.log('✅ Session nach Registrierung aktiv');
+                }
+            } catch(e) {
+                console.warn('Login-Versuch fehlgeschlagen:', e);
+            }
+            
             Utils.showToast('Registrierung erfolgreich!', 'success');
-            State.setUser({ ...authData.user, ...profile, firstName: cleanName });
+            
+            // WICHTIG: User-Objekt mit korrekter ID erstellen
+            const userObj = {
+                id: userId,  // UUID aus Supabase Auth - EXPLIZIT setzen!
+                firstName: cleanName,
+                nachname: cleanName,
+                email: email,
+                group_name: 'keiner Gruppe zugehörig',
+                gruppenname: 'keiner Gruppe zugehörig'
+            };
+            console.log('📝 setUser mit ID:', userObj.id);
+            State.setUser(userObj);
             return localGuest;
         } else {
             // Offline-Modus: Lokal speichern MIT PIN als Klartext!
@@ -1603,9 +1631,17 @@ const RegisteredGuests = {
             // Last login updaten
             await supabaseClient.from('profiles').update({ last_login_at: new Date().toISOString() }).eq('id', id);
             
-            const user = { ...data.user, ...profile, firstName: profile.first_name };
+            // WICHTIG: User-Objekt mit EXPLIZITER ID erstellen
+            // (verhindert dass profile.id undefined ist und die richtige ID überschreibt)
+            const user = { 
+                ...data.user, 
+                ...profile, 
+                id: id,  // ID EXPLIZIT setzen - die übergebene ID ist korrekt!
+                firstName: profile.first_name || profile.vorname || profile.display_name
+            };
+            console.log('📝 Login setUser mit ID:', user.id);
             State.setUser(user);
-            Utils.showToast(`Willkommen, ${profile.first_name}!`, 'success');
+            Utils.showToast(`Willkommen, ${user.firstName}!`, 'success');
             return user;
         } else {
             // Offline: Lokaler Login
@@ -1853,7 +1889,19 @@ const Auth = {
 const Buchungen = {
     async create(artikel, menge=1) {
         if (!State.currentUser) throw new Error('Nicht angemeldet');
-        const userId = State.currentUser.id || State.currentUser.gast_id;
+        
+        // User ID sicher ermitteln
+        let userId = State.currentUser.id || State.currentUser.gast_id;
+        
+        // Fallback: Wenn immer noch keine ID, aus localStorage
+        if (!userId) {
+            userId = localStorage.getItem('current_user_id');
+        }
+        
+        if (!userId) {
+            console.error('❌ KEINE USER ID GEFUNDEN!', State.currentUser);
+            throw new Error('Benutzer-ID nicht gefunden - bitte neu anmelden');
+        }
         
         console.log('📝 Buchung erstellen für User:', userId);
         console.log('📝 CurrentUser:', State.currentUser);
@@ -1863,7 +1911,7 @@ const Buchungen = {
         
         const b = {
             buchung_id: Utils.uuid(),
-            user_id: userId, // Für Supabase
+            user_id: String(userId), // Für Supabase - als String sicherstellen
             gast_id: String(userId), // Legacy Kompatibilität - als String
             gast_vorname: State.currentUser.firstName || State.currentUser.first_name || State.currentUser.vorname || '',
             gast_nachname: State.currentUser.nachname || '',
@@ -1889,6 +1937,7 @@ const Buchungen = {
         };
         
         console.log('📝 Buchung Objekt (Preismodus:', State.currentPreisModus, '):', b);
+        console.log('📝 user_id in Buchung:', b.user_id);
         
         // Immer lokal speichern (Cache)
         await db.buchungen.add({...b, sync_status: isOnline ? 'synced' : 'pending'});
@@ -1896,10 +1945,15 @@ const Buchungen = {
         // Online: Auch nach Supabase
         if (supabaseClient && isOnline) {
             try {
-                console.log('📤 Sende an Supabase...');
+                console.log('📤 Sende an Supabase mit user_id:', b.user_id);
+                
+                // Prüfe aktuelle Session
+                const { data: sessionData } = await supabaseClient.auth.getSession();
+                console.log('📤 Aktive Session:', sessionData?.session ? 'JA (user: ' + sessionData.session.user?.id + ')' : 'NEIN');
+                
                 const { data, error } = await supabaseClient.from('buchungen').insert(b).select();
                 if (error) {
-                    console.error('❌ Supabase insert error:', error);
+                    console.error('❌ Supabase insert error:', error.message, error.details, error.hint);
                     await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
                 } else {
                     console.log('✅ Supabase insert OK:', data);
