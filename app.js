@@ -1907,47 +1907,37 @@ const Auth = {
 };
 
 const Buchungen = {
+    // EINZELBUCHUNGEN: Bei Menge 5 werden 5 separate Buchungen erstellt (für Access/Registrierkasse)
     async create(artikel, menge=1) {
         if (!State.currentUser) throw new Error('Nicht angemeldet');
         
         // User ID sicher ermitteln
         let userId = State.currentUser.id || State.currentUser.gast_id;
+        if (!userId) userId = localStorage.getItem('current_user_id');
+        if (!userId) throw new Error('Benutzer-ID nicht gefunden - bitte neu anmelden');
         
-        // Fallback: Wenn immer noch keine ID, aus localStorage
-        if (!userId) {
-            userId = localStorage.getItem('current_user_id');
-        }
-        
-        if (!userId) {
-            console.error('❌ KEINE USER ID GEFUNDEN!', State.currentUser);
-            throw new Error('Benutzer-ID nicht gefunden - bitte neu anmelden');
-        }
-        
-        console.log('📝 Buchung erstellen für User:', userId);
-        console.log('📝 CurrentUser:', State.currentUser);
+        console.log('📝 Buchung erstellen für User:', userId, 'Menge:', menge);
         
         // Preis basierend auf aktivem Preismodus
         const preis = PreisModus.getPreis(artikel, State.currentPreisModus);
         
-        const b = {
-            buchung_id: Utils.uuid(),
-            user_id: String(userId), // Für Supabase - als String sicherstellen
-            gast_id: String(userId), // Legacy Kompatibilität - als String
+        // Basis-Daten für alle Buchungen
+        const basisDaten = {
+            user_id: String(userId),
+            gast_id: String(userId),
             gast_vorname: State.currentUser.firstName || State.currentUser.first_name || State.currentUser.vorname || '',
             gast_nachname: State.currentUser.nachname || '',
             gastgruppe: State.currentUser.zimmernummer || '',
-            group_name: State.selectedGroup || State.currentUser.group_name || '', // NEU: Gruppe
+            group_name: State.selectedGroup || State.currentUser.group_name || '',
             artikel_id: artikel.artikel_id, 
             artikel_name: artikel.name, 
             preis: parseFloat(preis),
-            preis_modus: State.currentPreisModus, // Speichern welcher Modus verwendet wurde
+            preis_modus: State.currentPreisModus,
             steuer_prozent: artikel.steuer_prozent || 10, 
-            menge: parseInt(menge),
-            datum: Utils.getBuchungsDatum(), // 7:00-7:00 Periode
+            datum: Utils.getBuchungsDatum(),
             uhrzeit: Utils.formatTime(new Date()),
-            erstellt_am: new Date().toISOString(), 
             exportiert: false,
-            aufgefuellt: false, // NEU: Für Auffüllliste (unabhängig von Export!)
+            aufgefuellt: false,
             geraet_id: Utils.getDeviceId(), 
             session_id: State.sessionId,
             storniert: false,
@@ -1956,47 +1946,57 @@ const Buchungen = {
             ist_umlage: false
         };
         
-        console.log('📝 Buchung Objekt (Preismodus:', State.currentPreisModus, '):', b);
-        console.log('📝 user_id in Buchung:', b.user_id);
-        
-        // Immer lokal speichern (Cache)
-        await db.buchungen.add({...b, sync_status: isOnline ? 'synced' : 'pending'});
-        
-        // Online: Auch nach Supabase
+        // Session einmal prüfen
+        let hasSession = false;
         if (supabaseClient && isOnline) {
-            try {
-                console.log('📤 Sende an Supabase mit user_id:', b.user_id);
-                
-                // Prüfe aktuelle Session
-                const { data: sessionData } = await supabaseClient.auth.getSession();
-                console.log('📤 Aktive Session:', sessionData?.session ? 'JA (user: ' + sessionData.session.user?.id + ')' : 'NEIN');
-                
-                // WICHTIG: Ohne Session keine Buchungen nach Supabase!
-                if (!sessionData?.session) {
-                    console.warn('KEINE Auth Session - Buchung nur lokal gespeichert!');
+            const { data: sessionData } = await supabaseClient.auth.getSession();
+            hasSession = !!sessionData?.session;
+        }
+        
+        // LOOP: Für jede Einheit eine separate Buchung erstellen
+        const erstellteBuchungen = [];
+        for (let i = 0; i < parseInt(menge); i++) {
+            const b = {
+                ...basisDaten,
+                buchung_id: Utils.uuid(),
+                menge: 1, // IMMER 1 pro Buchung!
+                erstellt_am: new Date().toISOString()
+            };
+            
+            // Lokal speichern
+            await db.buchungen.add({...b, sync_status: (isOnline && hasSession) ? 'synced' : 'pending'});
+            
+            // Online: Nach Supabase
+            if (supabaseClient && isOnline && hasSession) {
+                try {
+                    const { error } = await supabaseClient.from('buchungen').insert(b);
+                    if (error) {
+                        console.error('❌ Supabase insert error:', error.message);
+                        await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
+                    }
+                } catch(e) {
                     await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
-                } else {
-                    const { data, error } = await supabaseClient.from('buchungen').insert(b).select();
-                if (error) {
-                    console.error('❌ Supabase insert error:', error.message, error.details, error.hint);
-                    await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
-                } else {
-                    console.log('✅ Supabase insert OK:', data);
-                    await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
                 }
-                }
-            } catch(e) {
-                console.error('❌ Buchung sync error:', e);
-                await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
             }
-        } else {
-            console.log('⚠  Offline oder kein Supabase Client');
+            
+            erstellteBuchungen.push(b);
+        }
+        
+        console.log('✅', menge, 'Einzelbuchung(en) erstellt für:', artikel.name);
+        
+        // Ampel aktualisieren
+        setTimeout(() => SyncManager.updateUI(), 200);
+        
+        // Bei pending Buchungen: Retry im Hintergrund
+        const pendingCount = await SyncManager.getPendingCount();
+        if (pendingCount > 0) {
+            setTimeout(() => SyncManager.syncPending(), 3000); // Nach 3 Sek nochmal versuchen
         }
         
         await DataProtection.createBackup();
-        return b;
+        return erstellteBuchungen[0];
     },
-    
+
     async storno(buchung_id) {
         // Lokal laden
         const allBs = await db.buchungen.toArray();
@@ -2238,6 +2238,184 @@ const Buchungen = {
         }
     }
 };
+
+// ===========================================
+// SYNC MANAGER - Garantierte Buchungs-Synchronisation
+// ===========================================
+const SyncManager = {
+    syncInterval: null,
+    isSyncing: false,
+    
+    // Status: 'green' = alles OK, 'yellow' = pending, 'red' = offline
+    async getStatus() {
+        const pending = await this.getPendingCount();
+        if (!isOnline) return { status: 'red', pending, message: 'Offline' };
+        if (pending > 0) return { status: 'yellow', pending, message: `${pending} warten` };
+        return { status: 'green', pending: 0, message: 'Synchronisiert' };
+    },
+    
+    // Anzahl pending Buchungen
+    async getPendingCount() {
+        try {
+            const alle = await db.buchungen.toArray();
+            return alle.filter(b => b.sync_status === 'pending' && !b.storniert).length;
+        } catch(e) { return 0; }
+    },
+    
+    // Pending Buchungen synchronisieren
+    async syncPending() {
+        if (this.isSyncing || !isOnline || !supabaseClient) return { synced: 0, failed: 0 };
+        
+        this.isSyncing = true;
+        let synced = 0, failed = 0;
+        
+        try {
+            // Session prüfen
+            const { data: sessionData } = await supabaseClient.auth.getSession();
+            if (!sessionData?.session) {
+                console.log('⚠️ SyncManager: Keine Session');
+                this.isSyncing = false;
+                return { synced: 0, failed: 0, noSession: true };
+            }
+            
+            // Pending Buchungen laden
+            const alle = await db.buchungen.toArray();
+            const pending = alle.filter(b => b.sync_status === 'pending' && !b.storniert);
+            
+            console.log(`🔄 SyncManager: ${pending.length} pending Buchungen`);
+            
+            for (const b of pending) {
+                try {
+                    // Prüfen ob schon in Supabase existiert
+                    const { data: existing } = await supabaseClient
+                        .from('buchungen')
+                        .select('buchung_id')
+                        .eq('buchung_id', b.buchung_id)
+                        .single();
+                    
+                    if (existing) {
+                        // Schon vorhanden, nur lokal updaten
+                        await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
+                        synced++;
+                        continue;
+                    }
+                    
+                    // Upload zu Supabase
+                    const buchungData = { ...b };
+                    delete buchungData.sync_status; // Nicht nach Supabase senden
+                    
+                    const { error } = await supabaseClient.from('buchungen').insert(buchungData);
+                    
+                    if (error) {
+                        console.error('❌ Sync error:', b.buchung_id, error.message);
+                        failed++;
+                    } else {
+                        await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
+                        synced++;
+                        console.log('✅ Synced:', b.buchung_id);
+                    }
+                } catch(e) {
+                    console.error('❌ Sync exception:', e);
+                    failed++;
+                }
+            }
+        } catch(e) {
+            console.error('❌ SyncManager error:', e);
+        }
+        
+        this.isSyncing = false;
+        
+        if (synced > 0) {
+            console.log(`✅ SyncManager: ${synced} synchronisiert, ${failed} fehlgeschlagen`);
+            this.updateUI();
+        }
+        
+        return { synced, failed };
+    },
+    
+    // Ampel-HTML generieren
+    getAmpelHtml() {
+        return `<div id="sync-ampel" onclick="SyncManager.showDetails()" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.9);font-size:0.8rem;"></div>`;
+    },
+    
+    // Ampel aktualisieren
+    async updateUI() {
+        const ampelEl = document.getElementById('sync-ampel');
+        if (!ampelEl) return;
+        
+        const { status, pending, message } = await this.getStatus();
+        
+        const colors = {
+            green: '#27ae60',
+            yellow: '#f39c12', 
+            red: '#e74c3c'
+        };
+        
+        const icons = {
+            green: '🟢',
+            yellow: '🟡',
+            red: '🔴'
+        };
+        
+        ampelEl.innerHTML = `${icons[status]} <span style="color:${colors[status]};font-weight:600;">${message}</span>`;
+        ampelEl.title = status === 'green' ? 'Alle Buchungen synchronisiert' : 
+                        status === 'yellow' ? `${pending} Buchung(en) warten auf Upload` :
+                        'Offline - Buchungen werden lokal gespeichert';
+    },
+    
+    // Details Modal anzeigen
+    async showDetails() {
+        const { status, pending } = await this.getStatus();
+        
+        let message = '';
+        if (status === 'green') {
+            message = '✅ Alle deine Buchungen sind erfolgreich synchronisiert!';
+        } else if (status === 'yellow') {
+            message = `🟡 ${pending} Buchung(en) warten noch auf Upload.\n\nDie App versucht automatisch, diese hochzuladen.`;
+        } else {
+            message = '🔴 Du bist offline.\n\nDeine Buchungen werden lokal gespeichert und automatisch hochgeladen, sobald du wieder online bist.';
+        }
+        
+        Utils.showToast(message, status === 'green' ? 'success' : 'info');
+        
+        // Bei pending: Sofort Sync versuchen
+        if (status === 'yellow') {
+            this.syncPending();
+        }
+    },
+    
+    // Hintergrund-Sync starten (alle 60 Sekunden)
+    startBackgroundSync() {
+        if (this.syncInterval) return;
+        
+        console.log('🔄 SyncManager: Background sync gestartet');
+        
+        // Sofort einmal synchronisieren
+        this.syncPending();
+        this.updateUI();
+        
+        // Dann alle 60 Sekunden
+        this.syncInterval = setInterval(async () => {
+            const pending = await this.getPendingCount();
+            if (pending > 0 && isOnline) {
+                console.log('🔄 Background sync check...');
+                await this.syncPending();
+            }
+            this.updateUI();
+        }, 60000);
+    },
+    
+    // Hintergrund-Sync stoppen
+    stopBackgroundSync() {
+        if (this.syncInterval) {
+            clearInterval(this.syncInterval);
+            this.syncInterval = null;
+        }
+    }
+};
+
+// Global verfügbar machen
+window.SyncManager = SyncManager;
 
 // Fehlende Getränke Management
 const FehlendeGetraenke = {
@@ -3245,6 +3423,7 @@ window.Router = Router;
 
 const UI = {
     render(html) { document.getElementById('app').innerHTML = html; },
+    append(html) { document.getElementById('app').innerHTML += html; },
     renderAlphabet(onClick) {
         return `<div class="alphabet-container"><div class="alphabet-title">Wählen Sie den ersten Buchstaben:</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="${onClick}('${l}')">${l}</button>`).join('')}</div></div>`;
     },
@@ -6059,6 +6238,9 @@ Router.register('dashboard', async () => {
 Router.register('buchen', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
     
+    // SyncManager starten für Hintergrund-Synchronisation
+    SyncManager.startBackgroundSync();
+    
     // i18n Setup
     const t = (key, params) => i18n.t(key, params);
     const langBtn = i18n.renderLangButton();
@@ -6132,10 +6314,17 @@ Router.register('buchen', async () => {
             <div class="header-title">👤 ${name}</div>
             ${currentGroup ? `<div style="font-size:0.8rem;opacity:0.8;">🏫 ${currentGroup}</div>` : ''}
         </div>
-        <div class="header-right"><button class="btn btn-secondary" onclick="handleGastAbmelden()">${t('logout')}</button></div>
+        <div class="header-right" style="display:flex;align-items:center;gap:12px;">
+            ${SyncManager.getAmpelHtml()}
+            <button class="btn btn-secondary" onclick="handleGastAbmelden()">${t('logout')}</button>
+        </div>
     </div>
-    <div class="main-content" style="padding-bottom:${sessionBuchungen.length ? '180px' : '20px'};">
-        
+    <div class="main-content" style="padding-bottom:${sessionBuchungen.length ? '180px' : '20px'};">`);
+    
+    // Ampel nach dem Rendern aktualisieren
+    setTimeout(() => SyncManager.updateUI(), 100);
+    
+    UI.append(`
         ${meineBuchungen.length ? `
         <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);border-radius:16px;margin-bottom:20px;overflow:hidden;">
             <div onclick="toggleBuchungsDetails()" style="padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
@@ -6463,6 +6652,12 @@ window.handleBuchenUndAbmelden = async () => {
 
 // Gast Abmelden (gleiche Funktion, immer Buchungen speichern)
 window.handleGastAbmelden = async () => {
+    // SyncManager stoppen
+    SyncManager.stopBackgroundSync();
+    
+    // Noch ausstehende Buchungen synchronisieren bevor Abmeldung
+    await SyncManager.syncPending();
+    
     await Buchungen.fixSessionBuchungen();
     State.clearUser();
     Router.navigate('login');
