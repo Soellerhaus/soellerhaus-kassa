@@ -6277,12 +6277,14 @@ let artikelLongPressed = false;
 // Touch-Position tracking um Scroll von Tap zu unterscheiden
 let artikelTouchStartX = null;
 let artikelTouchStartY = null;
-const TOUCH_MOVE_THRESHOLD = 15; // Pixel - wenn mehr bewegt, ist es ein Scroll
+let artikelPressStartTime = null; // Zeitpunkt des Touch-Starts
+const TOUCH_MOVE_THRESHOLD = 30; // Pixel - wenn mehr bewegt, ist es ein Scroll (erhöht für besseres Scrollen)
 
 window.artikelPressStart = (event, artikelId) => {
     // NICHT event.preventDefault() bei touchstart - sonst funktioniert Scrollen nicht!
     artikelPressId = artikelId;
     artikelLongPressed = false;
+    artikelPressStartTime = Date.now(); // Touch-Startzeit merken
     
     // Touch-Startposition speichern
     if (event.touches && event.touches[0]) {
@@ -6350,8 +6352,9 @@ window.artikelPressEnd = (event) => {
         wasScroll = deltaX > TOUCH_MOVE_THRESHOLD || deltaY > TOUCH_MOVE_THRESHOLD;
     }
     
-    // Wenn kein Long-Press UND kein Scroll, dann normaler Klick (1 Stück buchen)
-    if (!artikelLongPressed && artikelPressId && !wasScroll) {
+    // Wenn kein Long-Press UND kein Scroll UND mindestens 150ms gedrückt, dann normaler Klick (1 Stück buchen)
+    const touchDuration = Date.now() - artikelPressStartTime;
+    if (!artikelLongPressed && artikelPressId && !wasScroll && touchDuration >= 150) {
         bucheArtikelDirekt(artikelPressId);
     }
     
@@ -6359,6 +6362,7 @@ window.artikelPressEnd = (event) => {
     artikelPressId = null;
     artikelTouchStartX = null;
     artikelTouchStartY = null;
+    artikelPressStartTime = null;
 };
 
 // Mengen-Modal anzeigen
