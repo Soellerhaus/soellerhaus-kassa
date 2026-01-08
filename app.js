@@ -6256,6 +6256,10 @@ window.bucheArtikelDirekt = async (id) => {
 let artikelPressTimer = null;
 let artikelPressId = null;
 let artikelLongPressed = false;
+// Touch-Position tracking um Scroll von Tap zu unterscheiden
+let artikelTouchStartX = null;
+let artikelTouchStartY = null;
+const TOUCH_MOVE_THRESHOLD = 15; // Pixel - wenn mehr bewegt, ist es ein Scroll
 
 window.artikelPressStart = (event, artikelId) => {
     // NICHT event.preventDefault() bei touchstart - sonst funktioniert Scrollen nicht!
