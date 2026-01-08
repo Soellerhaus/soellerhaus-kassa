@@ -3255,8 +3255,30 @@ const UI = {
 };
 
 // Routes
+// Auto-Refresh Timer für Startseite (neue Nachrichten laden)
+let loginRefreshTimer = null;
+
 Router.register('login', async () => {
     State.currentPin = ''; window.selectedGastId = null; window.currentLetter = null;
+    
+    // Vorherigen Timer stoppen
+    if (loginRefreshTimer) {
+        clearInterval(loginRefreshTimer);
+        loginRefreshTimer = null;
+    }
+    
+    // Auto-Refresh alle 2 Minuten starten (nur auf Login-Seite)
+    loginRefreshTimer = setInterval(async () => {
+        // Nur refreshen wenn noch auf Login-Seite
+        if (window.location.hash === '#login' || window.location.hash === '' || !window.location.hash) {
+            console.log('🔄 Auto-Refresh: Lade neue Nachrichten...');
+            Router.navigate('login');
+        } else {
+            // Nicht mehr auf Login-Seite -> Timer stoppen
+            clearInterval(loginRefreshTimer);
+            loginRefreshTimer = null;
+        }
+    }, 120000); // 120000ms = 2 Minuten
     const t = (key, params) => i18n.t(key, params);
     
     // Abgelaufene Nachrichten aufräumen
@@ -6453,15 +6475,37 @@ Router.register('profil', () => {
 });
 
 // Global handlers
-window.handleRegisterClick = () => Router.navigate('register');
-window.handleAdminClick = () => Router.navigate('admin-login');
+window.handleRegisterClick = () => {
+    // Auto-Refresh Timer stoppen
+    if (typeof loginRefreshTimer !== 'undefined' && loginRefreshTimer) {
+        clearInterval(loginRefreshTimer);
+        loginRefreshTimer = null;
+    }
+    Router.navigate('register');
+};
+window.handleAdminClick = () => {
+    // Auto-Refresh Timer stoppen
+    if (typeof loginRefreshTimer !== 'undefined' && loginRefreshTimer) {
+        clearInterval(loginRefreshTimer);
+        loginRefreshTimer = null;
+    }
+    Router.navigate('admin-login');
+};
 window.handleBackToLogin = () => Router.navigate('login');
 window.navigateToDashboard = () => Router.navigate('dashboard');
 window.navigateToBuchen = () => Router.navigate('buchen');
 window.navigateToHistorie = () => Router.navigate('historie');
 window.navigateToProfil = () => Router.navigate('profil');
 window.handleLogout = async () => { await Auth.logout(); };
-window.handleLetterSelect = l => { window.currentLetter = l; Router.navigate('name-select'); };
+window.handleLetterSelect = l => { 
+    // Auto-Refresh Timer stoppen
+    if (typeof loginRefreshTimer !== 'undefined' && loginRefreshTimer) {
+        clearInterval(loginRefreshTimer);
+        loginRefreshTimer = null;
+    }
+    window.currentLetter = l; 
+    Router.navigate('name-select'); 
+};
 window.handleNameSelect = id => { window.selectedGastId = id; Router.navigate('pin-entry'); };
 window.handlePinCancel = () => { window.selectedGastId = null; Router.navigate('login'); };
 
