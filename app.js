@@ -3289,14 +3289,14 @@ const Artikel = {
         // Erst abgelaufene Artikel cleanup
         await this.cleanupAbgelaufene();
         
-        // Dann lokale Daten prüfen
-        let r = await db.artikel.toArray();
-        
-        // Wenn lokal leer und online, von Supabase laden
-        if (r.length === 0 && supabaseClient && isOnline) {
+        // Von Supabase laden wenn online UND (Cache null ODER älter als 30 Sekunden)
+        const cacheAge = artikelCacheTime ? (Date.now() - artikelCacheTime) : Infinity;
+        if (supabaseClient && isOnline && (!artikelCache || cacheAge > 30000)) {
             await this.loadFromSupabase();
-            r = await db.artikel.toArray();
         }
+        
+        // Dann lokale Daten holen
+        let r = await db.artikel.toArray();
         
         // Cache aktualisieren
         if (r.length > 0) {
@@ -4381,7 +4381,7 @@ window.printAuffuellliste = async () => {
             <style>
                 @page { 
                     margin: 0; 
-                    size: 80mm auto;  /* Breite 80mm, Höhe automatisch */
+                    size: 80mm auto;
                 }
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 html, body { 
@@ -4389,21 +4389,83 @@ window.printAuffuellliste = async () => {
                     min-height: 0 !important;
                 }
                 body { 
-                    font-family: 'Courier New', monospace; 
-                    font-size: 12px;
+                    font-family: Arial, Helvetica, sans-serif; 
+                    font-size: 14px;
+                    font-weight: 600;
                     width: 80mm;
-                    padding: 3mm;
-                    padding-bottom: 8mm;
+                    padding: 4mm;
+                    padding-bottom: 10mm;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
                 }
-                .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
-                .header h1 { font-size: 16px; margin-bottom: 3px; }
-                .kategorie { font-weight: bold; background: #000; color: #fff; padding: 2px 4px; margin: 8px 0 4px 0; font-size: 11px; }
-                .item { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dotted #ccc; }
-                .item-name { flex: 1; }
-                .item-check { width: 45px; text-align: center; font-family: monospace; }
-                .item-menge { width: 25px; text-align: right; font-weight: bold; }
-                .footer { margin-top: 10px; text-align: center; border-top: 1px dashed #000; padding-top: 8px; font-size: 9px; }
-                .total { font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 5px 0; }
+                .header { 
+                    text-align: center; 
+                    margin-bottom: 12px; 
+                    border-bottom: 2px solid #000; 
+                    padding-bottom: 10px; 
+                }
+                .header h1 { 
+                    font-size: 22px; 
+                    font-weight: 900; 
+                    letter-spacing: 2px;
+                    margin-bottom: 5px; 
+                }
+                .header .datum {
+                    font-size: 14px;
+                    font-weight: 700;
+                }
+                .kategorie { 
+                    font-weight: 900; 
+                    background: #000; 
+                    color: #fff; 
+                    padding: 5px 8px; 
+                    margin: 12px 0 6px 0; 
+                    font-size: 14px;
+                    letter-spacing: 1px;
+                }
+                .item { 
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: center;
+                    padding: 6px 2px; 
+                    border-bottom: 1px solid #000; 
+                    font-size: 14px;
+                    font-weight: 700;
+                }
+                .item-name { 
+                    flex: 1; 
+                    font-weight: 700;
+                }
+                .item-check {
+                    width: 50px;
+                    text-align: center;
+                    font-weight: 900;
+                    font-size: 16px;
+                    font-family: Arial, sans-serif;
+                }
+                .item-menge { 
+                    min-width: 35px; 
+                    text-align: right; 
+                    font-weight: 900;
+                    font-size: 16px;
+                }
+                .total { 
+                    font-size: 18px; 
+                    font-weight: 900; 
+                    text-align: center; 
+                    margin: 12px 0; 
+                    border: 2px solid #000;
+                    padding: 8px; 
+                    letter-spacing: 1px;
+                }
+                .footer { 
+                    margin-top: 12px; 
+                    text-align: center; 
+                    border-top: 2px solid #000; 
+                    padding-top: 10px; 
+                    font-size: 12px;
+                    font-weight: 600;
+                }
                 @media print { 
                     html, body { 
                         width: 80mm; 
@@ -4415,25 +4477,24 @@ window.printAuffuellliste = async () => {
         <body>
             <div class="header">
                 <h1>AUFFÜLLLISTE</h1>
-                <div>${datum} ${zeit}</div>
+                <div class="datum">${datum} ${zeit}</div>
             </div>
             
             ${Object.keys(byKat).sort().map(kat => `
-                <div class="kategorie">${kat}</div>
+                <div class="kategorie">${kat.toUpperCase()}</div>
                 ${byKat[kat].map(item => `
                     <div class="item">
                         <span class="item-name">${item.name}</span>
                         <span class="item-check">__:__</span>
-                        <span class="item-menge">${item.menge}×</span>
+                        <span class="item-menge">${item.menge}x</span>
                     </div>
                 `).join('')}
             `).join('')}
             
-            <div class="total">GESAMT: ${total} Getränke</div>
+            <div class="total">GESAMT: ${total} STÜCK</div>
             
             <div class="footer">
-                Söllerhaus Kassa<br>
-                ✓ = aufgefüllt
+                Söllerhaus Kassa
             </div>
         </body>
         </html>
@@ -6823,7 +6884,6 @@ Router.register('buchen', async () => {
     
     // i18n Setup
     const t = (key, params) => i18n.t(key, params);
-    const langBtn = i18n.renderLangButton();
     
     // Prüfen ob Gruppenauswahl nötig
     const gruppenAktiv = await Gruppen.isAbfrageAktiv();
@@ -6843,8 +6903,9 @@ Router.register('buchen', async () => {
     const filtered = State.selectedCategory === 'alle' ? arts : arts.filter(a => a.kategorie_id === State.selectedCategory);
     const sessionBuchungen = await Buchungen.getSessionBuchungen();
     const sessionTotal = sessionBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
+    const sessionCount = sessionBuchungen.reduce((s,b) => s + b.menge, 0);
     
-    // ALLE Buchungen des Gastes laden (von Supabase wenn online)
+    // ALLE Buchungen des Gastes laden
     let meineBuchungen = [];
     if (supabaseClient && isOnline) {
         const { data } = await supabaseClient
@@ -6854,11 +6915,8 @@ Router.register('buchen', async () => {
             .eq('storniert', false)
             .eq('exportiert', false)
             .order('erstellt_am', { ascending: false });
-        if (data) {
-            meineBuchungen = data.map(b => ({ ...b, gast_id: b.user_id }));
-        }
+        if (data) meineBuchungen = data.map(b => ({ ...b, gast_id: b.user_id }));
     }
-    // Fallback: Lokale Daten
     if (meineBuchungen.length === 0) {
         const alleBuchungen = await db.buchungen.toArray();
         meineBuchungen = alleBuchungen.filter(b => 
@@ -6889,17 +6947,85 @@ Router.register('buchen', async () => {
     
     const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#4A5859'})[id] || '#2C5F7C';
     
+    // Warenkorb-Button HTML (oben rechts, kompakt)
+    const warenkorbBtnHtml = sessionBuchungen.length ? `
+        <button onclick="toggleWarenkorbDropdown()" id="warenkorb-btn" style="
+            position: relative;
+            background: var(--color-alpine-green);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 6px 12px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        ">
+            🛒 <span style="background:white;color:var(--color-alpine-green);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;">${sessionCount}</span>
+            <span style="font-size:0.85rem;">${Utils.formatCurrency(sessionTotal)}</span>
+        </button>
+    ` : '';
+    
     UI.render(`<div class="app-header">
         <div class="header-left">
             <div class="header-title">👤 ${name}</div>
-            ${currentGroup ? `<div style="font-size:0.8rem;opacity:0.8;">🏫 ${currentGroup}</div>` : ''}
+            ${currentGroup ? `<div style="font-size:0.75rem;opacity:0.8;">🏫 ${currentGroup}</div>` : ''}
         </div>
-        <div class="header-right" style="display:flex;align-items:center;gap:12px;">
+        <div class="header-right" style="display:flex;align-items:center;gap:8px;">
             ${SyncManager.getAmpelHtml()}
-            <button class="btn btn-secondary" onclick="handleGastAbmelden()">${t('logout')}</button>
+            ${warenkorbBtnHtml}
+            <button class="btn btn-secondary" onclick="handleGastAbmelden()" style="padding:6px 10px;font-size:0.9rem;">${t('logout')}</button>
         </div>
     </div>
-    <div class="main-content" style="padding-bottom:${sessionBuchungen.length ? '180px' : '20px'};">`);
+    
+    <!-- WARENKORB DROPDOWN -->
+    <div id="warenkorb-dropdown" style="
+        display: none;
+        position: fixed;
+        top: 55px;
+        right: 10px;
+        width: 300px;
+        max-width: calc(100vw - 20px);
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        border: 2px solid var(--color-alpine-green);
+        z-index: 2000;
+        overflow: hidden;
+    ">
+        <div style="padding:10px 14px;background:var(--color-alpine-green);color:white;display:flex;justify-content:space-between;align-items:center;">
+            <strong style="font-size:0.95rem;">🛒 Aktuell gebucht</strong>
+            <button onclick="toggleWarenkorbDropdown()" style="background:none;border:none;color:white;font-size:1.3rem;cursor:pointer;line-height:1;">×</button>
+        </div>
+        <div style="padding:10px;max-height:250px;overflow-y:auto;">
+            ${sessionBuchungen.length ? sessionBuchungen.map(b => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#f5f5f5;border-radius:8px;margin-bottom:6px;">
+                <div style="flex:1;">
+                    <div style="font-weight:600;font-size:0.9rem;">${b.artikel_name}</div>
+                    <div style="font-size:0.8rem;color:#666;">${b.menge}× ${Utils.formatCurrency(b.preis)}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-weight:700;font-size:0.9rem;">${Utils.formatCurrency(b.preis * b.menge)}</span>
+                    <button onclick="stornoBuchung('${b.buchung_id}')" style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.85rem;">✕</button>
+                </div>
+            </div>
+            `).join('') : '<p style="text-align:center;color:#999;padding:15px;font-size:0.9rem;">Noch keine Buchungen</p>'}
+        </div>
+        <div style="padding:10px 14px;border-top:1px solid #ddd;background:#fafafa;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <strong style="font-size:0.9rem;">Summe:</strong>
+                <strong style="font-size:1.2rem;color:var(--color-alpine-green);">${Utils.formatCurrency(sessionTotal)}</strong>
+            </div>
+            <button onclick="handleGastAbmelden()" style="width:100%;background:var(--color-alpine-green);color:white;border:none;border-radius:10px;padding:12px;font-size:1rem;font-weight:700;cursor:pointer;">
+                ✓ Fertig & Abmelden
+            </button>
+        </div>
+    </div>
+    
+    <div class="main-content" style="padding-bottom:20px;">`);
     
     // Ampel nach dem Rendern aktualisieren
     setTimeout(() => SyncManager.updateUI(), 100);
@@ -6907,27 +7033,27 @@ Router.register('buchen', async () => {
     UI.append(`
         ${meineBuchungen.length ? `
         <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);border-radius:16px;margin-bottom:20px;overflow:hidden;">
-            <div onclick="toggleBuchungsDetails()" style="padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+            <div onclick="toggleBuchungsDetails()" style="padding:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
                 <div style="color:white;">
-                    <div style="font-weight:700;font-size:1.1rem;">📋 ${t('my_bookings')}</div>
-                    <div style="font-size:0.9rem;opacity:0.9;">${meineBuchungen.length} ${t('items')} • ${t('total_sum')}</div>
+                    <div style="font-weight:700;font-size:1rem;">📋 ${t('my_bookings')}</div>
+                    <div style="font-size:0.85rem;opacity:0.9;">${meineBuchungen.length} Positionen</div>
                 </div>
                 <div style="text-align:right;color:white;">
-                    <div style="font-size:1.5rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
-                    <div id="buchungen-arrow" style="font-size:1.2rem;">▼</div>
+                    <div style="font-size:1.3rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
+                    <div id="buchungen-arrow" style="font-size:1rem;">▼</div>
                 </div>
             </div>
-            <div id="buchungen-details" style="display:none;background:white;padding:16px;max-height:300px;overflow-y:auto;">
+            <div id="buchungen-details" style="display:none;background:white;padding:12px;max-height:250px;overflow-y:auto;">
                 ${Object.keys(nachDatum).map(datum => `
-                <div style="margin-bottom:16px;">
-                    <div style="font-weight:700;color:var(--color-alpine-green);margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--color-stone-light);">
+                <div style="margin-bottom:12px;">
+                    <div style="font-weight:700;color:var(--color-alpine-green);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #eee;font-size:0.9rem;">
                         📅 ${datum}
                     </div>
                     ${nachDatum[datum].map(b => `
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--color-stone-light);border-radius:8px;margin-bottom:4px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#f5f5f5;border-radius:6px;margin-bottom:4px;font-size:0.85rem;">
                         <div>
                             <div style="font-weight:600;">${b.artikel_name}</div>
-                            <div style="font-size:0.8rem;color:var(--color-stone-dark);">🕐 ${b.uhrzeit?.substring(0,5) || ''} • ${b.menge}×</div>
+                            <div style="font-size:0.75rem;color:#888;">🕐 ${b.uhrzeit?.substring(0,5) || ''} • ${b.menge}×</div>
                         </div>
                         <div style="font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(b.preis * b.menge)}</div>
                     </div>
@@ -6939,65 +7065,55 @@ Router.register('buchen', async () => {
         ` : ''}
         
         ${fehlendeOffen.length ? `
-        <div class="fehlende-box" style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:20px;color:white;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                <span style="font-size:1.5rem;">⚠ </span>
+        <div style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:14px;padding:14px;margin-bottom:16px;color:white;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                <span style="font-size:1.3rem;">⚠️</span>
                 <div>
-                    <div style="font-weight:700;font-size:1.1rem;">${t('missing_drinks_yesterday')}</div>
-                    <div style="font-size:0.9rem;opacity:0.9;">${t('please_take_if_forgot')}</div>
+                    <div style="font-weight:700;font-size:1rem;">${t('missing_drinks_yesterday')}</div>
+                    <div style="font-size:0.85rem;opacity:0.9;">${t('please_take_if_forgot')}</div>
                 </div>
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
                 ${fehlendeOffen.map(f => `
-                <button onclick="uebernehmeFehlend(${f.id})" style="background:white;color:#333;border:none;border-radius:12px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
-                    <span style="font-size:1.2rem;">${f.icon || '🍺'}</span>
-                    <div style="text-align:left;">
-                        <div style="font-weight:600;font-size:0.9rem;">${f.artikel_name}</div>
-                        <div style="font-size:0.75rem;color:#666;">${f.datum} • ${Utils.formatCurrency(f.artikel_preis)}</div>
-                    </div>
+                <button onclick="uebernehmeFehlend(${f.id})" style="background:white;color:#333;border:none;border-radius:10px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:0.85rem;">
+                    <span>${f.icon || '🍺'}</span>
+                    <span style="font-weight:600;">${f.artikel_name}</span>
                 </button>
                 `).join('')}
             </div>
         </div>
         ` : ''}
         
-        <div class="form-group"><input type="text" class="form-input" placeholder="📝 ${t('search')}" oninput="searchArtikel(this.value)"></div>
-        <div class="category-tabs">
+        <div class="form-group" style="margin-bottom:12px;"><input type="text" class="form-input" placeholder="🔍 ${t('search')}" oninput="searchArtikel(this.value)" style="padding:10px 14px;"></div>
+        <div class="category-tabs" style="margin-bottom:14px;">
             ${kats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0)).map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})">${k.name}</div>`).join('')}
             <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')">${t('cat_all')}</div>
         </div>
         <div class="artikel-grid">
-            ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${renderTileContent(a)}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
+            ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onclick="bucheArtikelDirekt(${a.artikel_id})">${renderTileContent(a)}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
         </div>
-    </div>
-    ${sessionBuchungen.length ? `
-    <div class="session-popup" style="position:fixed;bottom:20px;right:20px;left:20px;max-width:400px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2);border:2px solid var(--color-alpine-green);z-index:1000;">
-        <div style="padding:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <strong style="font-size:1.1rem;">🛒 ${t('just_booked')}</strong>
-                <span style="font-size:1.4rem;font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(sessionTotal)}</span>
-            </div>
-            <div style="max-height:150px;overflow-y:auto;">
-                ${sessionBuchungen.map(b => `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--color-stone-light);border-radius:8px;margin-bottom:6px;">
-                    <div>
-                        <span style="font-weight:600;">${b.artikel_name}</span>
-                        <span style="color:var(--color-stone-dark);margin-left:8px;">× ${b.menge}</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <span style="font-weight:600;">${Utils.formatCurrency(b.preis * b.menge)}</span>
-                        <button class="btn btn-danger" onclick="stornoBuchung('${b.buchung_id}')" style="padding:4px 10px;font-size:0.85rem;">✕</button>
-                    </div>
-                </div>
-                `).join('')}
-            </div>
-            <div style="display:flex;gap:10px;margin-top:12px;">
-                <button class="btn btn-primary" onclick="handleGastAbmelden()" style="flex:1;padding:14px;font-size:1rem;">✓ ${t('done_logout')}</button>
-            </div>
-        </div>
-    </div>
-    ` : ''}`);
+    </div>`);
 });
+
+// Warenkorb Dropdown toggle
+window.toggleWarenkorbDropdown = () => {
+    const dropdown = document.getElementById('warenkorb-dropdown');
+    if (dropdown) {
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    }
+};
+
+// Dropdown schließen wenn außerhalb geklickt
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('warenkorb-dropdown');
+    const btn = document.getElementById('warenkorb-btn');
+    if (dropdown && dropdown.style.display === 'block') {
+        if (!dropdown.contains(e.target) && (!btn || !btn.contains(e.target))) {
+            dropdown.style.display = 'none';
+        }
+    }
+});
+
 
 // Buchungsdetails aufklappen/zuklappen
 window.toggleBuchungsDetails = () => {
