@@ -1021,89 +1021,126 @@ db.open().then(async () => {
 // TAGESMENÜ - Menü auf der Startseite anzeigen
 // ===========================================
 const TagesMenu = {
-    // Aktives Menü holen
+    // Prüfen ob eine Uhrzeit aktuell überschritten ist
+    istZeitVorbei(uhrzeitStr) {
+        if (!uhrzeitStr) return false;
+        const [stunden, minuten] = uhrzeitStr.split(':').map(Number);
+        const jetzt = new Date();
+        const jetztMinuten = jetzt.getHours() * 60 + jetzt.getMinutes();
+        const zielMinuten = stunden * 60 + minuten;
+        return jetztMinuten >= zielMinuten;
+    },
+    
+    // Aktive Menüs holen (Mittag und/oder Abend, je nach Uhrzeit)
     async getAktiv() {
+        let menuData = null;
+        
         // Erst von Supabase wenn online
         if (supabaseClient && isOnline) {
             try {
                 const { data } = await supabaseClient
                     .from('settings')
                     .select('value')
-                    .eq('key', 'tages_menu')
+                    .eq('key', 'tages_menu_v2')
                     .single();
                 
                 if (data?.value) {
-                    const menu = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-                    if (menu.aktiv) {
-                        // Lokal cachen
-                        await db.settings.put({ key: 'tages_menu', value: JSON.stringify(menu) });
-                        return menu;
-                    }
+                    menuData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                    // Lokal cachen
+                    await db.settings.put({ key: 'tages_menu_v2', value: JSON.stringify(menuData) });
                 }
             } catch(e) {
-                console.log('Kein Menü in Supabase');
+                console.log('Kein Menü v2 in Supabase');
             }
         }
         
         // Fallback: Lokal
-        try {
-            const setting = await db.settings.get('tages_menu');
-            if (setting?.value) {
-                const menu = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
-                if (menu.aktiv) return menu;
-            }
-        } catch(e) {}
+        if (!menuData) {
+            try {
+                const setting = await db.settings.get('tages_menu_v2');
+                if (setting?.value) {
+                    menuData = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
+                }
+            } catch(e) {}
+        }
         
-        return null;
+        if (!menuData) return null;
+        
+        // Prüfen welche Menüs gerade sichtbar sind
+        const result = { mittag: null, abend: null };
+        
+        // Mittagsmenü: aktiv und noch nicht ausgeblendet?
+        if (menuData.mittag?.aktiv && menuData.mittag?.text) {
+            if (!this.istZeitVorbei(menuData.mittag.ausblenden_um)) {
+                result.mittag = menuData.mittag;
+            }
+        }
+        
+        // Abendmenü: aktiv und noch nicht ausgeblendet?
+        if (menuData.abend?.aktiv && menuData.abend?.text) {
+            if (!this.istZeitVorbei(menuData.abend.ausblenden_um)) {
+                result.abend = menuData.abend;
+            }
+        }
+        
+        // Wenn keins aktiv, null zurückgeben
+        if (!result.mittag && !result.abend) return null;
+        
+        return result;
     },
     
-    // Menü speichern
-    async speichern(text) {
-        const menu = {
-            text: text.trim(),
-            aktiv: true,
-            erstellt_am: new Date().toISOString()
-        };
+    // Alle Menü-Daten laden (für Admin)
+    async getAlleMenus() {
+        let menuData = null;
         
+        if (supabaseClient && isOnline) {
+            try {
+                const { data } = await supabaseClient
+                    .from('settings')
+                    .select('value')
+                    .eq('key', 'tages_menu_v2')
+                    .single();
+                
+                if (data?.value) {
+                    menuData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                }
+            } catch(e) {}
+        }
+        
+        if (!menuData) {
+            try {
+                const setting = await db.settings.get('tages_menu_v2');
+                if (setting?.value) {
+                    menuData = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
+                }
+            } catch(e) {}
+        }
+        
+        return menuData || {
+            mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' },
+            abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }
+        };
+    },
+    
+    // Menüs speichern
+    async speichern(menuData) {
         // Lokal speichern
-        await db.settings.put({ key: 'tages_menu', value: JSON.stringify(menu) });
+        await db.settings.put({ key: 'tages_menu_v2', value: JSON.stringify(menuData) });
         
         // Supabase
         if (supabaseClient && isOnline) {
             try {
                 await supabaseClient.from('settings').upsert({ 
-                    key: 'tages_menu', 
-                    value: menu 
+                    key: 'tages_menu_v2', 
+                    value: menuData 
                 });
             } catch(e) {
                 console.error('Menü Supabase sync error:', e);
             }
         }
         
-        Utils.showToast('🍽️ Tagesmenü aktiviert!', 'success');
-        return menu;
-    },
-    
-    // Menü deaktivieren
-    async deaktivieren() {
-        const menu = {
-            text: '',
-            aktiv: false,
-            erstellt_am: null
-        };
-        
-        await db.settings.put({ key: 'tages_menu', value: JSON.stringify(menu) });
-        
-        if (supabaseClient && isOnline) {
-            try {
-                await supabaseClient.from('settings').upsert({ 
-                    key: 'tages_menu', 
-                    value: menu 
-                });
-            } catch(e) {}
-        }
-        
-        Utils.showToast('Tagesmenü deaktiviert', 'info');
+        Utils.showToast('🍽️ Menü gespeichert!', 'success');
+        return menuData;
     },
     
     // Text formatieren (Sterne als Trenner, etc.)
@@ -1121,37 +1158,73 @@ const TagesMenu = {
         return formatted;
     },
     
-    // Button für Startseite
-    renderButton() {
-        return `<button onclick="TagesMenu.showModal()" style="
-            background: linear-gradient(135deg, #8B4513, #D2691E);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 14px 24px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            box-shadow: 0 4px 12px rgba(139, 69, 19, 0.3);
-            width: 100%;
-            max-width: 300px;
-            margin: 0 auto;
-        ">
-            <span style="font-size:1.4rem;">🍽️</span>
-            Tagesmenü ansehen
-        </button>`;
+    // Buttons für Startseite (Mittag und/oder Abend)
+    renderButtons(menus) {
+        let html = '';
+        
+        if (menus.mittag) {
+            html += `<button onclick="TagesMenu.showModal('mittag')" style="
+                background: linear-gradient(135deg, #f39c12, #e67e22);
+                color: white;
+                border: none;
+                border-radius: 12px;
+                padding: 14px 24px;
+                font-size: 1.1rem;
+                font-weight: 600;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+                width: 100%;
+                max-width: 300px;
+                margin: 0 auto 12px;
+            ">
+                <span style="font-size:1.4rem;">🌞</span>
+                Mittagsmenü (${menus.mittag.uhrzeit} Uhr)
+            </button>`;
+        }
+        
+        if (menus.abend) {
+            html += `<button onclick="TagesMenu.showModal('abend')" style="
+                background: linear-gradient(135deg, #8B4513, #D2691E);
+                color: white;
+                border: none;
+                border-radius: 12px;
+                padding: 14px 24px;
+                font-size: 1.1rem;
+                font-weight: 600;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                box-shadow: 0 4px 12px rgba(139, 69, 19, 0.3);
+                width: 100%;
+                max-width: 300px;
+                margin: 0 auto;
+            ">
+                <span style="font-size:1.4rem;">🌙</span>
+                Abendmenü (${menus.abend.uhrzeit} Uhr)
+            </button>`;
+        }
+        
+        return html;
     },
     
     // Modal anzeigen
-    async showModal() {
-        const menu = await this.getAktiv();
+    async showModal(typ = 'mittag') {
+        const menus = await this.getAktiv();
+        if (!menus) return;
+        
+        const menu = menus[typ];
         if (!menu) return;
         
         const formattedText = this.formatText(menu.text);
+        const titel = typ === 'mittag' ? 'Mittagsmenü' : 'Abendmenü';
+        const icon = typ === 'mittag' ? '🌞' : '🌙';
+        const farbe = typ === 'mittag' ? '#e67e22' : '#8B4513';
         
         // Modal HTML
         const modalHtml = `
@@ -1192,8 +1265,9 @@ const TagesMenu = {
                 
                 <div style="padding: 30px;">
                     <div style="text-align:center;margin-bottom:24px;">
-                        <span style="font-size:3rem;">🍽️</span>
-                        <h2 style="margin:12px 0 0;font-family:var(--font-display);color:#8B4513;font-size:1.8rem;">Tagesmenü</h2>
+                        <span style="font-size:3rem;">${icon}</span>
+                        <h2 style="margin:12px 0 0;font-family:var(--font-display);color:${farbe};font-size:1.8rem;">${titel}</h2>
+                        <p style="margin:8px 0 0;color:#666;font-size:1rem;">Servierzeit: ${menu.uhrzeit} Uhr</p>
                     </div>
                     
                     <div style="
@@ -1205,7 +1279,7 @@ const TagesMenu = {
                         ${formattedText}
                     </div>
                     
-                    <div style="text-align:center;margin-top:24px;padding-top:16px;border-top:2px dashed #D2691E;opacity:0.6;font-size:0.9rem;">
+                    <div style="text-align:center;margin-top:24px;padding-top:16px;border-top:2px dashed ${farbe};opacity:0.6;font-size:0.9rem;">
                         Guten Appetit! 🍴
                     </div>
                 </div>
@@ -3180,8 +3254,42 @@ const Artikel = {
         return false;
     },
     
+    // Prüft ob ein Artikel zeitlich abgelaufen ist
+    istAbgelaufen(artikel) {
+        if (!artikel.aktiv_bis) return false;
+        return new Date(artikel.aktiv_bis) < new Date();
+    },
+    
+    // Automatisch abgelaufene Artikel deaktivieren
+    async cleanupAbgelaufene() {
+        const alle = await db.artikel.toArray();
+        let deaktiviert = 0;
+        
+        for (const a of alle) {
+            if (a.aktiv && a.aktiv_bis && new Date(a.aktiv_bis) < new Date()) {
+                await db.artikel.update(a.artikel_id, { aktiv: false });
+                if (supabaseClient && isOnline) {
+                    try {
+                        await supabaseClient.from('artikel').update({ aktiv: false }).eq('artikel_id', a.artikel_id);
+                    } catch(e) {}
+                }
+                deaktiviert++;
+                console.log(`⏰ Artikel "${a.name}" automatisch deaktiviert (abgelaufen)`);
+            }
+        }
+        
+        if (deaktiviert > 0) {
+            artikelCache = null; // Cache invalidieren
+        }
+        
+        return deaktiviert;
+    },
+    
     async getAll(f={}) {
-        // Erst lokale Daten prüfen
+        // Erst abgelaufene Artikel cleanup
+        await this.cleanupAbgelaufene();
+        
+        // Dann lokale Daten prüfen
         let r = await db.artikel.toArray();
         
         // Wenn lokal leer und online, von Supabase laden
@@ -3686,7 +3794,7 @@ Router.register('login', async () => {
     
     // Tagesmenü laden
     const tagesMenu = await TagesMenu.getAktiv();
-    const tagesMenuHtml = tagesMenu ? `<div style="max-width:600px;margin:0 auto 24px;">${TagesMenu.renderButton()}</div>` : '';
+    const tagesMenuHtml = tagesMenu ? `<div style="max-width:600px;margin:0 auto 24px;">${TagesMenu.renderButtons(tagesMenu)}</div>` : '';
     
     // Gast-spezifische Nachrichten laden (GastNachrichten - mehrere pro Gast möglich)
     // Gast kann Nachricht NICHT löschen - nur Admin kann das
@@ -3961,7 +4069,9 @@ Router.register('admin-dashboard', async () => {
     const verbleibendeZeit = aktiveNachricht ? GastNachricht.getVerbleibendeZeit(aktiveNachricht) : null;
     
     // Tagesmenü laden
-    const aktivesMenu = await TagesMenu.getAktiv();
+    const menuData = await TagesMenu.getAktiv();
+    const aktivesMenu = menuData && (menuData.mittag || menuData.abend); // true wenn mindestens eines aktiv
+    const menuPreview = menuData?.mittag?.text || menuData?.abend?.text || '';
     
     // Aktueller Preismodus
     const preismodus = await PreisModus.getModus();
@@ -4052,7 +4162,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                         <div style="font-size: 0.9rem; opacity: 0.9;">
                             ${aktivesMenu 
-                                ? `"${aktivesMenu.text.substring(0, 40)}${aktivesMenu.text.length > 40 ? '...' : ''}"`
+                                ? `"${menuPreview.substring(0, 40)}${menuPreview.length > 40 ? '...' : ''}"`
                                 : 'Menü für Gäste auf Startseite anzeigen'}
                         </div>
                     </div>
@@ -5412,7 +5522,7 @@ Router.register('admin-nachricht', async () => {
 Router.register('admin-tagesmenu', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    const aktivesMenu = await TagesMenu.getAktiv();
+    const menuData = await TagesMenu.getAlleMenus();
     
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🍽️ Tagesmenü</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
@@ -5425,105 +5535,172 @@ Router.register('admin-tagesmenu', async () => {
                     <div>
                         <div style="font-weight:700;font-size:1.1rem;">So funktioniert's</div>
                         <div style="font-size:0.9rem;opacity:0.9;">
-                            Zeige das Tagesmenü auf der Startseite für alle Gäste
+                            Zeige Mittags- und/oder Abendmenü auf der Startseite
                         </div>
                     </div>
                 </div>
                 <ul style="margin:0;padding-left:20px;font-size:0.9rem;opacity:0.95;">
-                    <li>Gäste sehen einen Button "Tagesmenü ansehen"</li>
-                    <li>Beim Klick öffnet sich ein schönes Menü-Modal</li>
+                    <li>Menüs werden automatisch nach der eingestellten Uhrzeit ausgeblendet</li>
                     <li>Nutze *** oder **** als Trenner zwischen Gängen</li>
-                    <li>Schreibe Allergene und vegane Varianten dazu</li>
+                    <li>Gäste sehen die Servierzeit im Button</li>
                 </ul>
             </div>
         </div>
         
-        ${aktivesMenu ? `
-        <!-- AKTIVES MENÜ VORSCHAU -->
-        <div class="card mb-3" style="border:3px solid #8B4513;">
-            <div class="card-header" style="background:#8B4513;color:white;">
-                <h2 class="card-title" style="margin:0;color:white;">✅ Aktuelles Menü (Vorschau)</h2>
+        <!-- MITTAGSMENÜ -->
+        <div class="card mb-3" style="border:3px solid ${menuData.mittag?.aktiv ? '#f39c12' : '#ddd'};">
+            <div class="card-header" style="background:${menuData.mittag?.aktiv ? 'linear-gradient(135deg, #f39c12, #e67e22)' : '#95a5a6'};color:white;">
+                <h2 class="card-title" style="margin:0;color:white;display:flex;align-items:center;gap:10px;">
+                    <span>🌞</span> Mittagsmenü
+                    ${menuData.mittag?.aktiv ? '<span style="background:rgba(255,255,255,0.3);padding:2px 10px;border-radius:12px;font-size:0.8rem;">AKTIV</span>' : ''}
+                </h2>
             </div>
             <div class="card-body">
-                <div style="background:#FFF8F0;padding:20px;border-radius:12px;text-align:center;line-height:1.8;">
-                    ${TagesMenu.formatText(aktivesMenu.text)}
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-weight:600;font-size:0.85rem;">🕐 Servierzeit</label>
+                        <input type="time" id="mittag-uhrzeit" class="form-input" value="${menuData.mittag?.uhrzeit || '12:00'}">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-weight:600;font-size:0.85rem;">🕐 Ausblenden um</label>
+                        <input type="time" id="mittag-ausblenden" class="form-input" value="${menuData.mittag?.ausblenden_um || '14:30'}">
+                    </div>
                 </div>
-                <div style="margin-top:16px;display:flex;gap:12px;">
-                    <button class="btn btn-primary" onclick="TagesMenu.showModal()" style="flex:1;padding:14px;">
-                        👁️ Vorschau anzeigen
-                    </button>
-                    <button class="btn btn-danger" onclick="deaktiviereMenu()" style="flex:1;padding:14px;">
-                        ❌ Menü deaktivieren
-                    </button>
-                </div>
-            </div>
-        </div>
-        ` : `
-        <!-- KEIN AKTIVES MENÜ -->
-        <div class="card mb-3" style="background:var(--color-stone-light);">
-            <div style="padding:40px;text-align:center;">
-                <div style="font-size:4rem;margin-bottom:16px;opacity:0.5;">🍽️</div>
-                <div style="font-size:1.2rem;font-weight:600;color:var(--color-stone-dark);">
-                    Kein aktives Tagesmenü
-                </div>
-                <div style="font-size:0.9rem;color:var(--color-stone-dark);margin-top:8px;">
-                    Erstelle ein Menü unten
-                </div>
-            </div>
-        </div>
-        `}
-        
-        <!-- MENÜ ERSTELLEN/BEARBEITEN -->
-        <div class="card">
-            <div class="card-header" style="background:var(--color-alpine-green);color:white;">
-                <h2 class="card-title" style="margin:0;color:white;">✏️ ${aktivesMenu ? 'Menü bearbeiten' : 'Neues Menü erstellen'}</h2>
-            </div>
-            <div class="card-body">
+                
                 <div class="form-group">
                     <label class="form-label" style="font-weight:600;">Menü-Text</label>
-                    <textarea id="menu-text" class="form-input" rows="10" placeholder="Gemischter Salat mit Dressingflaschen
+                    <textarea id="mittag-text" class="form-input" rows="6" placeholder="Gemischter Salat
 
 ****
 
 Käsespätzle mit Röstzwiebeln
-(Vegane Variante: mit Hefeschmelz)
 
 ***
 
-Apfelstrudel mit Vanillesauce
-
-─────────────────
-🌱 Allergene: A, C, G" style="font-size:1rem;font-family:inherit;line-height:1.6;">${aktivesMenu ? aktivesMenu.text : ''}</textarea>
-                    <small style="color:var(--color-stone-dark);">
-                        Tipp: Nutze *** oder **** als Trenner zwischen den Gängen
-                    </small>
+Dessert" style="font-size:0.95rem;line-height:1.5;">${menuData.mittag?.text || ''}</textarea>
                 </div>
                 
-                <button class="btn btn-primary btn-block" onclick="speichereMenu()" style="padding:20px;font-size:1.2rem;margin-top:16px;">
-                    🍽️ Menü ${aktivesMenu ? 'aktualisieren' : 'aktivieren'}
-                </button>
+                <div style="display:flex;gap:12px;">
+                    <button class="btn ${menuData.mittag?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleMittagMenu()" style="flex:1;padding:14px;">
+                        ${menuData.mittag?.aktiv ? '❌ Deaktivieren' : '✅ Aktivieren'}
+                    </button>
+                    ${menuData.mittag?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('mittag')" style="padding:14px;">👁️ Vorschau</button>` : ''}
+                </div>
             </div>
         </div>
+        
+        <!-- ABENDMENÜ -->
+        <div class="card mb-3" style="border:3px solid ${menuData.abend?.aktiv ? '#8B4513' : '#ddd'};">
+            <div class="card-header" style="background:${menuData.abend?.aktiv ? 'linear-gradient(135deg, #8B4513, #D2691E)' : '#95a5a6'};color:white;">
+                <h2 class="card-title" style="margin:0;color:white;display:flex;align-items:center;gap:10px;">
+                    <span>🌙</span> Abendmenü
+                    ${menuData.abend?.aktiv ? '<span style="background:rgba(255,255,255,0.3);padding:2px 10px;border-radius:12px;font-size:0.8rem;">AKTIV</span>' : ''}
+                </h2>
+            </div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-weight:600;font-size:0.85rem;">🕐 Servierzeit</label>
+                        <input type="time" id="abend-uhrzeit" class="form-input" value="${menuData.abend?.uhrzeit || '18:00'}">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-weight:600;font-size:0.85rem;">🕐 Ausblenden um</label>
+                        <input type="time" id="abend-ausblenden" class="form-input" value="${menuData.abend?.ausblenden_um || '19:30'}">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:600;">Menü-Text</label>
+                    <textarea id="abend-text" class="form-input" rows="6" placeholder="Tagessuppe
+
+****
+
+Schweinsbraten mit Knödel
+(Vegane Variante verfügbar)
+
+***
+
+Apfelstrudel mit Vanillesauce" style="font-size:0.95rem;line-height:1.5;">${menuData.abend?.text || ''}</textarea>
+                </div>
+                
+                <div style="display:flex;gap:12px;">
+                    <button class="btn ${menuData.abend?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleAbendMenu()" style="flex:1;padding:14px;">
+                        ${menuData.abend?.aktiv ? '❌ Deaktivieren' : '✅ Aktivieren'}
+                    </button>
+                    ${menuData.abend?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('abend')" style="padding:14px;">👁️ Vorschau</button>` : ''}
+                </div>
+            </div>
+        </div>
+        
+        <!-- ALLE SPEICHERN -->
+        <button class="btn btn-block" onclick="speichereAlleMenus()" style="padding:20px;font-size:1.2rem;background:var(--color-alpine-green);color:white;border:none;">
+            💾 Alle Änderungen speichern
+        </button>
         
     </div>`);
 });
 
-// Menü speichern
-window.speichereMenu = async () => {
-    const text = document.getElementById('menu-text')?.value?.trim();
-    if (!text) {
-        Utils.showToast('Bitte Menü-Text eingeben!', 'error');
+// Mittag aktivieren/deaktivieren
+window.toggleMittagMenu = async () => {
+    const menuData = await TagesMenu.getAlleMenus();
+    const text = document.getElementById('mittag-text')?.value?.trim();
+    const uhrzeit = document.getElementById('mittag-uhrzeit')?.value || '12:00';
+    const ausblenden = document.getElementById('mittag-ausblenden')?.value || '14:30';
+    
+    if (!menuData.mittag.aktiv && !text) {
+        Utils.showToast('Bitte erst Menü-Text eingeben!', 'error');
         return;
     }
     
-    await TagesMenu.speichern(text);
+    menuData.mittag = {
+        aktiv: !menuData.mittag.aktiv,
+        text: text || menuData.mittag.text,
+        uhrzeit: uhrzeit,
+        ausblenden_um: ausblenden
+    };
+    
+    await TagesMenu.speichern(menuData);
     Router.navigate('admin-tagesmenu');
 };
 
-// Menü deaktivieren
-window.deaktiviereMenu = async () => {
-    if (!confirm('Tagesmenü wirklich deaktivieren?')) return;
-    await TagesMenu.deaktivieren();
+// Abend aktivieren/deaktivieren
+window.toggleAbendMenu = async () => {
+    const menuData = await TagesMenu.getAlleMenus();
+    const text = document.getElementById('abend-text')?.value?.trim();
+    const uhrzeit = document.getElementById('abend-uhrzeit')?.value || '18:00';
+    const ausblenden = document.getElementById('abend-ausblenden')?.value || '19:30';
+    
+    if (!menuData.abend.aktiv && !text) {
+        Utils.showToast('Bitte erst Menü-Text eingeben!', 'error');
+        return;
+    }
+    
+    menuData.abend = {
+        aktiv: !menuData.abend.aktiv,
+        text: text || menuData.abend.text,
+        uhrzeit: uhrzeit,
+        ausblenden_um: ausblenden
+    };
+    
+    await TagesMenu.speichern(menuData);
+    Router.navigate('admin-tagesmenu');
+};
+
+// Alle Menüs speichern (Text und Zeiten, ohne Aktivierungs-Status zu ändern)
+window.speichereAlleMenus = async () => {
+    const menuData = await TagesMenu.getAlleMenus();
+    
+    // Mittag
+    menuData.mittag.text = document.getElementById('mittag-text')?.value?.trim() || '';
+    menuData.mittag.uhrzeit = document.getElementById('mittag-uhrzeit')?.value || '12:00';
+    menuData.mittag.ausblenden_um = document.getElementById('mittag-ausblenden')?.value || '14:30';
+    
+    // Abend
+    menuData.abend.text = document.getElementById('abend-text')?.value?.trim() || '';
+    menuData.abend.uhrzeit = document.getElementById('abend-uhrzeit')?.value || '18:00';
+    menuData.abend.ausblenden_um = document.getElementById('abend-ausblenden')?.value || '19:30';
+    
+    await TagesMenu.speichern(menuData);
     Router.navigate('admin-tagesmenu');
 };
 
@@ -6459,6 +6636,26 @@ Router.register('admin-articles', async () => {
         const preisSV = a.preis ?? 0;
         const preisHP = a.preis_hp ?? a.preis ?? 0;
         
+        // Zeitbegrenzung Anzeige
+        let zeitInfo = '';
+        if (a.aktiv_bis) {
+            const ablauf = new Date(a.aktiv_bis);
+            const jetzt = new Date();
+            const diffMs = ablauf - jetzt;
+            const diffStunden = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffTage = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            
+            if (diffMs > 0) {
+                if (diffTage > 0) {
+                    zeitInfo = `<div style="font-size:0.7rem;color:#e67e22;margin-top:2px;">⏰ ${diffTage}T übrig</div>`;
+                } else if (diffStunden > 0) {
+                    zeitInfo = `<div style="font-size:0.7rem;color:#e74c3c;margin-top:2px;">⏰ ${diffStunden}h übrig</div>`;
+                } else {
+                    zeitInfo = `<div style="font-size:0.7rem;color:#e74c3c;margin-top:2px;">⏰ <1h übrig</div>`;
+                }
+            }
+        }
+        
         return `<tr class="article-row" data-name="${a.name.toLowerCase()}" data-sku="${(a.sku||'').toLowerCase()}" data-id="${a.artikel_id}">
             <td style="width:50px;text-align:center;font-family:monospace;font-size:0.85rem;">
                 <span onclick="changeArtikelId(${a.artikel_id})" style="cursor:pointer;padding:4px 8px;background:#f0f0f0;border-radius:4px;border:1px solid #ddd;" title="Klicken zum Ändern der ID">${a.artikel_id}</span>
@@ -6488,10 +6685,14 @@ Router.register('admin-articles', async () => {
                 </select>
             </td>
             <td style="text-align:center;">
-                <label class="switch">
-                    <input type="checkbox" ${a.aktiv?'checked':''} onchange="toggleArtikelAktiv(${a.artikel_id}, this.checked)">
-                    <span class="slider"></span>
-                </label>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+                    <label class="switch">
+                        <input type="checkbox" ${a.aktiv?'checked':''} onchange="toggleArtikelAktiv(${a.artikel_id}, this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                    ${zeitInfo}
+                    <button onclick="showZeitbegrenzungModal(${a.artikel_id}, '${a.name.replace(/'/g, "\\'")}')" style="font-size:0.65rem;padding:2px 6px;border:1px solid #ddd;border-radius:4px;background:#f8f9fa;cursor:pointer;margin-top:2px;" title="Zeitbegrenzung setzen">⏰</button>
+                </div>
             </td>
             <td style="text-align:right;white-space:nowrap;">
                 <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✏️</button>
@@ -7201,12 +7402,18 @@ window.handlePermanentDeleteGuest = async id => {
 window.handleDeleteArticle = async id => { if(confirm('Artikel löschen?')) { await Artikel.delete(id); Router.navigate('admin-articles'); } };
 window.toggleArtikelAktiv = async (id, aktiv) => {
     try {
+        // Bei manueller Deaktivierung auch aktiv_bis löschen
+        const updateData = { aktiv: aktiv };
+        if (!aktiv) {
+            updateData.aktiv_bis = null; // Zeitbegrenzung entfernen
+        }
+        
         // Direkt DB updaten ohne Toast von Artikel.update
-        await db.artikel.update(id, { aktiv: aktiv });
+        await db.artikel.update(id, updateData);
         
         // Supabase auch updaten
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').update({ aktiv: aktiv }).eq('artikel_id', id);
+            await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
         }
         
         // Cache invalidieren
@@ -7216,6 +7423,132 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
         Router.navigate('admin-articles');
+    }
+};
+
+// Zeitbegrenzung Modal anzeigen
+window.showZeitbegrenzungModal = (artikelId, artikelName) => {
+    const modalHtml = `
+    <div id="zeit-modal-overlay" onclick="closeZeitModal()" style="
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.6);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    ">
+        <div onclick="event.stopPropagation()" style="
+            background: white;
+            border-radius: 16px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        ">
+            <div style="padding: 20px; border-bottom: 1px solid #eee;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <span>⏰</span> Zeitbegrenzung
+                </h3>
+                <p style="margin: 8px 0 0; color: #666; font-size: 0.9rem;">
+                    "${artikelName}"
+                </p>
+            </div>
+            
+            <div style="padding: 20px;">
+                <p style="margin: 0 0 16px; color: #666; font-size: 0.9rem;">
+                    Artikel automatisch deaktivieren nach:
+                </p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="setZeitbegrenzung(${artikelId}, 6)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
+                        ⏱️ 6 Stunden
+                    </button>
+                    <button onclick="setZeitbegrenzung(${artikelId}, 12)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
+                        ⏱️ 12 Stunden
+                    </button>
+                    <button onclick="setZeitbegrenzung(${artikelId}, 24)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
+                        📅 1 Tag
+                    </button>
+                    <button onclick="setZeitbegrenzung(${artikelId}, 48)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
+                        📅 2 Tage
+                    </button>
+                    <button onclick="setZeitbegrenzung(${artikelId}, 72)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
+                        📅 3 Tage
+                    </button>
+                    <button onclick="setZeitbegrenzung(${artikelId}, 168)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
+                        📅 7 Tage
+                    </button>
+                </div>
+                
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee;">
+                    <button onclick="setZeitbegrenzung(${artikelId}, 0)" class="btn btn-block" style="padding: 14px; background: #27ae60; color: white; border: none;">
+                        ♾️ Keine Begrenzung (dauerhaft aktiv)
+                    </button>
+                </div>
+            </div>
+            
+            <div style="padding: 16px; border-top: 1px solid #eee; text-align: right;">
+                <button onclick="closeZeitModal()" class="btn btn-secondary">Abbrechen</button>
+            </div>
+        </div>
+    </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+};
+
+// Zeitbegrenzung Modal schließen
+window.closeZeitModal = () => {
+    const modal = document.getElementById('zeit-modal-overlay');
+    if (modal) modal.remove();
+};
+
+// Zeitbegrenzung setzen
+window.setZeitbegrenzung = async (artikelId, stunden) => {
+    try {
+        let aktiv_bis = null;
+        
+        if (stunden > 0) {
+            const ablaufzeit = new Date();
+            ablaufzeit.setHours(ablaufzeit.getHours() + stunden);
+            aktiv_bis = ablaufzeit.toISOString();
+        }
+        
+        // Lokal updaten
+        await db.artikel.update(artikelId, { 
+            aktiv_bis: aktiv_bis,
+            aktiv: true // Artikel aktivieren wenn Zeitbegrenzung gesetzt wird
+        });
+        
+        // Supabase updaten
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('artikel').update({ 
+                aktiv_bis: aktiv_bis,
+                aktiv: true 
+            }).eq('artikel_id', artikelId);
+        }
+        
+        // Cache invalidieren
+        artikelCache = null;
+        
+        closeZeitModal();
+        
+        if (stunden > 0) {
+            const tage = Math.floor(stunden / 24);
+            const restStunden = stunden % 24;
+            let zeitText = '';
+            if (tage > 0) zeitText = `${tage} Tag(e)`;
+            else zeitText = `${restStunden} Stunden`;
+            Utils.showToast(`✅ Artikel aktiv für ${zeitText}`, 'success');
+        } else {
+            Utils.showToast('✅ Zeitbegrenzung entfernt', 'success');
+        }
+        
+        // Seite neu laden
+        Router.navigate('admin-articles');
+        
+    } catch (e) {
+        Utils.showToast('Fehler: ' + e.message, 'error');
     }
 };
 
