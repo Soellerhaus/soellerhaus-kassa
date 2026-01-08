@@ -4196,6 +4196,7 @@ Router.register('register', () => {
                 <label class="form-label">${t('first_name')} *</label>
                 <input type="text" id="register-vorname" class="form-input" placeholder="${placeholder}" autofocus style="font-size:1.2rem;padding:16px;">
             </div>
+            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:16px;margin-bottom:24px;">✔ ${t('register_btn')}</button>
             <div class="form-group">
                 <label class="form-label" style="text-align:center;display:block;">${t('pin_code')} *</label>
                 <div class="pin-display" id="register-pin-display" style="display:flex;justify-content:center;gap:12px;margin:16px 0;">
@@ -4208,7 +4209,6 @@ Router.register('register', () => {
                     <button type="button" class="pin-btn pin-btn-delete" onclick="handleRegisterPinDelete()">❌</button>
                 </div>
             </div>
-            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">✔ ${t('register_btn')}</button>
         </div>
         <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← ${t('back')}</button>
     </div></div>`);
@@ -7922,8 +7922,19 @@ window.handleRegisterSubmit = async () => {
     try { 
         console.log('Registrierung startet...', v.trim(), p.length);
         await RegisteredGuests.register(v.trim(), p); 
+        
         // Nach Registrierung prüfen ob Gruppe gewählt werden muss
-        setTimeout(async () => await navigateAfterLogin(), 500); 
+        const gruppenAktiv = await Gruppen.isAbfrageAktiv();
+        console.log('Gruppen aktiv?', gruppenAktiv, 'State.selectedGroup:', State.selectedGroup);
+        
+        if (gruppenAktiv && !State.selectedGroup) {
+            // Gruppenauswahl erforderlich - direkt navigieren
+            console.log('→ Navigiere zu Gruppenauswahl');
+            Router.navigate('gruppe-waehlen');
+        } else {
+            // Direkt zum Buchen
+            Router.navigate('buchen');
+        }
     } catch(e) {
         console.error('Registrierung Fehler:', e);
         Utils.showToast('Fehler: ' + e.message, 'error');
