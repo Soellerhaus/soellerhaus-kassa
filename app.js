@@ -3659,10 +3659,7 @@ Router.register('admin-dashboard', async () => {
                         <div style="font-size:0.8rem;opacity:0.9;margin-bottom:8px;">Daten aus JSON wiederherstellen</div>
                         <button class="btn" onclick="DataProtection.selectRestoreFile()" style="background:white;color:#e74c3c;border:none;padding:8px 16px;">📤 Datei wählen</button>
                     </div>
-                    <div style="padding:16px;background:var(--color-stone-light);border-radius:var(--radius-md);">
-                        <h3 style="font-weight:600;margin-bottom:8px;">📧 Kategorien</h3>
-                        <button class="btn btn-secondary" onclick="repairCategories()">Reparieren</button>
-                    </div>
+                    
                 </div>
             </div>
         </div>
@@ -7045,19 +7042,19 @@ window.saveEditArticle = async () => {
             console.error('Artikel seed Fehler:', e);
         }
         
-        // Kategorien initialisieren (lokal)
+        // Kategorien IMMER auf korrekte Werte setzen (automatische Reparatur)
         try {
-            if (await db.kategorien.count() === 0) {
-                await db.kategorien.bulkAdd([
-                    {kategorie_id:1, name:'Alkoholfreie Getränke', sortierung:10},
-                    {kategorie_id:2, name:'Biere', sortierung:20},
-                    {kategorie_id:3, name:'Weine', sortierung:30},
-                    {kategorie_id:4, name:'Schnäpse & Spirituosen', sortierung:40},
-                    {kategorie_id:5, name:'Heiße Getränke', sortierung:50},
-                    {kategorie_id:6, name:'Süßes & Salziges', sortierung:60},
-                    {kategorie_id:7, name:'Sonstiges', sortierung:70}
-                ]);
-            }
+            await db.kategorien.clear();
+            await db.kategorien.bulkAdd([
+                {kategorie_id:1, name:'Alkoholfreie Getränke', sortierung:10},
+                {kategorie_id:2, name:'Biere', sortierung:20},
+                {kategorie_id:3, name:'Weine', sortierung:30},
+                {kategorie_id:4, name:'Schnäpse & Spirituosen', sortierung:40},
+                {kategorie_id:5, name:'Heiße Getränke', sortierung:50},
+                {kategorie_id:6, name:'Süßes & Salziges', sortierung:60},
+                {kategorie_id:7, name:'Sonstiges', sortierung:70}
+            ]);
+            console.log('✅ Kategorien automatisch repariert');
         } catch(e) {
             console.error('Kategorien init Fehler:', e);
         }
