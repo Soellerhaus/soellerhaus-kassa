@@ -1,6 +1,6 @@
 // ================================
 // SEOLLERHAUS KASSA - MAIN APP v3.0
-// Supabase Multi-Device Version
+// Supabase Multi-Device Version 
 // ================================
 
 // ================================
