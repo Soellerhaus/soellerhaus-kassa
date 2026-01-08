@@ -2121,7 +2121,7 @@ const Auth = {
     },
     async adminLogin(pw) {
         // Standard Admin-Passwort Hash für 'admin123'
-        const defaultHash = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+        const defaultHash = '6c720cb9fbe0bf0b4889db0cbca428857f838046fdb7b56a709397d4b7e2609f';
         let stored = defaultHash;
         
         if (supabaseClient && isOnline) {
