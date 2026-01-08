@@ -6352,9 +6352,10 @@ window.artikelPressEnd = (event) => {
         wasScroll = deltaX > TOUCH_MOVE_THRESHOLD || deltaY > TOUCH_MOVE_THRESHOLD;
     }
     
-    // Wenn kein Long-Press UND kein Scroll UND mindestens 150ms gedrückt, dann normaler Klick (1 Stück buchen)
-    const touchDuration = Date.now() - artikelPressStartTime;
-    if (!artikelLongPressed && artikelPressId && !wasScroll && touchDuration >= 150) {
+    // Wenn kein Long-Press UND kein Scroll, dann normaler Klick (1 Stück buchen)
+    // Touch-Dauer prüfen (mindestens 80ms um versehentliches Antippen zu vermeiden)
+    const touchDuration = artikelPressStartTime ? (Date.now() - artikelPressStartTime) : 1000;
+    if (!artikelLongPressed && artikelPressId && !wasScroll && touchDuration >= 80) {
         bucheArtikelDirekt(artikelPressId);
     }
     
