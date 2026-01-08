@@ -2970,7 +2970,7 @@ const SyncManager = {
             red: '🔴'
         };
         
-        ampelEl.innerHTML = `${icons[status]} <span style="color:${colors[status]};font-weight:600;">${message}</span>`;
+        ampelEl.innerHTML = `<span style="font-size:1.2rem;cursor:pointer;" title="${status === 'green' ? 'Synchronisiert' : status === 'yellow' ? pending + ' warten' : 'Offline'}">${icons[status]}</span>`;
         ampelEl.title = status === 'green' ? 'Alle Buchungen synchronisiert' : 
                         status === 'yellow' ? `${pending} Buchung(en) warten auf Upload` :
                         'Offline - Buchungen werden lokal gespeichert';
