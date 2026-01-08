@@ -4177,14 +4177,6 @@ Router.register('admin-dashboard', async () => {
             <small style="opacity:0.9;">(${auffuellAnzahl} Getränke zum Auffüllen)</small>
         </button>
         
-        <!-- EXCEL EXPORT FÜR REGISTRIERKASSE -->
-        ${nichtExp.length ? `
-        <button class="btn btn-block" onclick="handleExportExcel()" style="padding:20px;font-size:1.2rem;margin-bottom:12px;background:linear-gradient(135deg, #217346, #1e6b3d);color:white;border:none;">
-            📊 EXCEL für Registrierkasse<br>
-            <small style="opacity:0.9;">(${nichtExp.length} Buchungen exportieren)</small>
-        </button>
-        ` : ''}
-        
         <!-- ALLE BUCHUNGEN ANSEHEN -->
         <button class="btn btn-block" onclick="Router.navigate('admin-alle-buchungen')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;background:#6c5ce7;color:white;border:none;">
             📋 Alle Buchungen ansehen<br>
@@ -4333,11 +4325,11 @@ Router.register('admin-auffuellliste', async () => {
             </button>
         </div>
         
-        <div class="card mb-3" style="background:#f8f9fa;border:2px dashed #ccc;">
-            <div style="padding:16px;">
-                <p style="margin:0;color:#666;font-size:0.9rem;">
-                    💡 <strong>Hinweis:</strong> Die Auffüllliste ist UNABHÄNGIG vom Registrierkasse-Export.<br>
-                    Export für Registrierkasse → Im Admin Dashboard
+        <div class="card mb-3" style="background:#fff3cd;border:1px solid #ffc107;">
+            <div style="padding:12px;">
+                <p style="margin:0;color:#856404;font-size:0.85rem;">
+                    🖨️ <strong>Tipp:</strong> Damit der Thermodrucker automatisch gewählt wird:<br>
+                    Im Druckdialog → "EPSON TM-T88V" wählen → Häkchen bei "Als Standard speichern"
                 </p>
             </div>
         </div>
@@ -4387,24 +4379,36 @@ window.printAuffuellliste = async () => {
         <head>
             <title>Auffüllliste - ${datum}</title>
             <style>
+                @page { 
+                    margin: 0; 
+                    size: 80mm auto;  /* Breite 80mm, Höhe automatisch */
+                }
                 * { margin: 0; padding: 0; box-sizing: border-box; }
+                html, body { 
+                    height: auto !important;
+                    min-height: 0 !important;
+                }
                 body { 
                     font-family: 'Courier New', monospace; 
                     font-size: 12px;
                     width: 80mm;
-                    padding: 5mm;
+                    padding: 3mm;
+                    padding-bottom: 8mm;
                 }
-                .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
-                .header h1 { font-size: 16px; margin-bottom: 5px; }
-                .kategorie { font-weight: bold; background: #000; color: #fff; padding: 3px 5px; margin: 10px 0 5px 0; }
-                .item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dotted #ccc; }
+                .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
+                .header h1 { font-size: 16px; margin-bottom: 3px; }
+                .kategorie { font-weight: bold; background: #000; color: #fff; padding: 2px 4px; margin: 8px 0 4px 0; font-size: 11px; }
+                .item { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dotted #ccc; }
                 .item-name { flex: 1; }
-                .item-check { width: 50px; text-align: center; font-family: monospace; }
-                .item-menge { width: 30px; text-align: right; font-weight: bold; }
-                .footer { margin-top: 15px; text-align: center; border-top: 1px dashed #000; padding-top: 10px; font-size: 10px; }
-                .total { font-size: 14px; font-weight: bold; text-align: center; margin: 10px 0; }
+                .item-check { width: 45px; text-align: center; font-family: monospace; }
+                .item-menge { width: 25px; text-align: right; font-weight: bold; }
+                .footer { margin-top: 10px; text-align: center; border-top: 1px dashed #000; padding-top: 8px; font-size: 9px; }
+                .total { font-size: 13px; font-weight: bold; text-align: center; margin: 8px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 5px 0; }
                 @media print { 
-                    body { width: 100%; }
+                    html, body { 
+                        width: 80mm; 
+                        height: auto !important;
+                    }
                 }
             </style>
         </head>
@@ -4428,14 +4432,18 @@ window.printAuffuellliste = async () => {
             <div class="total">GESAMT: ${total} Getränke</div>
             
             <div class="footer">
-                Seollerhaus Kassa<br>
+                Söllerhaus Kassa<br>
                 ✓ = aufgefüllt
             </div>
         </body>
         </html>
     `);
     printWindow.document.close();
-    printWindow.print();
+    
+    // Kurz warten dann automatisch drucken
+    setTimeout(() => {
+        printWindow.print();
+    }, 300);
 };
 
 // Nur Auffüllliste zurücksetzen (NICHT Export!)
