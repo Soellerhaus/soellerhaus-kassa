@@ -8547,7 +8547,6 @@ window.saveEditArticle = async () => {
     // Alten Artikel holen
     const oldArticle = await Artikel.getById(id);
     const oldSortierung = oldArticle?.sortierung || 1;
-    const oldKat = oldArticle?.kategorie_id;
     
     // Alle Artikel in der Ziel-Kategorie holen und nach sortierung sortieren
     const allArticles = await Artikel.getAll();
@@ -8559,36 +8558,45 @@ window.saveEditArticle = async () => {
     const targetIndex = newPos - 1; // Position 1 = Index 0
     const artikelAufZielPos = artikelInKategorie[targetIndex];
     
-    // Berechne die neue Sortierung
-    let neueSortierung = newPos;
+    // Berechne die neue Sortierung für den bearbeiteten Artikel
+    let neueSortierung = oldSortierung; // Standard: behalten
     
     if (artikelAufZielPos && artikelAufZielPos.artikel_id !== id) {
-        // Es gibt einen anderen Artikel auf dieser Position
+        // Es gibt einen anderen Artikel auf der Zielposition
+        // Der bearbeitete Artikel bekommt dessen sortierung
         neueSortierung = artikelAufZielPos.sortierung;
         
-        // Platztausch: Der andere Artikel bekommt die alte Sortierung
-        console.log(`🔄 Platztausch: "${artikelAufZielPos.name}" (ID ${artikelAufZielPos.artikel_id}) bekommt sortierung ${oldSortierung}`);
+        console.log(`🔄 Platztausch:`);
+        console.log(`   "${oldArticle.name}" (ID ${id}): sortierung ${oldSortierung} → ${neueSortierung}`);
+        console.log(`   "${artikelAufZielPos.name}" (ID ${artikelAufZielPos.artikel_id}): sortierung ${artikelAufZielPos.sortierung} → ${oldSortierung}`);
         
-        await db.artikel.update(artikelAufZielPos.artikel_id, { sortierung: oldSortierung });
-        
-        // Auch in Supabase aktualisieren!
-        if (supabaseClient && isOnline) {
-            try {
-                await supabaseClient.from('artikel').update({ sortierung: oldSortierung }).eq('artikel_id', artikelAufZielPos.artikel_id);
-                console.log('✅ Platztausch in Supabase gespeichert');
-            } catch(e) {
-                console.error('Supabase Platztausch Fehler:', e);
+        // ZUERST den anderen Artikel aktualisieren (bekommt die alte Sortierung)
+        try {
+            // Lokal
+            await db.artikel.update(artikelAufZielPos.artikel_id, { sortierung: oldSortierung });
+            
+            // Supabase
+            if (supabaseClient && isOnline) {
+                const { error } = await supabaseClient
+                    .from('artikel')
+                    .update({ sortierung: oldSortierung })
+                    .eq('artikel_id', artikelAufZielPos.artikel_id);
+                
+                if (error) {
+                    console.error('Supabase Fehler beim Tausch-Artikel:', error);
+                } else {
+                    console.log(`✅ "${artikelAufZielPos.name}" in Supabase: sortierung = ${oldSortierung}`);
+                }
             }
+        } catch(e) {
+            console.error('Fehler beim Aktualisieren des Tausch-Artikels:', e);
         }
         
         Utils.showToast(`Position getauscht mit "${artikelAufZielPos.name}"`, 'info');
     }
     
-    // Cache invalidieren vor dem Update
-    artikelCache = null;
-    artikelCacheTime = null;
-    
-    await Artikel.update(id, { 
+    // DANN den bearbeiteten Artikel aktualisieren
+    const updateData = { 
         name: name.trim(), 
         name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
         sku: document.getElementById('article-sku')?.value?.trim() || null, 
@@ -8600,11 +8608,37 @@ window.saveEditArticle = async () => {
         sortierung: neueSortierung,
         icon: iconMap[katId],
         bild: window.currentArticleImage || null
-    });
+    };
+    
+    try {
+        // Lokal
+        await db.artikel.update(id, updateData);
+        
+        // Supabase
+        if (supabaseClient && isOnline) {
+            const { error } = await supabaseClient
+                .from('artikel')
+                .update(updateData)
+                .eq('artikel_id', id);
+            
+            if (error) {
+                console.error('Supabase Fehler beim Artikel-Update:', error);
+            } else {
+                console.log(`✅ "${name}" in Supabase aktualisiert: sortierung = ${neueSortierung}`);
+            }
+        }
+    } catch(e) {
+        console.error('Fehler beim Aktualisieren des Artikels:', e);
+    }
+    
+    // Cache komplett invalidieren
+    artikelCache = null;
+    artikelCacheTime = null;
+    
+    Utils.showToast('Artikel aktualisiert', 'success');
     closeArticleModal();
     Router.navigate('admin-articles');
 };
-
 // Init
 (async function initApp() {
     console.log('🚀 Seollerhaus Kassa v3.0 (Supabase) startet...');
