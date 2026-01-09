@@ -4648,6 +4648,11 @@ Router.register('admin-dashboard', async () => {
                         <div style="font-size:0.8rem;opacity:0.9;margin-bottom:8px;">Daten aus JSON wiederherstellen</div>
                         <button class="btn" onclick="DataProtection.selectRestoreFile()" style="background:white;color:#e74c3c;border:none;padding:8px 16px;"> Datei wählen</button>
                     </div>
+                    <div style="padding:16px;background:linear-gradient(135deg, #9b59b6, #8e44ad);border-radius:var(--radius-md);color:white;">
+                        <h3 style="font-weight:600;margin-bottom:8px;">🔄 Lokale → Supabase</h3>
+                        <div style="font-size:0.8rem;opacity:0.9;margin-bottom:8px;">Lokale Buchungen hochladen</div>
+                        <button class="btn" onclick="migrateLocalToSupabase()" style="background:white;color:#9b59b6;border:none;padding:8px 16px;">🔄 Migrieren</button>
+                    </div>
                     
                 </div>
             </div>
@@ -9395,4 +9400,97 @@ Screenshot beifuegen:`;
     const whatsappUrl = `https://wa.me/${whatsappNummer}?text=${encodedNachricht}`;
     
     window.open(whatsappUrl, '_blank');
+};
+
+// Migration: Lokale Buchungen nach Supabase hochladen
+window.migrateLocalToSupabase = async () => {
+    if (!supabaseClient || !isOnline) {
+        Utils.showToast('Keine Verbindung zu Supabase!', 'error');
+        return;
+    }
+    
+    if (!confirm('Alle lokalen Buchungen nach Supabase migrieren?\n\nDies lädt alle Buchungen aus der lokalen Datenbank hoch.')) {
+        return;
+    }
+    
+    Utils.showToast('🔄 Migration gestartet...', 'info');
+    
+    try {
+        // Alle lokalen Buchungen laden
+        const lokaleBuchungen = await db.buchungen.toArray();
+        console.log('📦 Lokale Buchungen gefunden:', lokaleBuchungen.length);
+        
+        if (lokaleBuchungen.length === 0) {
+            Utils.showToast('Keine lokalen Buchungen gefunden', 'info');
+            return;
+        }
+        
+        let hochgeladen = 0;
+        let uebersprungen = 0;
+        let fehler = 0;
+        
+        for (const b of lokaleBuchungen) {
+            try {
+                // Prüfen ob schon in Supabase existiert
+                const { data: existing } = await supabaseClient
+                    .from('buchungen')
+                    .select('buchung_id')
+                    .eq('buchung_id', b.buchung_id)
+                    .single();
+                
+                if (existing) {
+                    uebersprungen++;
+                    continue;
+                }
+                
+                // Buchung für Supabase vorbereiten
+                const buchungData = {
+                    buchung_id: b.buchung_id,
+                    user_id: b.user_id || b.gast_id,
+                    gast_id: b.gast_id || b.user_id,
+                    gast_vorname: b.gast_vorname || b.gastname || '',
+                    artikel_id: b.artikel_id,
+                    artikel_name: b.artikel_name,
+                    preis: b.preis,
+                    menge: b.menge || 1,
+                    datum: b.datum,
+                    uhrzeit: b.uhrzeit,
+                    erstellt_am: b.erstellt_am,
+                    storniert: b.storniert || false,
+                    exportiert: b.exportiert || false,
+                    aufgefuellt: b.aufgefuellt || false,
+                    group_name: b.group_name || 'keiner Gruppe zugehoerig',
+                    session_id: b.session_id || null
+                };
+                
+                const { error } = await supabaseClient.from('buchungen').insert(buchungData);
+                
+                if (error) {
+                    if (error.code === '23505') {
+                        // Duplikat - schon vorhanden
+                        uebersprungen++;
+                    } else {
+                        console.error('❌ Migration error:', b.buchung_id, error.message);
+                        fehler++;
+                    }
+                } else {
+                    hochgeladen++;
+                    console.log('✅ Migriert:', b.buchung_id);
+                }
+            } catch(e) {
+                console.error('❌ Migration exception:', e);
+                fehler++;
+            }
+        }
+        
+        Utils.showToast(`✅ Migration fertig!\n${hochgeladen} hochgeladen\n${uebersprungen} übersprungen\n${fehler} Fehler`, 'success');
+        console.log(`📊 Migration: ${hochgeladen} hochgeladen, ${uebersprungen} übersprungen, ${fehler} Fehler`);
+        
+        // Dashboard neu laden
+        Router.navigate('admin-dashboard');
+        
+    } catch(e) {
+        console.error('❌ Migration Fehler:', e);
+        Utils.showToast('Migration fehlgeschlagen: ' + e.message, 'error');
+    }
 };
