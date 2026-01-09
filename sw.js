@@ -7285,25 +7285,36 @@ window.exportGästeExcel = async () => {
 Router.register('admin-articles', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
+    console.log('📋 admin-articles: Lade Artikel...');
+    
     // DIREKT aus Supabase laden (nicht aus Cache!)
     let articles = [];
     if (supabaseClient && isOnline) {
         try {
+            console.log('📡 Lade aus Supabase...');
             const { data, error } = await supabaseClient
                 .from('artikel')
                 .select('*')
                 .order('sortierung');
-            if (!error && data) {
+            if (error) {
+                console.error('❌ Supabase Fehler:', error);
+            } else if (data) {
                 articles = data;
-                console.log('✅ Artikelverwaltung: ' + data.length + ' Artikel aus Supabase geladen');
+                // Zeige Aktivierungsstatus
+                const aktive = data.filter(a => a.aktiv).length;
+                const inaktive = data.filter(a => !a.aktiv).length;
+                console.log('✅ Artikelverwaltung: ' + data.length + ' Artikel aus Supabase (' + aktive + ' aktiv, ' + inaktive + ' inaktiv)');
             }
         } catch(e) {
             console.error('Supabase Fehler:', e);
         }
+    } else {
+        console.log('⚠️ Keine Supabase-Verbindung, nutze lokale DB');
     }
     
     // Fallback: lokale Datenbank
     if (articles.length === 0) {
+        console.log('📂 Fallback: Lade aus lokaler DB...');
         articles = await Artikel.getAll();
     }
     
@@ -8512,6 +8523,8 @@ window.handlePermanentDeleteGuest = async id => {
 };
 window.handleDeleteArticle = async id => { if(confirm('Artikel löschen?')) { await Artikel.delete(id); Router.navigate('admin-articles'); } };
 window.toggleArtikelAktiv = async (id, aktiv) => {
+    console.log('🔄 toggleArtikelAktiv aufgerufen:', id, aktiv);
+    
     try {
         // Bei manueller Deaktivierung auch aktiv_bis löschen
         const updateData = { aktiv: aktiv };
@@ -8519,27 +8532,39 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
             updateData.aktiv_bis = null; // Zeitbegrenzung entfernen
         }
         
+        console.log('📤 Sende an Supabase:', updateData);
+        
         // ZUERST Supabase updaten (wichtig!)
         if (supabaseClient && isOnline) {
-            const { error } = await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
+            const { data, error } = await supabaseClient
+                .from('artikel')
+                .update(updateData)
+                .eq('artikel_id', id)
+                .select();
+            
             if (error) {
+                console.error('❌ Supabase Fehler:', error);
                 throw new Error('Supabase Fehler: ' + error.message);
             }
+            
+            console.log('✅ Supabase Antwort:', data);
             console.log('✅ Artikel ' + id + ' in Supabase ' + (aktiv ? 'aktiviert' : 'deaktiviert'));
         } else {
+            console.error('❌ Keine Supabase-Verbindung!');
             throw new Error('Keine Verbindung zu Supabase!');
         }
         
         // Dann lokal updaten
         await db.artikel.update(id, updateData);
+        console.log('✅ Lokal aktualisiert');
         
         // Cache invalidieren
         artikelCache = null;
         
         Utils.showToast(aktiv ? 'Artikel aktiviert' : 'Artikel deaktiviert', 'success');
     } catch (e) {
+        console.error('❌ Toggle Fehler:', e);
         Utils.showToast('Fehler: ' + e.message, 'error');
-        Router.navigate('admin-articles');
     }
 };
 
