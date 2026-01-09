@@ -3791,12 +3791,19 @@ const Artikel = {
             data.artikel_id = (m?.artikel_id||0)+1; 
         }
         
+        // ZUERST in Supabase erstellen (wichtig!)
+        if (supabaseClient && isOnline) {
+            const { error } = await supabaseClient.from('artikel').insert(data);
+            if (error) {
+                console.error('Supabase Insert Fehler:', error);
+                throw new Error('Supabase Fehler: ' + error.message);
+            }
+            console.log('✅ Artikel ' + data.artikel_id + ' in Supabase erstellt');
+        }
+        
+        // Dann lokal erstellen
         await db.artikel.add(data);
         artikelCache = null; // Cache invalidieren
-        
-        if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').insert(data);
-        }
         
         await DataProtection.createBackup();
         Utils.showToast('Artikel erstellt', 'success');
@@ -3816,32 +3823,47 @@ const Artikel = {
                 const conflicting = allArtikel.find(a => a.artikel_id !== id && a.sortierung === newPos);
                 
                 if (conflicting) {
-                    await db.artikel.update(conflicting.artikel_id, { sortierung: oldPos });
+                    // ZUERST Supabase
                     if (supabaseClient && isOnline) {
                         await supabaseClient.from('artikel').update({ sortierung: oldPos }).eq('artikel_id', conflicting.artikel_id);
                     }
+                    await db.artikel.update(conflicting.artikel_id, { sortierung: oldPos });
                 }
             }
         }
         
+        // ZUERST Supabase updaten (wichtig!)
+        if (supabaseClient && isOnline) {
+            const { error } = await supabaseClient.from('artikel').update(changes).eq('artikel_id', id);
+            if (error) {
+                console.error('Supabase Update Fehler:', error);
+                throw new Error('Supabase Fehler: ' + error.message);
+            }
+            console.log('✅ Artikel ' + id + ' in Supabase aktualisiert');
+        }
+        
+        // Dann lokal updaten
         await db.artikel.update(id, changes);
         artikelCache = null; // Cache invalidieren
-        
-        if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').update(changes).eq('artikel_id', id);
-        }
         
         await DataProtection.createBackup(); 
         Utils.showToast('Artikel aktualisiert', 'success'); 
     },
     
     async delete(id) { 
+        // ZUERST Supabase löschen (wichtig!)
+        if (supabaseClient && isOnline) {
+            const { error } = await supabaseClient.from('artikel').delete().eq('artikel_id', id);
+            if (error) {
+                console.error('Supabase Delete Fehler:', error);
+                throw new Error('Supabase Fehler: ' + error.message);
+            }
+            console.log('✅ Artikel ' + id + ' in Supabase gelöscht');
+        }
+        
+        // Dann lokal löschen
         await db.artikel.delete(id);
         artikelCache = null;
-        
-        if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').delete().eq('artikel_id', id);
-        }
         
         await DataProtection.createBackup(); 
         Utils.showToast('Artikel gelöscht', 'success'); 
@@ -8475,13 +8497,19 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
             updateData.aktiv_bis = null; // Zeitbegrenzung entfernen
         }
         
-        // Direkt DB updaten ohne Toast von Artikel.update
-        await db.artikel.update(id, updateData);
-        
-        // Supabase auch updaten
+        // ZUERST Supabase updaten (wichtig!)
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
+            const { error } = await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
+            if (error) {
+                throw new Error('Supabase Fehler: ' + error.message);
+            }
+            console.log('✅ Artikel ' + id + ' in Supabase ' + (aktiv ? 'aktiviert' : 'deaktiviert'));
+        } else {
+            throw new Error('Keine Verbindung zu Supabase!');
         }
+        
+        // Dann lokal updaten
+        await db.artikel.update(id, updateData);
         
         // Cache invalidieren
         artikelCache = null;
@@ -8625,12 +8653,13 @@ window.quickUpdatePreis = async (id, typ, wert) => {
         const preis = parseFloat(wert) || 0;
         const update = typ === 'hp' ? { preis_hp: preis } : { preis: preis };
         
-        await db.artikel.update(id, update);
-        
+        // ZUERST Supabase updaten (wichtig!)
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').update(update).eq('artikel_id', id);
+            const { error } = await supabaseClient.from('artikel').update(update).eq('artikel_id', id);
+            if (error) throw new Error('Supabase Fehler: ' + error.message);
         }
         
+        await db.artikel.update(id, update);
         artikelCache = null;
         
         const label = typ === 'hp' ? 'HP-Preis' : 'SV-Preis';
@@ -8643,12 +8672,13 @@ window.quickUpdatePreis = async (id, typ, wert) => {
 // MwSt direkt ändern
 window.quickUpdateMwst = async (id, mwst) => {
     try {
-        await db.artikel.update(id, { steuer_prozent: mwst });
-        
+        // ZUERST Supabase updaten (wichtig!)
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').update({ steuer_prozent: mwst }).eq('artikel_id', id);
+            const { error } = await supabaseClient.from('artikel').update({ steuer_prozent: mwst }).eq('artikel_id', id);
+            if (error) throw new Error('Supabase Fehler: ' + error.message);
         }
         
+        await db.artikel.update(id, { steuer_prozent: mwst });
         artikelCache = null;
         Utils.showToast(`MwSt auf ${mwst}% geändert`, 'success');
     } catch (e) {
@@ -8662,18 +8692,21 @@ window.changeArtikelKategorie = async (id, neueKategorieId) => {
         const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Suesses & Salziges',7:'Sonstiges'};
         const iconMap = {1:'',2:'',3:'',4:'',5:'[Kaffee]',6:'',7:''};
         
-        await db.artikel.update(id, { 
+        const updateData = { 
             kategorie_id: neueKategorieId,
-            kategorie_name: katMap[neueKategorieId] || 'Sonstiges',
+            kategorie_name: katMap[neueKategorieId] || 'Sonstiges'
+        };
+        
+        // ZUERST Supabase updaten (wichtig!)
+        if (supabaseClient && isOnline) {
+            const { error } = await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
+            if (error) throw new Error('Supabase Fehler: ' + error.message);
+        }
+        
+        await db.artikel.update(id, { 
+            ...updateData,
             icon: iconMap[neueKategorieId] || ''
         });
-        
-        if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').update({ 
-                kategorie_id: neueKategorieId,
-                kategorie_name: katMap[neueKategorieId] || 'Sonstiges'
-            }).eq('artikel_id', id);
-        }
         
         artikelCache = null;
         Utils.showToast('Kategorie geändert', 'success');
