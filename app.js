@@ -8056,27 +8056,29 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
             updateData.aktiv_bis = null; // Zeitbegrenzung entfernen
         }
         
-        // ERST Supabase updaten (Single Source of Truth)
-        if (supabaseClient && isOnline) {
-            const { error } = await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
-            if (error) {
-                console.error('Supabase Artikel-Update Fehler:', error);
-                throw new Error('Sync fehlgeschlagen');
-            }
-            console.log('✅ Artikel in Supabase aktualisiert:', id, aktiv);
-        }
-        
-        // Dann lokal updaten
+        // Lokal ERST updaten (für schnelle UI-Reaktion)
         await db.artikel.update(id, updateData);
         
-        // Cache invalidieren - erzwingt Neuladen von Supabase
+        // Dann Supabase updaten
+        if (supabaseClient && isOnline) {
+            try {
+                const { error } = await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
+                if (error) {
+                    console.error('Supabase Artikel-Update Fehler:', error);
+                    // Trotzdem weitermachen - lokal ist schon gespeichert
+                }
+            } catch(e) {
+                console.error('Supabase sync error:', e);
+            }
+        }
+        
+        // Cache invalidieren - erzwingt Neuladen
         artikelCache = null;
         artikelCacheTime = null;
         
         Utils.showToast(aktiv ? 'Artikel aktiviert' : 'Artikel deaktiviert', 'success');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
-        Router.navigate('admin-articles');
     }
 };
 
