@@ -3169,20 +3169,46 @@ const FehlendeGetraenke = {
 
 // ============ GRUPPEN-VERWALTUNG ============
 const Gruppen = {
-    // Einstellung: Gruppenabfrage aktiv?
+    // Einstellung: Gruppenabfrage aktiv? - IMMER von Supabase laden!
     async isAbfrageAktiv() {
+        // Erst von Supabase laden (Single Source of Truth)
+        if (supabaseClient && isOnline) {
+            try {
+                const { data } = await supabaseClient
+                    .from('settings')
+                    .select('value')
+                    .eq('key', 'gruppenAbfrageAktiv')
+                    .single();
+                
+                if (data !== null) {
+                    // Lokal cachen
+                    await db.settings.put({ key: 'gruppenAbfrageAktiv', value: data.value });
+                    return data.value === true;
+                }
+            } catch(e) {
+                console.log('Gruppen-Einstellung von Supabase laden:', e.message);
+            }
+        }
+        // Fallback: Lokal
         const setting = await db.settings.get('gruppenAbfrageAktiv');
         return setting?.value === true;
     },
     
     async setAbfrageAktiv(aktiv) {
-        await db.settings.put({ key: 'gruppenAbfrageAktiv', value: aktiv });
+        // ERST Supabase, dann lokal
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('settings').upsert({ 
-                key: 'gruppenAbfrageAktiv', 
-                value: aktiv 
-            });
+            try {
+                await supabaseClient.from('settings').upsert({ 
+                    key: 'gruppenAbfrageAktiv', 
+                    value: aktiv 
+                }, { onConflict: 'key' });
+                console.log('✅ Gruppenabfrage in Supabase gespeichert:', aktiv);
+            } catch(e) {
+                console.error('Supabase settings error:', e);
+            }
         }
+        // Lokal speichern
+        await db.settings.put({ key: 'gruppenAbfrageAktiv', value: aktiv });
     },
     
     // Alle Gruppen laden
@@ -7923,11 +7949,14 @@ window.handleRegisterSubmit = async () => {
         console.log('Registrierung startet...', v.trim(), p.length);
         await RegisteredGuests.register(v.trim(), p); 
         
+        // WICHTIG: Bei neuer Registrierung hat der Gast noch KEINE Gruppe gewählt!
+        State.selectedGroup = null;
+        
         // Nach Registrierung prüfen ob Gruppe gewählt werden muss
         const gruppenAktiv = await Gruppen.isAbfrageAktiv();
         console.log('Gruppen aktiv?', gruppenAktiv, 'State.selectedGroup:', State.selectedGroup);
         
-        if (gruppenAktiv && !State.selectedGroup) {
+        if (gruppenAktiv) {
             // Gruppenauswahl erforderlich - direkt navigieren
             console.log('→ Navigiere zu Gruppenauswahl');
             Router.navigate('gruppe-waehlen');
