@@ -3552,56 +3552,81 @@ const PreisModus = {
 // Umlage auf alle Gäste
 const Umlage = {
     async bucheAufAlle(artikel_id, beschreibung = 'Umlage') {
+        // NUR Supabase!
+        if (!supabaseClient || !isOnline) {
+            throw new Error('Keine Internetverbindung. Bitte später nochmal versuchen.');
+        }
+        
         const artikel = await Artikel.getById(artikel_id);
         if (!artikel) throw new Error('Artikel nicht gefunden');
         
-        // Alle aktiven Gäste holen
-        const registrierte = await RegisteredGuests.getAll();
-        const legacy = (await db.gäste.toArray()).filter(g => g.aktiv && !g.checked_out);
-        const alleGäste = [...registrierte, ...legacy];
+        // Alle aktiven Gäste von Supabase holen
+        const { data: profiles, error } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('aktiv', true)
+            .eq('geloescht', false);
         
-        if (alleGäste.length === 0) throw new Error('Keine aktiven Gäste');
+        if (error) throw new Error('Fehler beim Laden der Gäste');
+        
+        // WICHTIG: Gäste mit Ausnahme Umlage filtern!
+        const alleGäste = (profiles || []).filter(g => g.ausnahmeumlage !== true);
+        const ausgenommen = (profiles || []).length - alleGäste.length;
+        
+        if (alleGäste.length === 0) throw new Error('Keine aktiven Gäste für Umlage');
         
         // Preis pro Gast berechnen (aufgerundet auf 2 Dezimalen)
         const preisProGast = Math.ceil((artikel.preis / alleGäste.length) * 100) / 100;
         
-        const heute = Utils.getBuchungsDatum(); // 7:00-7:00 Periode
+        const heute = Utils.getBuchungsDatum();
         const uhrzeit = Utils.formatTime(new Date());
         
-        // Für jeden Gast eine Buchung erstellen
+        let erfolg = 0;
+        let fehler = 0;
+        
+        // Für jeden Gast eine Buchung erstellen - DIREKT nach Supabase
         for (const gast of alleGäste) {
-            const gastId = gast.id || gast.gast_id;
-            const gastName = gast.firstName || gast.vorname;
+            const gastId = gast.id;
+            const gastName = gast.vorname || gast.display_name || gast.first_name;
             
             const b = {
                 buchung_id: Utils.uuid(),
+                user_id: gastId,  // WICHTIG für Supabase!
                 gast_id: gastId,
                 gast_vorname: gastName,
-                gast_nachname: gast.nachname || '',
-                gastgruppe: gast.zimmernummer || '',
                 artikel_id: artikel.artikel_id,
                 artikel_name: `${artikel.name} (Umlage)`,
                 preis: preisProGast,
-                steuer_prozent: artikel.steuer_prozent || 10,
                 menge: 1,
                 datum: heute,
                 uhrzeit: uhrzeit,
                 erstellt_am: new Date().toISOString(),
                 exportiert: false,
-                gerät_id: Utils.getDeviceId(),
-                sync_status: 'pending',
-                session_id: null,
                 storniert: false,
                 fix: true,
                 ist_umlage: true,
-                umlage_beschreibung: beschreibung
+                group_name: gast.group_name || 'keiner Gruppe zugehoerig',
+                session_id: null
             };
-            await db.buchungen.add(b);
+            
+            // Direkt nach Supabase
+            const { error: insertError } = await supabaseClient.from('buchungen').insert(b);
+            if (insertError) {
+                console.error('❌ Umlage Buchung Fehler:', gastName, insertError.message);
+                fehler++;
+            } else {
+                console.log('✅ Umlage gebucht für:', gastName);
+                erfolg++;
+            }
         }
         
-        await DataProtection.createBackup();
-        Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${alleGäste.length} Gäste verteilt`, 'success');
-        return { preisProGast, anzahlGäste: alleGäste.length };
+        if (ausgenommen > 0) {
+            Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gäste verteilt (${ausgenommen} ausgenommen)`, 'success');
+        } else {
+            Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gäste verteilt`, 'success');
+        }
+        
+        return { preisProGast, anzahlGäste: erfolg, ausgenommen, fehler };
     }
 };
 
@@ -5405,9 +5430,25 @@ window.deleteFehlendes = async (id) => {
 // ============ UMLAGE ROUTE ============
 Router.register('admin-umlage', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
-    const guests = await RegisteredGuests.getAll();
-    const legacyGuests = (await db.gäste.toArray()).filter(g => g.aktiv && !g.checked_out);
-    const totalGuests = guests.length + legacyGuests.length;
+    
+    // Gäste von Supabase laden
+    let totalGuests = 0;
+    let ausgenommen = 0;
+    
+    if (supabaseClient && isOnline) {
+        const { data: profiles } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('aktiv', true)
+            .eq('geloescht', false);
+        
+        if (profiles) {
+            // Gäste mit Ausnahme zählen
+            const ohneAusnahme = profiles.filter(g => g.ausnahmeumlage !== true);
+            totalGuests = ohneAusnahme.length;
+            ausgenommen = profiles.length - totalGuests;
+        }
+    }
     
     // Fehlende Getränke laden
     const fehlendeOffen = await FehlendeGetränke.getOffene();
@@ -5418,8 +5459,9 @@ Router.register('admin-umlage', async () => {
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-danger);color:white;">
             <div style="padding:20px;text-align:center;">
-                <div style="font-size:2rem;font-weight:700;">${totalGuests} aktive Gäste</div>
-                <div style="opacity:0.9;">Kosten werden gleichmaessig verteilt</div>
+                <div style="font-size:2rem;font-weight:700;">${totalGuests} Gäste für Umlage</div>
+                <div style="opacity:0.9;">Kosten werden gleichmäßig verteilt</div>
+                ${ausgenommen > 0 ? `<div style="margin-top:8px;background:rgba(255,255,255,0.2);padding:6px 12px;border-radius:20px;display:inline-block;">${ausgenommen} Gäste ausgenommen</div>` : ''}
             </div>
         </div>
         
@@ -5474,13 +5516,31 @@ Router.register('admin-umlage', async () => {
 });
 
 window.bucheUmlageFürAlle = async () => {
-    const guests = await RegisteredGuests.getAll();
-    const legacyGuests = (await db.gäste.toArray()).filter(g => g.aktiv && !g.checked_out);
-    const alleGäste = [...guests, ...legacyGuests];
+    // NUR Supabase!
+    if (!supabaseClient || !isOnline) {
+        Utils.showToast('Keine Internetverbindung!', 'error');
+        return;
+    }
+    
+    // Alle aktiven Gäste von Supabase holen
+    const { data: profiles, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('aktiv', true)
+        .eq('geloescht', false);
+    
+    if (profileError) {
+        Utils.showToast('Fehler beim Laden der Gäste', 'error');
+        return;
+    }
+    
+    // WICHTIG: Gäste mit Ausnahme Umlage filtern!
+    const alleGäste = (profiles || []).filter(g => g.ausnahmeumlage !== true);
+    const ausgenommen = (profiles || []).length - alleGäste.length;
     const totalGuests = alleGäste.length;
     
     if (totalGuests === 0) {
-        Utils.showToast('Keine aktiven Gäste', 'error');
+        Utils.showToast('Keine aktiven Gäste für Umlage', 'error');
         return;
     }
     
@@ -5493,54 +5553,75 @@ window.bucheUmlageFürAlle = async () => {
     const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
     const preisProGast = Math.ceil((gesamtPreis / totalGuests) * 100) / 100;
     
-    if (!confirm(`UMLAGE durchführen?\n\n${fehlendeOffen.length} fehlende Getränke\nGesamtwert: ${Utils.formatCurrency(gesamtPreis)}\n\n${Utils.formatCurrency(preisProGast)} x ${totalGuests} Gäste`)) {
+    let confirmMsg = `UMLAGE durchführen?\n\n${fehlendeOffen.length} fehlende Getränke\nGesamtwert: ${Utils.formatCurrency(gesamtPreis)}\n\n${Utils.formatCurrency(preisProGast)} x ${totalGuests} Gäste`;
+    if (ausgenommen > 0) {
+        confirmMsg += `\n\n(${ausgenommen} Gäste ausgenommen)`;
+    }
+    
+    if (!confirm(confirmMsg)) {
         return;
     }
     
-    const heute = Utils.getBuchungsDatum(); // 7:00-7:00 Periode
+    const heute = Utils.getBuchungsDatum();
     const uhrzeit = Utils.formatTime(new Date());
     
-    // Für jeden Gast eine Buchung erstellen
+    let erfolg = 0;
+    let fehler = 0;
+    
+    // Für jeden Gast eine Buchung erstellen - DIREKT nach Supabase
     for (const gast of alleGäste) {
-        const gastId = gast.id || gast.gast_id;
-        const gastName = gast.firstName || gast.vorname;
+        const gastId = gast.id;
+        const gastName = gast.vorname || gast.display_name || gast.first_name;
         
         const b = {
             buchung_id: Utils.uuid(),
+            user_id: gastId,  // WICHTIG für Supabase!
             gast_id: gastId,
             gast_vorname: gastName,
-            gast_nachname: gast.nachname || '',
-            gastgruppe: gast.zimmernummer || '',
-            artikel_id: 0,
+            artikel_id: 9999,  // Spezielle ID für Umlage
             artikel_name: `Umlage (${fehlendeOffen.length} Getränke)`,
             preis: preisProGast,
-            steuer_prozent: 10,
             menge: 1,
             datum: heute,
             uhrzeit: uhrzeit,
             erstellt_am: new Date().toISOString(),
             exportiert: false,
-            gerät_id: Utils.getDeviceId(),
-            sync_status: 'pending',
-            session_id: null,
             storniert: false,
             fix: true,
-            ist_umlage: true
+            ist_umlage: true,
+            group_name: gast.group_name || 'keiner Gruppe zugehoerig',
+            session_id: null
         };
-        await db.buchungen.add(b);
+        
+        // Direkt nach Supabase
+        const { error: insertError } = await supabaseClient.from('buchungen').insert(b);
+        if (insertError) {
+            console.error('❌ Umlage Buchung Fehler:', gastName, insertError.message);
+            fehler++;
+        } else {
+            console.log('✅ Umlage gebucht für:', gastName);
+            erfolg++;
+        }
     }
     
-    // Alle fehlenden Getränke als umgelegt markieren
+    // Alle fehlenden Getränke als umgelegt markieren - in Supabase
     for (const f of fehlendeOffen) {
-        await db.fehlendeGetraenke.update(f.id, { 
-            uebernommen: true, 
-            uebernommen_am: new Date().toISOString(),
-            umgelegt: true
-        });
+        await supabaseClient
+            .from('fehlende_getraenke')
+            .update({ 
+                uebernommen: true, 
+                uebernommen_am: new Date().toISOString(),
+                umgelegt: true
+            })
+            .eq('id', f.id);
     }
     
-    await DataProtection.createBackup();
-    Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${totalGuests} Gäste verteilt`, 'success');
+    if (ausgenommen > 0) {
+        Utils.showToast(`✅ Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gäste verteilt (${ausgenommen} ausgenommen)`, 'success');
+    } else {
+        Utils.showToast(`✅ Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gäste verteilt`, 'success');
+    }
+    
     Router.navigate('admin-dashboard');
 };
 
