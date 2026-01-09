@@ -3417,19 +3417,40 @@ const Gruppen = {
             erstellt_am: new Date().toISOString()
         };
         
-        // Lokal speichern
-        const id = await db.gruppen.add(gruppe);
-        gruppe.id = id;
-        
-        // Supabase
+        // ZUERST Supabase (wenn online) - bekommt eigene ID
         if (supabaseClient && isOnline) {
             try {
-                await supabaseClient.from('gruppen').insert(gruppe);
+                const { data, error } = await supabaseClient
+                    .from('gruppen')
+                    .insert({ 
+                        name: gruppe.name, 
+                        aktiv: true, 
+                        erstellt_am: gruppe.erstellt_am 
+                    })
+                    .select()
+                    .single();
+                
+                if (error) {
+                    console.error('Gruppe Supabase insert error:', error);
+                    throw new Error('Gruppe konnte nicht gespeichert werden: ' + error.message);
+                }
+                
+                if (data) {
+                    console.log('✅ Gruppe in Supabase gespeichert:', data);
+                    // Lokal mit Supabase-ID speichern
+                    gruppe.id = data.id;
+                    try { await db.gruppen.put(gruppe); } catch(e) {}
+                    return data;
+                }
             } catch(e) {
                 console.error('Gruppe sync error:', e);
+                throw e;
             }
         }
         
+        // Fallback: Nur lokal speichern (offline)
+        const id = await db.gruppen.add(gruppe);
+        gruppe.id = id;
         return gruppe;
     },
     
@@ -4841,8 +4862,21 @@ window.repairCategories = async () => {
 
 // Auffüllliste Route
 Router.register('admin-auffüllliste', async () => {
-    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
-    const liste = await Buchungen.getAuffüllliste();
+    console.log('📋 Auffüllliste Route - isAdmin:', State.isAdmin);
+    if (!State.isAdmin) { 
+        console.log('⚠️ Nicht als Admin eingeloggt, leite zum Login');
+        Router.navigate('admin-login'); 
+        return; 
+    }
+    
+    let liste = [];
+    try {
+        liste = await Buchungen.getAuffüllliste();
+        console.log('✅ Auffüllliste geladen:', liste.length, 'Positionen');
+    } catch(e) {
+        console.error('❌ Auffüllliste Fehler:', e);
+        Utils.showToast('Fehler beim Laden: ' + e.message, 'error');
+    }
     
     // Nach Kategorie gruppieren
     const byKat = {};
@@ -5852,10 +5886,13 @@ window.showAddGruppeModal = () => {
 
 window.addGruppe = async (name) => {
     try {
-        await Gruppen.add(name);
+        console.log('➕ Füge Gruppe hinzu:', name);
+        const result = await Gruppen.add(name);
+        console.log('✅ Gruppe hinzugefügt:', result);
         Utils.showToast(`Gruppe "${name}" hinzugefuegt`, 'success');
         Router.navigate('admin-gruppen');
     } catch (e) {
+        console.error('❌ Gruppe hinzufügen Fehler:', e);
         Utils.showToast(e.message, 'error');
     }
 };
