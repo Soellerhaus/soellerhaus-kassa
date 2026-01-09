@@ -8428,6 +8428,15 @@ window.showAddArticleModal = () => {
 window.showEditArticleModal = async id => {
     const a = await Artikel.getById(id);
     if (!a) return;
+    
+    // Aktuelle Position in der Kategorie berechnen (1-basiert)
+    const allArticles = await Artikel.getAll();
+    const artikelInKategorie = allArticles
+        .filter(art => art.kategorie_id === a.kategorie_id)
+        .sort((x, y) => (x.sortierung || 0) - (y.sortierung || 0));
+    const currentPos = artikelInKategorie.findIndex(art => art.artikel_id === a.artikel_id) + 1;
+    const maxPos = artikelInKategorie.length;
+    
     const c = document.getElementById('article-modal-container');
     const hasImage = a.bild && a.bild.startsWith('data:');
     const previewContent = hasImage ? `<img src="${a.bild}" style="width:100%;height:100%;object-fit:cover;">` : (a.icon || '📦');
@@ -8439,7 +8448,7 @@ window.showEditArticleModal = async id => {
         <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;">${previewContent}</div>
         <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
         <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;">📷 Foto wählen</button>
-        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✢</button>
+        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✖</button>
     </div>
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" value="${a.name}"></div>
     <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" value="${a.name_kurz||''}"></div>
@@ -8450,7 +8459,7 @@ window.showEditArticleModal = async id => {
         <div style="font-weight:600;margin-bottom:12px;">💰 Preise</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#3498db;font-weight:600;">🏠  Selbstversorger (€)</label>
+                <label class="form-label" style="color:#3498db;font-weight:600;">🏠  Selbstversorger (€)</label>
                 <input type="number" id="article-price-sv" class="form-input" value="${preisSV.toFixed(2)}" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
             </div>
             <div class="form-group" style="margin-bottom:0;">
@@ -8461,7 +8470,7 @@ window.showEditArticleModal = async id => {
     </div>
     
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" value="${a.sortierung||1}" min="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
+        <div class="form-group"><label class="form-label">Position (1-${maxPos})</label><input type="number" id="article-sort" class="form-input" value="${currentPos}" min="1" max="${maxPos}"><small style="color:var(--color-stone-dark);">Tauscht mit Artikel auf Pos.</small></div>
         <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'}[i]}</option>`).join('')}</select></div>
     </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
@@ -8535,37 +8544,49 @@ window.saveEditArticle = async () => {
     const preisSV = parseFloat(document.getElementById('article-price-sv')?.value) || 0;
     const preisHP = parseFloat(document.getElementById('article-price-hp')?.value) || 0;
     
-    // Alten Artikel holen für Positions-Tausch
+    // Alten Artikel holen
     const oldArticle = await Artikel.getById(id);
-    const oldPos = oldArticle?.sortierung || 1;
+    const oldSortierung = oldArticle?.sortierung || 1;
     const oldKat = oldArticle?.kategorie_id;
     
-    // Wenn Position oder Kategorie geändert wurde, Platztausch prüfen
-    if (oldPos !== newPos || oldKat !== katId) {
-        // Finde Artikel der aktuell auf der neuen Position ist (in der neuen Kategorie)
-        const allArticles = await Artikel.getAll();
-        const artikelAufNeuerPos = allArticles.find(a => 
-            a.artikel_id !== id && 
-            a.kategorie_id === katId && 
-            a.sortierung === newPos
-        );
+    // Alle Artikel in der Ziel-Kategorie holen und nach sortierung sortieren
+    const allArticles = await Artikel.getAll();
+    const artikelInKategorie = allArticles
+        .filter(a => a.kategorie_id === katId)
+        .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
+    
+    // Finde den aktuellen Artikel an der gewünschten Position (1-basiert)
+    const targetIndex = newPos - 1; // Position 1 = Index 0
+    const artikelAufZielPos = artikelInKategorie[targetIndex];
+    
+    // Berechne die neue Sortierung
+    let neueSortierung = newPos;
+    
+    if (artikelAufZielPos && artikelAufZielPos.artikel_id !== id) {
+        // Es gibt einen anderen Artikel auf dieser Position
+        neueSortierung = artikelAufZielPos.sortierung;
         
-        // Platztausch: Der andere Artikel bekommt die alte Position
-        if (artikelAufNeuerPos) {
-            console.log(`🔄 Platztausch: Artikel ${artikelAufNeuerPos.name} (ID ${artikelAufNeuerPos.artikel_id}) bekommt Position ${oldPos}`);
-            await db.artikel.update(artikelAufNeuerPos.artikel_id, { sortierung: oldPos });
-            
-            // Auch in Supabase aktualisieren!
-            if (supabaseClient && isOnline) {
-                try {
-                    await supabaseClient.from('artikel').update({ sortierung: oldPos }).eq('artikel_id', artikelAufNeuerPos.artikel_id);
-                    console.log('✅ Platztausch in Supabase gespeichert');
-                } catch(e) {
-                    console.error('Supabase Platztausch Fehler:', e);
-                }
+        // Platztausch: Der andere Artikel bekommt die alte Sortierung
+        console.log(`🔄 Platztausch: "${artikelAufZielPos.name}" (ID ${artikelAufZielPos.artikel_id}) bekommt sortierung ${oldSortierung}`);
+        
+        await db.artikel.update(artikelAufZielPos.artikel_id, { sortierung: oldSortierung });
+        
+        // Auch in Supabase aktualisieren!
+        if (supabaseClient && isOnline) {
+            try {
+                await supabaseClient.from('artikel').update({ sortierung: oldSortierung }).eq('artikel_id', artikelAufZielPos.artikel_id);
+                console.log('✅ Platztausch in Supabase gespeichert');
+            } catch(e) {
+                console.error('Supabase Platztausch Fehler:', e);
             }
         }
+        
+        Utils.showToast(`Position getauscht mit "${artikelAufZielPos.name}"`, 'info');
     }
+    
+    // Cache invalidieren vor dem Update
+    artikelCache = null;
+    artikelCacheTime = null;
     
     await Artikel.update(id, { 
         name: name.trim(), 
@@ -8576,7 +8597,7 @@ window.saveEditArticle = async () => {
         kategorie_id: katId, 
         kategorie_name: katMap[katId], 
         aktiv: document.getElementById('article-active')?.checked, 
-        sortierung: newPos,
+        sortierung: neueSortierung,
         icon: iconMap[katId],
         bild: window.currentArticleImage || null
     });
