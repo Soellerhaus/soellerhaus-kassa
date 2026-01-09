@@ -5583,8 +5583,17 @@ Router.register('admin-gruppen', async () => {
     const gruppen = await Gruppen.getAll();
     const isAktiv = await Gruppen.isAbfrageAktiv();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
+        <style>
+            .toggle-switch { position:relative;display:inline-block;width:60px;height:34px; }
+            .toggle-switch input { opacity:0;width:0;height:0; }
+            .toggle-slider { position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.3s;border-radius:34px; }
+            .toggle-slider:before { position:absolute;content:"";height:26px;width:26px;left:4px;bottom:4px;background-color:white;transition:.3s;border-radius:50%; }
+            .toggle-switch input:checked + .toggle-slider { background-color:#27ae60; }
+            .toggle-switch input:checked + .toggle-slider:before { transform:translateX(26px); }
+        </style>
+        
         <!-- TOGGLE: Gruppenabfrage aktiv -->
         <div class="card mb-3" style="background:${isAktiv ? 'var(--color-alpine-green)' : '#95a5a6'};color:white;">
             <div style="padding:20px;display:flex;justify-content:space-between;align-items:center;">
@@ -5594,9 +5603,9 @@ Router.register('admin-gruppen', async () => {
                         ${isAktiv ? 'Gäste müssen nach Login eine Gruppe wählen' : 'Keine Gruppenabfrage beim Login'}
                     </div>
                 </div>
-                <label class="switch" style="position:relative;display:inline-block;width:60px;height:34px;">
+                <label class="toggle-switch">
                     <input type="checkbox" id="gruppenToggle" ${isAktiv ? 'checked' : ''} onchange="toggleGruppenAbfrage(this.checked)">
-                    <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:34px;"></span>
+                    <span class="toggle-slider"></span>
                 </label>
             </div>
         </div>
