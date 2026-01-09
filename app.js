@@ -2189,31 +2189,38 @@ const RegisteredGuests = {
         const cleanName = firstName.trim().toUpperCase();
         
         // Nur Buchstaben, Leerzeichen und Bindestrich erlaubt
-        if (!/^[A-ZAeOeUe][A-ZAeOeUe\s\-]*$/.test(cleanName)) {
+        if (!/^[A-ZÄÖÜa-zäöü][A-ZÄÖÜa-zäöü\s\-]*$/i.test(cleanName)) {
             throw new Error('Name darf nur Buchstaben und Bindestriche enthalten!');
         }
         
         // Prüfen ob Name schon vergeben - NUR bei AKTIVEN Gästen!
-        // Ausgecheckte Gäste (aktiv=false) blockieren den Namen NICHT
         if (supabaseClient && isOnline) {
-            const { data: existing } = await supabaseClient
+            // Alle aktiven Profile laden und client-seitig prüfen (sicherer als ilike)
+            const { data: allProfiles } = await supabaseClient
                 .from('profiles')
-                .select('vorname')
+                .select('vorname, first_name, display_name')
                 .eq('gelöscht', false)
-                .eq('aktiv', true)  // Nur aktive Gäste prüfen!
-                .ilike('vorname', cleanName);
-            if (existing && existing.length > 0) {
-                throw new Error('Dieser Name ist bereits vergeben! Bitte waehle einen anderen.');
+                .eq('aktiv', true);
+            
+            if (allProfiles && allProfiles.length > 0) {
+                const nameExists = allProfiles.find(p => {
+                    const existingName = (p.display_name || p.vorname || p.first_name || '').toUpperCase().trim();
+                    return existingName === cleanName;
+                });
+                
+                if (nameExists) {
+                    throw new Error('Dieser Name ist bereits vergeben! Bitte wähle einen anderen.');
+                }
             }
         } else {
             const alleGäste = await db.registeredGuests.toArray();
             const nameExists = alleGäste.find(g => 
-                ((g.nachname || g.firstName || '').toUpperCase() === cleanName) && 
+                ((g.nachname || g.firstName || '').toUpperCase().trim() === cleanName) && 
                 !g.gelöscht && 
-                g.aktiv !== false  // Nur aktive Gäste prüfen!
+                g.aktiv !== false
             );
             if (nameExists) {
-                throw new Error('Dieser Name ist bereits vergeben! Bitte waehle einen anderen.');
+                throw new Error('Dieser Name ist bereits vergeben! Bitte wähle einen anderen.');
             }
         }
         
@@ -2499,19 +2506,28 @@ const RegisteredGuests = {
                         return startsWithLetter && isNotDeleted && isActive;
                     });
                     
-                    console.log('✅ Gefunden für', letter + ':', filtered.length);
+                    // DEDUPLIZIERUNG: Nur einzigartige Namen behalten (ersten Eintrag pro Name)
+                    const seenNames = new Set();
+                    const deduplicated = filtered.filter(p => {
+                        const name = (p.display_name || p.first_name || '').toUpperCase().trim();
+                        if (seenNames.has(name)) {
+                            return false; // Duplikat überspringen
+                        }
+                        seenNames.add(name);
+                        return true;
+                    });
                     
-                    if (filtered.length > 0) {
-                        const cnt = {};
-                        return filtered.map(g => {
+                    console.log('✅ Gefunden für', letter + ':', deduplicated.length, '(nach Deduplizierung)');
+                    
+                    if (deduplicated.length > 0) {
+                        return deduplicated.map(g => {
                             const name = g.display_name || g.first_name;
-                            cnt[name] = (cnt[name] || 0) + 1;
                             return { 
                                 ...g, 
                                 id: g.id, 
                                 firstName: name, 
                                 nachname: name, 
-                                displayName: cnt[name] > 1 ? `${name} (${cnt[name]})` : name 
+                                displayName: name 
                             };
                         });
                     }
@@ -2531,11 +2547,18 @@ const RegisteredGuests = {
             return name.startsWith(letter.toUpperCase());
         });
         
-        const cnt = {};
-        return filtered.sort((a,b) => (a.nachname || a.firstName || '').localeCompare(b.nachname || b.firstName || '')).map(g => { 
+        // Deduplizierung auch für lokale Daten
+        const seenNames = new Set();
+        const deduplicated = filtered.filter(g => {
+            const name = (g.nachname || g.firstName || '').toUpperCase().trim();
+            if (seenNames.has(name)) return false;
+            seenNames.add(name);
+            return true;
+        });
+        
+        return deduplicated.sort((a,b) => (a.nachname || a.firstName || '').localeCompare(b.nachname || b.firstName || '')).map(g => { 
             const name = g.nachname || g.firstName;
-            cnt[name] = (cnt[name]||0)+1; 
-            return {...g, firstName: name, displayName: cnt[name] > 1 ? `${name} (${cnt[name]})` : name}; 
+            return {...g, firstName: name, displayName: name}; 
         });
     },
     
