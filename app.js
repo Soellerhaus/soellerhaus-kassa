@@ -2408,22 +2408,9 @@ const RegisteredGuests = {
             
             // WICHTIG: Prüfen ob Email vorhanden ist (für Auth Session)
             if (!profile.email) {
-                // Gast wurde ohne Auth User angelegt - nur PIN prüfen (Legacy-Support)
-                console.warn('Gast hat keine Email - PIN-only Login (keine Auth Session)');
-                if (password !== profile.pin_hash) {
-                    throw new Error('Falsches Passwort');
-                }
-                // WARNUNG: Keine Auth Session = Buchungen funktionieren evtl. nicht!
-                console.warn('ACHTUNG: Keine Auth Session - Buchungen werden nur lokal gespeichert!');
-                const user = { 
-                    ...profile, 
-                    id: id,
-                    firstName: profile.first_name || profile.vorname || profile.display_name,
-                    noAuthSession: true // Flag für Buchungslogik
-                };
-                State.setUser(user);
-                Utils.showToast(`Willkommen, ${user.firstName}!`, 'success');
-                return user;
+                // Gast wurde ohne Auth User angelegt - KEIN Login erlaubt!
+                console.error('❌ Gast hat keine Email - kein Supabase Auth Account');
+                throw new Error('Login fehlgeschlagen. Bitte später nochmal versuchen.');
             }
             
             // Login mit Email und erweitertem Passwort
@@ -2453,32 +2440,8 @@ const RegisteredGuests = {
             Utils.showToast(`Willkommen, ${user.firstName}!`, 'success');
             return user;
         } else {
-            // Offline: Lokaler Login
-            const g = await db.registeredGuests.get(id);
-            if (!g) throw new Error('Gast nicht gefunden');
-            if (g.gelöscht) throw new Error('Account deaktiviert');
-            if (g.aktiv === false) throw new Error('Du hast bereits ausgecheckt. Bitte wende dich an die Rezeption.');
-            
-            // Passwort-Check: Unterstuetzt sowohl Hash als auch Klartext
-            let passwortOk = false;
-            if (g.salt && g.passwordHash) {
-                // Alte Methode: Hash-Check
-                passwortOk = (await Utils.hashPassword(password, g.salt) === g.passwordHash);
-            } else if (g.passwort) {
-                // Neue Methode: Klartext-Check (wie Access)
-                passwortOk = (password === g.passwort);
-            } else if (g.passwordHash && !g.salt) {
-                // Fallback: passwordHash ist Klartext
-                passwortOk = (password === g.passwordHash);
-            }
-            
-            if (!passwortOk) throw new Error('Falsches Passwort');
-            
-            await db.registeredGuests.update(id, { lastLoginAt: new Date().toISOString() });
-            const displayName = g.nachname || g.firstName;
-            State.setUser({ ...g, firstName: displayName });
-            Utils.showToast(`Willkommen, ${displayName}! (Offline)`, 'success');
-            return g;
+            // Offline: Kein Login möglich - brauchen Supabase für Buchungen
+            throw new Error('Keine Internetverbindung. Bitte später nochmal versuchen.');
         }
     },
     
@@ -2751,11 +2714,15 @@ const Buchungen = {
             ist_umlage: false
         };
         
-        // Session einmal prüfen
+        // Session prüfen - OHNE Session keine Buchung erlaubt!
         let hasSession = false;
         if (supabaseClient && isOnline) {
             const { data: sessionData } = await supabaseClient.auth.getSession();
             hasSession = !!sessionData?.session;
+        }
+        
+        if (!hasSession) {
+            throw new Error('Verbindungsfehler. Bitte abmelden, neu anmelden und nochmal versuchen.');
         }
         
         // LOOP: Für jede Einheit eine separate Buchung erstellen
@@ -2768,20 +2735,20 @@ const Buchungen = {
                 erstellt_am: new Date().toISOString()
             };
             
-            // Lokal speichern
-            await db.buchungen.add({...b, sync_status: (isOnline && hasSession) ? 'synced' : 'pending'});
-            
-            // Online: Nach Supabase
-            if (supabaseClient && isOnline && hasSession) {
-                try {
-                    const { error } = await supabaseClient.from('buchungen').insert(b);
-                    if (error) {
-                        console.error(' Supabase insert error:', error.message);
-                        await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
-                    }
-                } catch(e) {
-                    await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
+            // Direkt nach Supabase (Session ist vorhanden)
+            try {
+                const { error } = await supabaseClient.from('buchungen').insert(b);
+                if (error) {
+                    console.error('❌ Supabase insert error:', error.message);
+                    // Trotzdem lokal speichern für späteren Sync
+                    await db.buchungen.add({...b, sync_status: 'pending'});
+                } else {
+                    console.log('✅ Buchung nach Supabase:', b.buchung_id);
+                    await db.buchungen.add({...b, sync_status: 'synced'});
                 }
+            } catch(e) {
+                console.error('❌ Supabase exception:', e);
+                await db.buchungen.add({...b, sync_status: 'pending'});
             }
             
             erstellteBuchungen.push(b);
@@ -3075,10 +3042,10 @@ const SyncManager = {
         let synced = 0, failed = 0;
         
         try {
-            // Session prüfen
+            // Session prüfen - ohne Session kein Sync
             const { data: sessionData } = await supabaseClient.auth.getSession();
             if (!sessionData?.session) {
-                console.log('⚠️ SyncManager: Keine Session');
+                console.log('⚠️ SyncManager: Keine Session - Sync nicht möglich');
                 this.isSyncing = false;
                 return { synced: 0, failed: 0, noSession: true };
             }
@@ -3087,7 +3054,12 @@ const SyncManager = {
             const alle = await db.buchungen.toArray();
             const pending = alle.filter(b => b.sync_status === 'pending' && !b.storniert);
             
-            console.log(` SyncManager: ${pending.length} pending Buchungen`);
+            console.log(`🔄 SyncManager: ${pending.length} pending Buchungen`);
+            
+            if (pending.length === 0) {
+                this.isSyncing = false;
+                return { synced: 0, failed: 0 };
+            }
             
             for (const b of pending) {
                 try {
@@ -3105,15 +3077,37 @@ const SyncManager = {
                         continue;
                     }
                     
-                    // Upload zu Supabase
-                    const buchungData = { ...b };
-                    delete buchungData.sync_status; // Nicht nach Supabase senden
+                    // Upload zu Supabase - nur erlaubte Felder senden
+                    const buchungData = {
+                        buchung_id: b.buchung_id,
+                        user_id: b.user_id || b.gast_id,
+                        gast_id: b.gast_id || b.user_id,
+                        gast_vorname: b.gast_vorname || b.gastname || '',
+                        artikel_id: b.artikel_id,
+                        artikel_name: b.artikel_name,
+                        preis: b.preis,
+                        menge: b.menge || 1,
+                        datum: b.datum,
+                        uhrzeit: b.uhrzeit,
+                        erstellt_am: b.erstellt_am,
+                        storniert: b.storniert || false,
+                        exportiert: b.exportiert || false,
+                        aufgefuellt: b.aufgefuellt || false,
+                        group_name: b.group_name || 'keiner Gruppe zugehoerig',
+                        session_id: b.session_id || null
+                    };
                     
                     const { error } = await supabaseClient.from('buchungen').insert(buchungData);
                     
                     if (error) {
-                        console.error(' Sync error:', b.buchung_id, error.message);
-                        failed++;
+                        console.error(' Sync error:', b.buchung_id, error.message, error.details);
+                        // Bei bestimmten Fehlern trotzdem als synced markieren
+                        if (error.message.includes('duplicate') || error.code === '23505') {
+                            await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
+                            synced++;
+                        } else {
+                            failed++;
+                        }
                     } else {
                         await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
                         synced++;
@@ -3176,7 +3170,7 @@ const SyncManager = {
         if (status === 'green') {
             message = '✅ Alle deine Buchungen sind erfolgreich synchronisiert!';
         } else if (status === 'yellow') {
-            message = ` ${pending} Buchung(en) warten noch auf Upload.\n\nDie App versucht automatisch, diese hochzuladen.`;
+            message = ` ${pending} Buchung(en) warten noch auf Upload.\n\nDie App versucht automatisch, diese hochzuladen.\n\nKlicke nochmal um Sync zu erzwingen.`;
         } else {
             message = ' Du bist offline.\n\nDeine Buchungen werden lokal gespeichert und automatisch hochgeladen, sobald du wieder online bist.';
         }
@@ -3185,7 +3179,11 @@ const SyncManager = {
         
         // Bei pending: Sofort Sync versuchen
         if (status === 'yellow') {
-            this.syncPending();
+            console.log('🔄 Manueller Sync gestartet...');
+            const result = await this.syncPending();
+            console.log('✅ Sync abgeschlossen:', result);
+            // Status aktualisieren
+            setTimeout(() => this.updateUI(), 500);
         }
     },
     
@@ -5114,12 +5112,28 @@ Router.register('admin-alle-buchungen', async () => {
             .eq('geloescht', false)
             .eq('aktiv', true)
             .order('vorname');
-        if (data) alleGäste = data.map(g => ({ id: g.id, name: g.display_name || g.vorname }));
+        if (data) {
+            // DEDUPLIZIERUNG: Nur einen Eintrag pro Name
+            const seenNames = new Set();
+            alleGäste = data.filter(g => {
+                const name = (g.display_name || g.vorname || '').toUpperCase().trim();
+                if (seenNames.has(name)) return false;
+                seenNames.add(name);
+                return true;
+            }).map(g => ({ id: g.id, name: g.display_name || g.vorname }));
+        }
     }
     if (alleGäste.length === 0) {
         const local = await db.registeredGuests.toArray();
-        alleGäste = local.filter(g => !g.gelöscht && g.aktiv !== false)
-            .map(g => ({ id: g.id, name: g.nachname || g.firstName }));
+        const filtered = local.filter(g => !g.gelöscht && g.aktiv !== false);
+        // Deduplizierung auch lokal
+        const seenNames = new Set();
+        alleGäste = filtered.filter(g => {
+            const name = (g.nachname || g.firstName || '').toUpperCase().trim();
+            if (seenNames.has(name)) return false;
+            seenNames.add(name);
+            return true;
+        }).map(g => ({ id: g.id, name: g.nachname || g.firstName }));
     }
     
     // Ausgewählter Gast aus State
