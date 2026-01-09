@@ -6501,7 +6501,7 @@ window.handleCheeseOrderDone = async (orderId) => {
 Router.register('admin-guests', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Alle Gäste laden - IMMER von Supabase wenn online (enthaelt pin_hash)
+    // Alle Gäste laden - IMMER von Supabase wenn online (enthält pin_hash)
     let guests = [];
     let loadedFrom = 'lokal';
     
@@ -6518,30 +6518,54 @@ Router.register('admin-guests', async () => {
                 console.error('Supabase Gäste laden Fehler:', error);
             } else if (data && data.length > 0) {
                 loadedFrom = 'Supabase';
+                
+                // DEDUPLIZIERUNG: Nur einen Eintrag pro Name behalten
+                const seenNames = new Set();
+                const uniqueData = data.filter(g => {
+                    const name = (g.display_name || g.vorname || g.first_name || '').toUpperCase().trim();
+                    if (seenNames.has(name)) {
+                        console.log('⚠️ Duplikat übersprungen:', name);
+                        return false;
+                    }
+                    seenNames.add(name);
+                    return true;
+                });
+                
                 // Supabase Daten mit korrekten Feldnamen mappen
-                guests = data.map(g => {
-                    console.log('Gast:', g.vorname);
+                guests = uniqueData.map(g => {
+                    const pin = g.pin_hash || g.pin || '';
+                    console.log('Gast:', g.vorname || g.display_name, 'PIN:', pin ? '****' : 'KEINE');
                     return {
                         ...g,
-                        nachname: g.vorname || g.first_name,
-                        firstName: g.vorname || g.first_name,
-                        passwort: g.pin_hash,  // PIN aus Supabase
-                        passwordHash: g.pin_hash,
+                        nachname: g.display_name || g.vorname || g.first_name,
+                        firstName: g.display_name || g.vorname || g.first_name,
+                        passwort: pin,  // PIN aus Supabase
+                        passwordHash: pin,
+                        pin_hash: pin,
                         gruppenname: g.group_name || 'keiner Gruppe zugehörig',
                         ausnahmeumlage: g.ausnahmeumlage || false
                     };
                 });
-                console.log('✅ Gäste von Supabase geladen:', guests.length);
+                console.log('✅ Gäste von Supabase geladen:', guests.length, '(nach Deduplizierung)');
             }
         } catch(e) {
             console.error('Supabase Gäste laden Exception:', e);
         }
     }
     
-    // Fallback: Lokale Daten - nur aktive
+    // Fallback: Lokale Daten - nur aktive, dedupliziert
     if (guests.length === 0) {
-        guests = await db.registeredGuests.toArray();
-        guests = guests.filter(g => !g.gelöscht && g.aktiv !== false);
+        let localGuests = await db.registeredGuests.toArray();
+        localGuests = localGuests.filter(g => !g.gelöscht && g.aktiv !== false);
+        
+        // Deduplizierung
+        const seenNames = new Set();
+        guests = localGuests.filter(g => {
+            const name = (g.nachname || g.firstName || '').toUpperCase().trim();
+            if (seenNames.has(name)) return false;
+            seenNames.add(name);
+            return true;
+        });
         console.log('⚠️ Gäste von lokalem Cache geladen:', guests.length);
     }
     
@@ -7058,6 +7082,8 @@ window.saveGast = async () => {
                     .from('profiles')
                     .update({ 
                         vorname: nachname,
+                        display_name: nachname,
+                        first_name: nachname,
                         pin_hash: passwort,
                         group_name: gruppenname,
                         aktiv: true,
@@ -7067,8 +7093,9 @@ window.saveGast = async () => {
                 
                 if (error) {
                     console.error('Supabase Update Fehler:', error);
+                    Utils.showToast('Supabase Fehler: ' + error.message, 'error');
                 } else {
-                    console.log('✅ Gast in Supabase aktualisiert');
+                    console.log('✅ Gast in Supabase aktualisiert (PIN: ' + passwort + ')');
                 }
             } catch (e) {
                 console.error('Supabase Update Exception:', e);
