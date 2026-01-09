@@ -2199,7 +2199,7 @@ const RegisteredGuests = {
             const { data: allProfiles } = await supabaseClient
                 .from('profiles')
                 .select('vorname, first_name, display_name')
-                .eq('gelöscht', false)
+                .eq('geloescht', false)
                 .eq('aktiv', true);
             
             if (allProfiles && allProfiles.length > 0) {
@@ -2272,7 +2272,7 @@ const RegisteredGuests = {
                                 vorname: cleanName,
                                 group_name: 'keiner Gruppe zugehörig',
                                 aktiv: true,
-                                gelöscht: false
+                                geloescht: false
                             })
                             .eq('id', userId);
                         
@@ -2293,7 +2293,7 @@ const RegisteredGuests = {
                                 first_name: cleanName,
                                 group_name: 'keiner Gruppe zugehörig',
                                 aktiv: true,
-                                gelöscht: false,
+                                geloescht: false,
                                 created_at: new Date().toISOString()
                             });
                         
@@ -2334,7 +2334,7 @@ const RegisteredGuests = {
                 ausnahmeumlage: false,
                 aktiv: true,
                 createdAt: new Date().toISOString(),
-                gelöscht: false 
+                geloescht: false 
             };
             try { await db.registeredGuests.add(localGuest); } catch(e) {}
             
@@ -2381,7 +2381,7 @@ const RegisteredGuests = {
                 ausnahmeumlage: false,
                 aktiv: true,
                 createdAt: new Date().toISOString(), 
-                gelöscht: false, 
+                geloescht: false, 
                 pendingSync: true 
             };
             await db.registeredGuests.add(guest);
@@ -2403,7 +2403,7 @@ const RegisteredGuests = {
                 .single();
             
             if (!profile) throw new Error('Gast nicht gefunden');
-            if (profile.gelöscht) throw new Error('Account deaktiviert');
+            if (profile.geloescht || profile.gelöscht) throw new Error('Account deaktiviert');
             if (profile.aktiv === false) throw new Error('Du hast bereits ausgecheckt. Bitte wende dich an die Rezeption.');
             
             // WICHTIG: Prüfen ob Email vorhanden ist (für Auth Session)
@@ -2501,7 +2501,7 @@ const RegisteredGuests = {
                     const filtered = data.filter(p => {
                         const name = (p.display_name || p.first_name || '').toUpperCase();
                         const startsWithLetter = name.startsWith(letter.toUpperCase());
-                        const isNotDeleted = p.gelöscht !== true;
+                        const isNotDeleted = p.geloescht !== true && p.gelöscht !== true;  // Beide Schreibweisen prüfen
                         const isActive = p.aktiv !== false;  // Nur aktive Gäste
                         return startsWithLetter && isNotDeleted && isActive;
                     });
@@ -2564,7 +2564,7 @@ const RegisteredGuests = {
     
     async getAll() { 
         if (supabaseClient && isOnline) {
-            const { data } = await supabaseClient.from('profiles').select('*').eq('gelöscht', false).eq('aktiv', true).order('first_name');
+            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false).eq('aktiv', true).order('first_name');
             return (data || []).map(g => ({ ...g, firstName: g.first_name }));
         }
         const all = await db.registeredGuests.toArray();
@@ -2573,7 +2573,7 @@ const RegisteredGuests = {
     
     async getGelöschte() {
         if (supabaseClient && isOnline) {
-            const { data } = await supabaseClient.from('profiles').select('*').eq('gelöscht', true);
+            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', true);
             return (data || []).map(g => ({ ...g, firstName: g.first_name }));
         }
         const all = await db.registeredGuests.toArray();
@@ -2582,7 +2582,7 @@ const RegisteredGuests = {
     
     async softDelete(id) { 
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('profiles').update({ gelöscht: true, gelöscht_am: new Date().toISOString() }).eq('id', id);
+            await supabaseClient.from('profiles').update({ geloescht: true, geloescht_am: new Date().toISOString() }).eq('id', id);
         }
         try { await db.registeredGuests.update(id, { gelöscht: true, gelöschtAm: new Date().toISOString() }); } catch(e) {}
         Utils.showToast('Gast in Papierkorb verschoben', 'success'); 
@@ -2590,9 +2590,9 @@ const RegisteredGuests = {
     
     async restore(id) {
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('profiles').update({ gelöscht: false, gelöscht_am: null }).eq('id', id);
+            await supabaseClient.from('profiles').update({ geloescht: false, geloescht_am: null }).eq('id', id);
         }
-        try { await db.registeredGuests.update(id, { gelöscht: false, gelöschtAm: null }); } catch(e) {}
+        try { await db.registeredGuests.update(id, { geloescht: false, gelöschtAm: null }); } catch(e) {}
         Utils.showToast('Gast wiederhergestellt', 'success');
     },
     
@@ -2693,7 +2693,7 @@ const Auth = {
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 if (session?.user) {
                     const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', session.user.id).single();
-                    if (profile && !profile.gelöscht) {
+                    if (profile && !profile.geloescht && !profile.gelöscht) {
                         State.setUser({ ...session.user, ...profile, firstName: profile.first_name });
                         return true;
                     }
@@ -6510,7 +6510,7 @@ Router.register('admin-guests', async () => {
             const { data, error } = await supabaseClient
                 .from('profiles')
                 .select('*')
-                .eq('gelöscht', false)
+                .eq('geloescht', false)
                 .eq('aktiv', true)  // Nur AKTIVE Gäste (nicht ausgecheckt)
                 .order('vorname');
             
@@ -6575,7 +6575,7 @@ Router.register('admin-guests', async () => {
         const { count } = await supabaseClient
             .from('profiles')
             .select('*', { count: 'exact', head: true })
-            .eq('gelöscht', false)
+            .eq('geloescht', false)
             .eq('aktiv', false);
         inaktivCount = count || 0;
     }
@@ -6739,7 +6739,7 @@ Router.register('admin-guests-inaktiv', async () => {
             const { data, error } = await supabaseClient
                 .from('profiles')
                 .select('*')
-                .eq('gelöscht', false)
+                .eq('geloescht', false)
                 .eq('aktiv', false)
                 .order('vorname');
             
@@ -6851,7 +6851,7 @@ window.syncPinsToSupabase = async () => {
                         vorname: g.nachname || g.firstName,
                         group_name: g.gruppenname || g.group_name || 'keiner Gruppe zugehörig',
                         aktiv: true,
-                        gelöscht: false
+                        geloescht: false
                     });
                 
                 if (insertError) {
@@ -7049,7 +7049,7 @@ window.saveGast = async () => {
     let alleGäste = [];
     if (supabaseClient && isOnline) {
         try {
-            const { data } = await supabaseClient.from('profiles').select('*').eq('gelöscht', false).eq('aktiv', true);
+            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false).eq('aktiv', true);
             if (data) alleGäste = data.map(g => ({ ...g, nachname: g.vorname, passwort: g.pin_hash }));
         } catch(e) {}
     }
@@ -7087,7 +7087,7 @@ window.saveGast = async () => {
                         pin_hash: passwort,
                         group_name: gruppenname,
                         aktiv: true,
-                        gelöscht: false
+                        geloescht: false
                     })
                     .eq('id', editId);
                 
@@ -7112,7 +7112,7 @@ window.saveGast = async () => {
                 passwort: passwort,
                 passwordHash: passwort,
                 aktiv: true,
-                gelöscht: false
+                geloescht: false
             });
         } catch(e) {
             // Falls ID nicht als Key existiert, versuche mit where
@@ -7184,7 +7184,7 @@ window.saveGast = async () => {
                         pin_hash: passwort,
                         group_name: gruppenname,
                         aktiv: true,
-                        gelöscht: false,
+                        geloescht: false,
                         created_at: now
                     }, { onConflict: 'id' });
                 
@@ -7212,7 +7212,7 @@ window.saveGast = async () => {
             passwort: passwort,
             passwordHash: passwort,
             aktiv: true,
-            gelöscht: false,
+            geloescht: false,
             createdAt: now
         });
         
@@ -9230,7 +9230,7 @@ window.saveEditArticle = async () => {
                                 passwordHash: p.pin_hash,
                                 gruppenname: p.group_name,
                                 group_name: p.group_name,
-                                gelöscht: false,
+                                geloescht: false,
                                 email: p.email
                             });
                         } catch(e) {}
