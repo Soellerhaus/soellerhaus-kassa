@@ -1,5 +1,5 @@
 // ================================
-// SEOLLERHAUS KASSA - MAIN APP v3.3
+// SEOLLERHAUS KASSA - MAIN APP v3.4
 // Supabase Multi-Device Version
 // ================================
 
@@ -27,10 +27,10 @@ function initSupabase() {
                 detectSessionInUrl: false
             }
         });
-        console.log('✦ Supabase Client initialisiert');
+        console.log('✅ Supabase Client initialisiert');
         return true;
     }
-    console.warn('⚠  Supabase nicht verfügbar - Offline-Modus');
+    console.warn('⚠  Supabase nicht verfügbar - Offline-Modus');
     return false;
 }
 
@@ -47,7 +47,7 @@ async function syncPendingData() {
                 }
             } catch (e) { console.error('Sync error:', e); }
         }
-        if (pending.length > 0) console.log(`✦ ${pending.length} Buchungen synchronisiert`);
+        if (pending.length > 0) console.log(`✅ ${pending.length} Buchungen synchronisiert`);
     } catch (e) { console.error('syncPendingData error:', e); }
 }
 
@@ -185,7 +185,7 @@ const DataProtection = {
                 if (backup.fehlendeGetraenke) {
                     for (const f of backup.fehlendeGetraenke) { try { await db.fehlendeGetraenke.add(f); } catch(e) {} }
                 }
-                console.log('✦ Daten wiederhergestellt');
+                console.log('✅ Daten wiederhergestellt');
             }
         } catch (e) { console.error(e); }
     },
@@ -300,7 +300,7 @@ const DataProtection = {
             // Backup-Datum speichern
             this.setLastBackupDate();
             
-            Utils.showToast(`✦ Vollständiges Backup erstellt!\n${data.statistik.anzahlGaeste} Gäste, ${data.statistik.anzahlArtikel} Artikel, ${data.statistik.anzahlBuchungen} Buchungen`, 'success');
+            Utils.showToast(`✅ Vollständiges Backup erstellt!\n${data.statistik.anzahlGaeste} Gäste, ${data.statistik.anzahlArtikel} Artikel, ${data.statistik.anzahlBuchungen} Buchungen`, 'success');
             return true;
         } catch (e) {
             console.error('Backup Fehler:', e);
@@ -463,7 +463,7 @@ const DataProtection = {
                             </label>
                             <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
                                 <input type="checkbox" id="restore-kategorien" checked ${stats.kategorien === 0 ? 'disabled' : ''}>
-                                <span>📚 Kategorien <strong>(${stats.kategorien})</strong></span>
+                                <span>📂 Kategorien <strong>(${stats.kategorien})</strong></span>
                             </label>
                             <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
                                 <input type="checkbox" id="restore-gruppen" ${stats.gruppen === 0 ? 'disabled' : ''}>
@@ -490,7 +490,7 @@ const DataProtection = {
                             <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#f8d7da;border:2px solid #dc3545;border-radius:8px;cursor:pointer;">
                                 <input type="radio" name="restore-mode" value="replace" style="margin-top:3px;">
                                 <div>
-                                    <strong>🗘️ Ersetzen (Vorsicht!)</strong>
+                                    <strong>🗑️ Ersetzen (Vorsicht!)</strong>
                                     <div style="font-size:0.85rem;color:#666;">ALLE bestehenden Daten werden gelöscht und durch Backup ersetzt</div>
                                 </div>
                             </label>
@@ -699,7 +699,7 @@ const DataProtection = {
             if (restored.gruppen > 0) summary.push(`${restored.gruppen} Gruppen`);
             if (restored.fehlende > 0) summary.push(`${restored.fehlende} Fehlende`);
             
-            Utils.showToast(`✦ Wiederherstellung erfolgreich!\n${summary.join(', ') || 'Keine neuen Daten'}`, 'success');
+            Utils.showToast(`✅ Wiederherstellung erfolgreich!\n${summary.join(', ') || 'Keine neuen Daten'}`, 'success');
             
             // Seite neu laden um Änderungen anzuzeigen
             setTimeout(() => {
@@ -1139,7 +1139,7 @@ const TagesMenu = {
             }
         }
         
-        Utils.showToast('🍽️ Menü gespeichert!', 'success');
+        Utils.showToast('🍽 Menü gespeichert!', 'success');
         return menuData;
     },
     
@@ -1261,7 +1261,7 @@ const TagesMenu = {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                ">✢</button>
+                ">✕</button>
                 
                 <div style="padding: 30px;">
                     <div style="text-align:center;margin-bottom:24px;">
@@ -1406,6 +1406,7 @@ const CheeseOrders = {
                 overflow-y:auto;
                 box-shadow:0 20px 60px rgba(0,0,0,0.3);
             ">
+                <!-- Header -->
                 <div style="
                     background:linear-gradient(135deg, #f4d03f, #f39c12);
                     padding:20px;
@@ -1421,33 +1422,63 @@ const CheeseOrders = {
                             </div>
                         </div>
                         <button onclick="CheeseOrders.closeModal()" style="
-                            background:rgba(255,255,255,0.3);border:none;width:36px;height:36px;
-                            border-radius:50%;font-size:1.2rem;cursor:pointer;
+                            background:rgba(255,255,255,0.3);
+                            border:none;
+                            width:36px;height:36px;
+                            border-radius:50%;
+                            font-size:1.2rem;
+                            cursor:pointer;
+                            display:flex;align-items:center;justify-content:center;
                         ">✕</button>
                     </div>
                 </div>
+                
+                <!-- Body -->
                 <div style="padding:20px;">
+                    <!-- Name -->
                     <div style="margin-bottom:20px;">
-                        <label style="display:block;font-weight:600;margin-bottom:8px;color:#333;">Ihr Name *</label>
+                        <label style="display:block;font-weight:600;margin-bottom:8px;color:#333;">
+                            Ihr Name *
+                        </label>
                         <input type="text" id="cheese-guest-name" placeholder="z.B. Maria" style="
-                            width:100%;padding:14px;border:2px solid #e0e0e0;border-radius:10px;
-                            font-size:1rem;box-sizing:border-box;
-                        ">
+                            width:100%;
+                            padding:14px;
+                            border:2px solid #e0e0e0;
+                            border-radius:10px;
+                            font-size:1rem;
+                            box-sizing:border-box;
+                        " onfocus="this.style.borderColor='#f39c12'" onblur="this.style.borderColor='#e0e0e0'">
                     </div>
+                    
+                    <!-- Menge -->
                     <div style="margin-bottom:20px;">
-                        <label style="display:block;font-weight:600;margin-bottom:8px;color:#333;">Menge wählen</label>
+                        <label style="display:block;font-weight:600;margin-bottom:8px;color:#333;">
+                            Menge wählen
+                        </label>
                         <div style="display:flex;align-items:center;justify-content:center;gap:16px;background:#f8f9fa;padding:16px;border-radius:12px;">
                             <button onclick="CheeseOrders.adjustGrams(-50)" style="
-                                width:50px;height:50px;border-radius:50%;border:2px solid #f39c12;
-                                background:white;font-size:1.5rem;font-weight:bold;color:#f39c12;cursor:pointer;
+                                width:50px;height:50px;
+                                border-radius:50%;
+                                border:2px solid #f39c12;
+                                background:white;
+                                font-size:1.5rem;
+                                font-weight:bold;
+                                color:#f39c12;
+                                cursor:pointer;
                             ">−</button>
                             <div style="text-align:center;min-width:100px;">
                                 <div id="cheese-grams-display" style="font-size:2rem;font-weight:700;color:#333;">100</div>
                                 <div style="font-size:0.9rem;color:#666;">Gramm</div>
                             </div>
                             <button onclick="CheeseOrders.adjustGrams(50)" style="
-                                width:50px;height:50px;border-radius:50%;border:2px solid #f39c12;
-                                background:white;font-size:1.5rem;font-weight:bold;color:#f39c12;cursor:pointer;
+                                width:50px;height:50px;
+                                border-radius:50%;
+                                border:2px solid #f39c12;
+                                background:white;
+                                font-size:1.5rem;
+                                font-weight:bold;
+                                color:#f39c12;
+                                cursor:pointer;
                             ">+</button>
                         </div>
                         <div style="text-align:center;margin-top:8px;font-size:0.85rem;color:#888;">
@@ -1455,20 +1486,34 @@ const CheeseOrders = {
                             <span style="color:#e67e22;">⚖️ Grammzahl ist ca.-Angabe (Richtwert)</span>
                         </div>
                     </div>
+                    
+                    <!-- Verpackung -->
                     <div style="margin-bottom:20px;">
-                        <label style="display:block;font-weight:600;margin-bottom:8px;color:#333;">Verpackung wählen</label>
+                        <label style="display:block;font-weight:600;margin-bottom:8px;color:#333;">
+                            Verpackung wählen
+                        </label>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                             <label id="cheese-pkg-film" onclick="CheeseOrders.selectPackaging('FILM')" style="
-                                padding:16px;border:3px solid #f39c12;border-radius:12px;background:#fffbeb;
-                                cursor:pointer;text-align:center;
+                                padding:16px;
+                                border:3px solid #f39c12;
+                                border-radius:12px;
+                                background:#fffbeb;
+                                cursor:pointer;
+                                text-align:center;
+                                transition:all 0.2s;
                             ">
                                 <div style="font-size:1.5rem;margin-bottom:4px;">🎁</div>
                                 <div style="font-weight:600;color:#333;">Klarsichtfolie</div>
                                 <div style="color:#27ae60;font-weight:700;">Gratis</div>
                             </label>
                             <label id="cheese-pkg-vacuum" onclick="CheeseOrders.selectPackaging('VACUUM')" style="
-                                padding:16px;border:3px solid #e0e0e0;border-radius:12px;background:white;
-                                cursor:pointer;text-align:center;
+                                padding:16px;
+                                border:3px solid #e0e0e0;
+                                border-radius:12px;
+                                background:white;
+                                cursor:pointer;
+                                text-align:center;
+                                transition:all 0.2s;
                             ">
                                 <div style="font-size:1.5rem;margin-bottom:4px;">📦</div>
                                 <div style="font-weight:600;color:#333;">Vakuumiert</div>
@@ -1476,7 +1521,15 @@ const CheeseOrders = {
                             </label>
                         </div>
                     </div>
-                    <div style="background:linear-gradient(135deg, #2c3e50, #34495e);padding:20px;border-radius:12px;color:white;margin-bottom:20px;">
+                    
+                    <!-- Preis -->
+                    <div style="
+                        background:linear-gradient(135deg, #2c3e50, #34495e);
+                        padding:20px;
+                        border-radius:12px;
+                        color:white;
+                        margin-bottom:20px;
+                    ">
                         <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
                             <span>Käse (ca. <span id="cheese-price-grams">100</span>g × 2,50 €/100g)</span>
                             <span id="cheese-price-base">2,50 €</span>
@@ -1492,7 +1545,16 @@ const CheeseOrders = {
                             </div>
                         </div>
                     </div>
-                    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:14px;margin-bottom:20px;font-size:0.85rem;">
+                    
+                    <!-- Hinweise -->
+                    <div style="
+                        background:#fff3cd;
+                        border:1px solid #ffc107;
+                        border-radius:10px;
+                        padding:14px;
+                        margin-bottom:20px;
+                        font-size:0.85rem;
+                    ">
                         <div style="font-weight:600;color:#856404;margin-bottom:8px;">⚠️ Wichtige Hinweise:</div>
                         <ul style="margin:0;padding-left:20px;color:#856404;line-height:1.6;">
                             <li>Grammzahl ist <strong>ca.-Angabe</strong> (Käse wird frisch geschnitten)</li>
@@ -1501,24 +1563,41 @@ const CheeseOrders = {
                             <li>Dies ist nur eine <strong>Vorbestellung</strong></li>
                         </ul>
                     </div>
+                    
+                    <!-- Button -->
                     <button onclick="CheeseOrders.submitOrder()" style="
-                        width:100%;padding:18px;background:linear-gradient(135deg, #27ae60, #2ecc71);
-                        color:white;border:none;border-radius:12px;font-size:1.1rem;font-weight:700;cursor:pointer;
-                    ">🧀 Käse vorbestellen</button>
+                        width:100%;
+                        padding:18px;
+                        background:linear-gradient(135deg, #27ae60, #2ecc71);
+                        color:white;
+                        border:none;
+                        border-radius:12px;
+                        font-size:1.1rem;
+                        font-weight:700;
+                        cursor:pointer;
+                        transition:transform 0.2s, box-shadow 0.2s;
+                    " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 20px rgba(39,174,96,0.4)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+                        🧀 Käse vorbestellen
+                    </button>
                 </div>
             </div>
         </div>`;
+        
         document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Initiale Werte setzen
         this.currentGrams = this.MIN_GRAMS;
         this.currentPackaging = 'FILM';
         this.updatePriceDisplay();
     },
     
+    // Modal schließen
     closeModal() {
         const modal = document.getElementById('cheese-modal-overlay');
         if (modal) modal.remove();
     },
     
+    // Gramm anpassen
     adjustGrams(delta) {
         const newGrams = (this.currentGrams || this.MIN_GRAMS) + delta;
         if (newGrams >= this.MIN_GRAMS && newGrams <= this.MAX_GRAMS) {
@@ -1528,76 +1607,113 @@ const CheeseOrders = {
         }
     },
     
+    // Verpackung wählen
     selectPackaging(type) {
         this.currentPackaging = type;
+        
         const filmEl = document.getElementById('cheese-pkg-film');
         const vacuumEl = document.getElementById('cheese-pkg-vacuum');
         const vacuumRow = document.getElementById('cheese-price-vacuum-row');
+        
         if (type === 'FILM') {
-            filmEl.style.borderColor = '#f39c12'; filmEl.style.background = '#fffbeb';
-            vacuumEl.style.borderColor = '#e0e0e0'; vacuumEl.style.background = 'white';
+            filmEl.style.borderColor = '#f39c12';
+            filmEl.style.background = '#fffbeb';
+            vacuumEl.style.borderColor = '#e0e0e0';
+            vacuumEl.style.background = 'white';
             vacuumRow.style.display = 'none';
         } else {
-            filmEl.style.borderColor = '#e0e0e0'; filmEl.style.background = 'white';
-            vacuumEl.style.borderColor = '#f39c12'; vacuumEl.style.background = '#fffbeb';
+            filmEl.style.borderColor = '#e0e0e0';
+            filmEl.style.background = 'white';
+            vacuumEl.style.borderColor = '#f39c12';
+            vacuumEl.style.background = '#fffbeb';
             vacuumRow.style.display = 'flex';
         }
+        
         this.updatePriceDisplay();
     },
     
+    // Preis-Anzeige aktualisieren
     updatePriceDisplay() {
         const grams = this.currentGrams || this.MIN_GRAMS;
         const packaging = this.currentPackaging || 'FILM';
         const prices = this.calculatePrice(grams, packaging);
+        
         document.getElementById('cheese-price-grams').textContent = grams;
         document.getElementById('cheese-price-base').textContent = this.formatPrice(prices.basePriceCents);
         document.getElementById('cheese-price-total').textContent = this.formatPrice(prices.totalPriceCents);
     },
     
+    // Bestellung absenden
     async submitOrder() {
         const nameInput = document.getElementById('cheese-guest-name');
         const name = nameInput?.value?.trim();
+        
+        // Validierung
         if (!name) {
             nameInput.style.borderColor = '#e74c3c';
             nameInput.focus();
             Utils.showToast('Bitte Namen eingeben!', 'error');
             return;
         }
+        
         try {
             await this.createOrder(name, this.currentGrams, this.currentPackaging);
             this.closeModal();
+            
+            // Erfolgsbestätigung
             Utils.showToast('🧀 Käse-Bestellung erfolgreich!', 'success');
+            
+            // Bestätigungs-Popup
             setTimeout(() => {
                 const confirmHtml = `
                 <div id="cheese-confirm-overlay" onclick="this.remove()" style="
-                    position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);
-                    display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;
+                    position:fixed;top:0;left:0;right:0;bottom:0;
+                    background:rgba(0,0,0,0.7);
+                    display:flex;align-items:center;justify-content:center;
+                    z-index:9999;padding:16px;
                 ">
-                    <div style="background:white;border-radius:16px;padding:32px;text-align:center;max-width:350px;">
+                    <div style="
+                        background:white;
+                        border-radius:16px;
+                        padding:32px;
+                        text-align:center;
+                        max-width:350px;
+                        box-shadow:0 20px 60px rgba(0,0,0,0.3);
+                    ">
                         <div style="font-size:4rem;margin-bottom:16px;">✅</div>
                         <h2 style="color:#27ae60;margin:0 0 12px;">Bestellung erfolgreich!</h2>
                         <p style="color:#666;margin:0 0 20px;line-height:1.5;">
-                            Ihr Käse wird für Sie vorbereitet.<br><strong>Abholung beim Check-out.</strong>
+                            Ihr Käse wird für Sie vorbereitet.<br>
+                            <strong>Abholung beim Check-out.</strong>
                         </p>
                         <button onclick="this.parentElement.parentElement.remove()" style="
-                            padding:14px 32px;background:#27ae60;color:white;border:none;
-                            border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;
+                            padding:14px 32px;
+                            background:#27ae60;
+                            color:white;
+                            border:none;
+                            border-radius:10px;
+                            font-size:1rem;
+                            font-weight:600;
+                            cursor:pointer;
                         ">OK, verstanden</button>
                     </div>
                 </div>`;
                 document.body.insertAdjacentHTML('beforeend', confirmHtml);
             }, 300);
+            
         } catch (error) {
             console.error('Käse-Bestellung Fehler:', error);
             Utils.showToast('Fehler bei der Bestellung: ' + error.message, 'error');
         }
     },
     
+    // Interne State-Variablen
     currentGrams: 100,
     currentPackaging: 'FILM'
 };
-window.CheeseOrders = CheeseOrders;
 
+// Global verfügbar machen
+window.CheeseOrders = CheeseOrders;
 
 const Utils = {
     uuid: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c=='x'?r:(r&0x3|0x8)).toString(16); }),
@@ -1612,14 +1728,14 @@ const Utils = {
         const jetzt = new Date();
         const stunde = jetzt.getHours();
         
-        // Vor 7 Uhr morgens? → Datum vom Vortag verwenden
+        // Vor 7 Uhr morgens? ←’ Datum vom Vortag verwenden
         if (stunde < 7) {
             const gestern = new Date(jetzt);
             gestern.setDate(gestern.getDate() - 1);
             return this.formatDate(gestern);
         }
         
-        // Ab 7 Uhr → heutiges Datum
+        // Ab 7 Uhr ←’ heutiges Datum
         return this.formatDate(jetzt);
     },
     
@@ -1724,7 +1840,7 @@ const i18n = {
             'message_from_team': 'Nachricht vom Team',
             'important_message': 'WICHTIGE NACHRICHT!',
             'hours_visible': 'Noch {h}h sichtbar',
-            'click_to_close': 'Klicke ✢ zum Schließen',
+            'click_to_close': 'Klicke ✕ zum Schließen',
             'read_close': 'Gelesen & Schließen',
             
             // Name-Auswahl
@@ -1807,7 +1923,7 @@ const i18n = {
             'message_from_team': 'Message from the team',
             'important_message': 'IMPORTANT MESSAGE!',
             'hours_visible': 'Visible for {h}h',
-            'click_to_close': 'Click ✢ to close',
+            'click_to_close': 'Click ✕ to close',
             'read_close': 'Read & Close',
             
             // Name selection
@@ -1908,8 +2024,33 @@ const i18n = {
         return newLang;
     },
     
-    // Button HTML rendern - oben mitte mit Flaggen
+    // Button HTML rendern - oben mitte mit Flaggen (nur Sprache)
     renderLangButton() {
+        const flag = this.currentLang === 'de' ? '🇬🇧' : '🇩🇪';
+        const label = this.currentLang === 'de' ? 'English' : 'Deutsch';
+        return `
+        <div style="position:fixed;top:12px;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:12px;z-index:1000;">
+            <button onclick="toggleLanguage()" style="
+                background:white;
+                color:#333;
+                border:1px solid #ddd;
+                border-radius:20px;
+                padding:6px 14px;
+                font-size:0.85rem;
+                font-weight:500;
+                cursor:pointer;
+                box-shadow:0 2px 6px rgba(0,0,0,0.1);
+                display:flex;
+                align-items:center;
+                gap:6px;
+            ">
+                ${flag} ${label}
+            </button>
+        </div>`;
+    },
+    
+    // Button HTML für Startseite mit Sprache UND WhatsApp
+    renderLangButtonWithWhatsApp() {
         const flag = this.currentLang === 'de' ? '🇬🇧' : '🇩🇪';
         const label = this.currentLang === 'de' ? 'English' : 'Deutsch';
         return `
@@ -2071,7 +2212,7 @@ const RegisteredGuests = {
             }
             
             const userId = authData.user.id;
-            console.log('✦ Auth SignUp OK, User ID:', userId);
+            console.log('✅ Auth SignUp OK, User ID:', userId);
             
             // Warte auf Trigger (Profile wird automatisch erstellt)
             await new Promise(r => setTimeout(r, 1000));
@@ -2101,7 +2242,7 @@ const RegisteredGuests = {
                             .eq('id', userId);
                         
                         if (!updateError) {
-                            console.log('✦ PIN in Profile gespeichert (Update)');
+                            console.log('✅ PIN in Profile gespeichert (Update)');
                             pinSaved = true;
                             break;
                         }
@@ -2122,7 +2263,7 @@ const RegisteredGuests = {
                             });
                         
                         if (!insertError) {
-                            console.log('✦ PIN in Profile gespeichert (Insert)');
+                            console.log('✅ PIN in Profile gespeichert (Insert)');
                             pinSaved = true;
                             break;
                         }
@@ -2173,7 +2314,7 @@ const RegisteredGuests = {
                 if (loginError) {
                     console.warn('Login nach Registrierung fehlgeschlagen:', loginError);
                 } else {
-                    console.log('✦ Session nach Registrierung aktiv');
+                    console.log('✅ Session nach Registrierung aktiv');
                 }
             } catch(e) {
                 console.warn('Login-Versuch fehlgeschlagen:', e);
@@ -2330,7 +2471,7 @@ const RegisteredGuests = {
                         return startsWithLetter && isNotDeleted && isActive;
                     });
                     
-                    console.log('✦ Gefunden für', letter + ':', filtered.length);
+                    console.log('✅ Gefunden für', letter + ':', filtered.length);
                     
                     if (filtered.length > 0) {
                         const cnt = {};
@@ -2595,7 +2736,7 @@ const Buchungen = {
             erstellteBuchungen.push(b);
         }
         
-        console.log('✦', menge, 'Einzelbuchung(en) erstellt für:', artikel.name);
+        console.log('✅', menge, 'Einzelbuchung(en) erstellt für:', artikel.name);
         
         // Ampel aktualisieren
         setTimeout(() => SyncManager.updateUI(), 200);
@@ -2925,7 +3066,7 @@ const SyncManager = {
                     } else {
                         await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
                         synced++;
-                        console.log('✦ Synced:', b.buchung_id);
+                        console.log('✅ Synced:', b.buchung_id);
                     }
                 } catch(e) {
                     console.error('❌ Sync exception:', e);
@@ -2939,7 +3080,7 @@ const SyncManager = {
         this.isSyncing = false;
         
         if (synced > 0) {
-            console.log(`✦ SyncManager: ${synced} synchronisiert, ${failed} fehlgeschlagen`);
+            console.log(`✅ SyncManager: ${synced} synchronisiert, ${failed} fehlgeschlagen`);
             this.updateUI();
         }
         
@@ -2970,7 +3111,7 @@ const SyncManager = {
             red: '🔴'
         };
         
-        ampelEl.innerHTML = `<span style="font-size:1.2rem;cursor:pointer;" title="${status === 'green' ? 'Synchronisiert' : status === 'yellow' ? pending + ' warten' : 'Offline'}">${icons[status]}</span>`;
+        ampelEl.innerHTML = `${icons[status]} <span style="color:${colors[status]};font-weight:600;">${message}</span>`;
         ampelEl.title = status === 'green' ? 'Alle Buchungen synchronisiert' : 
                         status === 'yellow' ? `${pending} Buchung(en) warten auf Upload` :
                         'Offline - Buchungen werden lokal gespeichert';
@@ -2982,7 +3123,7 @@ const SyncManager = {
         
         let message = '';
         if (status === 'green') {
-            message = '✦ Alle deine Buchungen sind erfolgreich synchronisiert!';
+            message = '✅ Alle deine Buchungen sind erfolgreich synchronisiert!';
         } else if (status === 'yellow') {
             message = `🟡 ${pending} Buchung(en) warten noch auf Upload.\n\nDie App versucht automatisch, diese hochzuladen.`;
         } else {
@@ -3169,74 +3310,20 @@ const FehlendeGetraenke = {
 
 // ============ GRUPPEN-VERWALTUNG ============
 const Gruppen = {
-    // Einstellung: Gruppenabfrage aktiv? - IMMER von Supabase laden!
+    // Einstellung: Gruppenabfrage aktiv?
     async isAbfrageAktiv() {
-        // Erst von Supabase laden (Single Source of Truth)
-        if (supabaseClient && isOnline) {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('settings')
-                    .select('value')
-                    .eq('key', 'gruppenAbfrageAktiv')
-                    .single();
-                
-                if (!error && data !== null) {
-                    // Wert kann Boolean oder String sein
-                    const isActive = data.value === true || data.value === 'true';
-                    console.log('📊 Gruppenabfrage aus Supabase:', data.value, '→', isActive);
-                    // Lokal cachen
-                    await db.settings.put({ key: 'gruppenAbfrageAktiv', value: isActive });
-                    return isActive;
-                }
-            } catch(e) {
-                console.log('Gruppen-Einstellung von Supabase laden:', e.message);
-            }
-        }
-        // Fallback: Lokal
         const setting = await db.settings.get('gruppenAbfrageAktiv');
-        const isActive = setting?.value === true || setting?.value === 'true';
-        console.log('📊 Gruppenabfrage lokal:', setting?.value, '→', isActive);
-        return isActive;
+        return setting?.value === true;
     },
     
     async setAbfrageAktiv(aktiv) {
-        const boolValue = aktiv === true || aktiv === 'true';
-        
-        // ERST Supabase, dann lokal
+        await db.settings.put({ key: 'gruppenAbfrageAktiv', value: aktiv });
         if (supabaseClient && isOnline) {
-            try {
-                // Prüfen ob settings Tabelle existiert und Eintrag vorhanden
-                const { data: existing } = await supabaseClient
-                    .from('settings')
-                    .select('key')
-                    .eq('key', 'gruppenAbfrageAktiv')
-                    .maybeSingle();
-                
-                if (existing) {
-                    // Update - OHNE updated_at falls Spalte nicht existiert
-                    const { error } = await supabaseClient
-                        .from('settings')
-                        .update({ value: boolValue })
-                        .eq('key', 'gruppenAbfrageAktiv');
-                    
-                    if (error) throw error;
-                } else {
-                    // Insert
-                    const { error } = await supabaseClient
-                        .from('settings')
-                        .insert({ key: 'gruppenAbfrageAktiv', value: boolValue });
-                    
-                    if (error) throw error;
-                }
-                console.log('✅ Gruppenabfrage in Supabase gespeichert:', boolValue);
-            } catch(e) {
-                console.error('Supabase settings error:', e);
-                Utils.showToast('Fehler beim Speichern in Supabase: ' + e.message, 'error');
-                return; // Nicht lokal speichern wenn Supabase fehlschlägt
-            }
+            await supabaseClient.from('settings').upsert({ 
+                key: 'gruppenAbfrageAktiv', 
+                value: aktiv 
+            });
         }
-        // Lokal speichern
-        await db.settings.put({ key: 'gruppenAbfrageAktiv', value: boolValue });
     },
     
     // Alle Gruppen laden
@@ -3624,7 +3711,7 @@ const Artikel = {
                 await db.artikel.bulkAdd(data);
                 artikelCache = data;
                 artikelCacheTime = Date.now();
-                console.log('✦ Artikel von Supabase geladen:', data.length);
+                console.log('✅ Artikel von Supabase geladen:', data.length);
                 return true;
             } else {
                 console.log('Supabase hat keine Artikel, nutze lokale Daten');
@@ -3668,10 +3755,9 @@ const Artikel = {
         // Erst abgelaufene Artikel cleanup
         await this.cleanupAbgelaufene();
         
-        // Von Supabase laden wenn online UND (Cache null ODER älter als 5 Sekunden)
-        // Kurzer Cache für schnelle Synchronisation zwischen Geräten!
+        // Von Supabase laden wenn online UND (Cache null ODER älter als 30 Sekunden)
         const cacheAge = artikelCacheTime ? (Date.now() - artikelCacheTime) : Infinity;
-        if (supabaseClient && isOnline && (!artikelCache || cacheAge > 5000)) {
+        if (supabaseClient && isOnline && (!artikelCache || cacheAge > 30000)) {
             await this.loadFromSupabase();
         }
         
@@ -3807,7 +3893,7 @@ const Artikel = {
             7: 'Sonstiges',
             8: 'Sonstiges'
         };
-        const iconMap = {0:'📦',1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☢',6:'🍬',7:'📦',8:'📦'};
+        const iconMap = {0:'📦',1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦',8:'📦'};
         
         let imp=0, upd=0, skip=0;
         
@@ -3925,7 +4011,7 @@ const Artikel = {
                 if (error) {
                     console.error('Supabase upsert error:', error);
                 } else {
-                    console.log('✦ Artikel nach Supabase synchronisiert');
+                    console.log('✅ Artikel nach Supabase synchronisiert');
                 }
             } catch(e) {
                 console.error('Supabase sync error:', e);
@@ -3933,7 +4019,7 @@ const Artikel = {
         }
         
         await DataProtection.createBackup();
-        const msg = `✦ ${imp} neu, ${upd} aktualisiert, ${skip} übersprungen`;
+        const msg = `✅ ${imp} neu, ${upd} aktualisiert, ${skip} übersprungen`;
         console.log(msg);
         Utils.showToast(msg, 'success');
         return {imp, upd, skip};
@@ -3946,7 +4032,7 @@ const Artikel = {
                 {artikel_id:201,sku:'ZIP-05',name:'Zipfer Märzen 0.5l',name_kurz:'Zipfer',preis:4.2,steuer_prozent:10,kategorie_id:2,kategorie_name:'Biere',aktiv:true,sortierung:10,icon:'🍺'},
                 {artikel_id:301,sku:'GV-025',name:'Grüner Veltliner 0.25l',name_kurz:'Grüner V.',preis:4.8,steuer_prozent:10,kategorie_id:3,kategorie_name:'Wein',aktiv:true,sortierung:10,icon:'🍷'},
                 {artikel_id:501,sku:'OBS-02',name:'Obstler 2cl',name_kurz:'Obstler',preis:3.5,steuer_prozent:10,kategorie_id:4,kategorie_name:'Spirituosen',aktiv:true,sortierung:10,icon:'🥃'},
-                {artikel_id:601,sku:'KAF-GR',name:'Kaffee groß',name_kurz:'Kaffee',preis:3.5,steuer_prozent:10,kategorie_id:5,kategorie_name:'Heiße Getränke',aktiv:true,sortierung:10,icon:'☢'}
+                {artikel_id:601,sku:'KAF-GR',name:'Kaffee groß',name_kurz:'Kaffee',preis:3.5,steuer_prozent:10,kategorie_id:5,kategorie_name:'Heiße Getränke',aktiv:true,sortierung:10,icon:'☕'}
             ]);
         }
     }
@@ -4131,7 +4217,7 @@ const UI = {
     },
     renderNameList(gaeste, onSelect) {
         if (!gaeste?.length) return `<div class="name-list-empty"><p>Keine Einträge</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">Zurück</button></div>`;
-        return `<div class="name-list-container"><div class="name-list-title">Wählen Sie Ihren Namen:</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="${onSelect}('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">Zurück</button></div>`;
+        return `<div class="name-list-container"><div class="name-list-title">Wählen Sie Ihren Namen:</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="${onSelect}('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">←’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">Zurück</button></div>`;
     }
 };
 
@@ -4223,7 +4309,7 @@ Router.register('login', async () => {
     const fehlendeHtml = fehlendeList.length ? `
     <div style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:24px;color:white;max-width:600px;margin:0 auto 24px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <span style="font-size:1.3rem;">⚠ </span>
+            <span style="font-size:1.3rem;">⚠ </span>
             <div style="font-weight:700;">${t('missing_drinks')}</div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
@@ -4233,10 +4319,10 @@ Router.register('login', async () => {
     </div>
     ` : '';
     
-    // Sprachauswahl Button
-    const langBtn = i18n.renderLangButton();
+    // Sprachauswahl Button mit WhatsApp (nur auf Startseite)
+    const langBtn = i18n.renderLangButtonWithWhatsApp();
     
-    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,UklGRhASAABXRUJQVlA4WAoAAAAwAAAAKwEAMwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZBTFBI0wEAAAEPMP8REUJys22R5HyIA3MjhD8N75XKhOAARgPtNS3K69EhDFYngPf/gPi8UFBdcgAR/Z8AACirwxH17A9Rz3KMbwf5dZDz/0RXf4hr2MupAR7h8hQk2hgAApXMlKkiSCQKXfrH9AjlSkG2aCHTVaKQRikTtldcj7RK2sZlwk287pnGMBAy6ZUn+q2PpK2k4Vz0UEA9ssNt8tlWYeSZEzKRXbLNaeQ6YJFFp2yyzV4nRq5DZaMOGaSAibxxI52y27KHRVr2erQFNIu8oL3d5cmTTv7HHcABTfaQGQ/UsEPZkNtOEqDSjFGy6NZNLwBKN9dmIg0K/RTpI0nEDdAic8ky5Xq+9ppHZLiA9lQAcgc7UwJQmZcpdJJT00kECj8PWWQGRA9FcqUHGiSeZ4RzzQL7ZdL21AJtrpmp4oC6g53K+9ReId3UOuZ6No+9DeCYbpjeUyR3tYvvqEkdRXL30ObKgM8OTxTZVbTnjEzkQoae9DB0xxPXDVYyS142ok8bjTRk6IWxiijJY1EU20hMpTAiUdSqbQxoXBIpI8oTP9ErTyGLkuafShmLVK68+8eQXklUCpR+v0ZXGJDpUegi6cmlMmTBMlJpEhegAomYdBgsAWgOAFZQOCBGDgAA8EUAnQEqLAE0AD5RJI5Fo6IhEooGHDgFBLIBkgEDJAB2139O3fkB+QHyvVX+9fhD+i+0TyJ5E8uXkL++/mX/WPoT6Ifzf/sfcD/wX9a6Q/mA/Tf/o/6r3Of7h/ov7t7qP2J/zv6gfIB/Rf5h6yP/A9k/+u/732L/5V/Z//P64v68/CL+2n7h+0H/89Y78W/1j8XPBr/DflF2FGqXmX9LehH1KRl8muAF698A/aZ5z5gXrv9c76zUg73+wB/L/6L6L/4/wTPrP+59gL+Lf1T/nf4j15f+n/I+cr8u/xv/k9wT+R/0z/pf3n2qvWt+4vsL/qh/3GI6wAjRj9bMz7HBIzvWJRfblmeKxHz0t2F/QbdlgbQjS+e6KaJGvTwNut9lMjrfGREAQ55sZ4GsQ0R5P78FUEoELeXfFK4ICs/57Irep4bLZHxZ2eC55Puspd8wFwf0dzGnxfL2O3YXhSb26aaSoZcrwZ1fnVcoghDJi/BuhkBWHrIhKHlU/dUrZpqo/wDLl1HrQy3ZAGsaOtCuTvdm/dpHtrxFwMO7qjA3Y1E7ExaxGeYUrY+g5PZN3NI8JrmZqGRg2s5RPrtik7+rJ/FD0CO1MXgzGW0OxiuO+DafE52X/ACUhlqx9LbKqNoRE3UmRheu8NpUz5bh/PQwdq+yNEudSjeCjk8P9FIkWwWJU7AKwULj7Qer7iaAGNME88BEjomKT0tHFK12Btr0DcxEem6Rcw7l8PLAiudqrZrw6JaPeTPVGAD++oDstng5indz+W6cz7srqPIq/nHE58jAsViyXg2TOmuYIp5WhRzL8/xOOcDb9j/jhvRWkPdafKk4EW1hFFJ18nJpYr+Pnzw+1SnD2y5vFYWojn5pNjnl6+eBU6GBjK55GdXW8S11wyWCfA8ckes78+7+AubbKrZnLcAvMu6KHyUTSDD/hqqOut2P/1lHzNBWVh600xdznmVUHZ5B//2Gec+qqka3uap7R7LvMTM4TF3Ozbk7Fqbtpa7gh8jhe5MW3kNQMH8TOF07vHC+9t0CSR6wolbbzRGehUhlL1lL+oYmb9f/bc4CH8yJq66BoEsnUl7kPDwbcdBiqjsFLyToQbMQopgju5Gfn81+BwID7eN3nsHX/opP/9GI//+ilIVCm9pY3C5FwqiMESZQrWYkpmGpvr/+tO14evMmfrvb//7BIp76TESDJU7amA7Rfv7lFGsUi+bBguDC6LHXPCSGsbjE9wmikSbVq9SDIk9J8lRsXKQDiyItL48X4/6VUJ8uprEZrs+Cbpb9dQ4dDiWIGcI9hOcCSTXQ3logKfD6QErT3RRWrfOSZhj7CdcubtBtevqqNd7765p8df3KONDf2jtEM/Z+vsZyD88h6w7nxCqEfF+GP/iZzsq5+JDYspyzq2nL/W59iEjZUphyL1WuFG+XBEB0/cX1HMdklyZW2fPQOZ8ml97qkSgL8dBJx9//ukmFXUr+NqG8cbf5D8AUOx5sVYolpEbHzoPMVlu3bisTVfvjiwSzaz/R4H2C8y3BREeL4nrYUYECfMMULNhnhl9pXZcK8uhyFPBZBhfCsFwOSNukbjqBBaQKZYTTM26qFs2uGLNg1umIHHnyF9PvEgSKc0rmoA6iseC2LwSnkZEJkAJmJtc3yl/y+4ClyYwckDFrMwm84p9vXP8MD7xEuzAS10i7CgdKYNWxpVDTl0Xm5iWjAdWmbfm36FygNDe3stWfwHjHEZIIOqyglhR8QsQ+66TTIiXa1O1002ezTjklzQuCvLBgK+mmV3/4eGDARqpgjj9RaamqLH2RuOCyzp4T3fzW+7sL057wTXo3bnWA5LcaMKjSvaOJqtCOpJ9HXDkxjVHekYjYNO6Lb8hkNs9qnHR+tvcq8U+5aopZzrgfj46I7907wgSP1LBr7jytYQMecmXzRnfVR6RgVuxpIt6o1ciPP5ZG7zfjLxq3IotmNJmTkktsJC0+vJRRySHfiB28d1HVi2iWBARGheYu/fPhMPeie0ABWGPWN676JJkbaGZdDj5GD9DykoH2f+IwTZ+6hQAGF1n70s9EzffN32c9p75x746ECTl8P5X+udHzBNRyXCVLhKO0gqI0b6Z1OMRJH5puyeVWpK643OuQ1gnH4DzjhWOstzVjlG/208mC5NDxn46cIWsFhkyRXwle++Qdn7/AbrHRsZxBEiACzzV1WcWscoSz5y3fnXsqwAW9lPJ/w9F9XHIj67bV0+RDBm+t3Oa4BUNt99buEbkgnYeJNNZS7bET8GH3+/47gzmNdQiNZ8JaOOhPFz8OuyhQp0PLHldpM0CuGzNBVl/E4mlGUD04sgKI+LBRr44/1bah/Xcb5VRaBGur7v/ybxPlQ/mj//hOVdjvIEyD48ghebMOgv066iBYFEnatkHHN8n03EeYjrtjnuUfng1RhgTBgbueXq0kgOwN+0w1V7WxOBCBLogyuTK+e/JjMzbeaGFfh6oXlNaHTRpYec5+fSiuAzS8hai9MsjIYsr7bB//9KNH1NmTjJhjWoyAoEPgJ8k9/ovASQniQCpJWoppv4KAsusREuJu2jVEWTk4n2gcR3m0+qG0tlvVVZXZSFpnkGfJwcaKiambNVuvAAVqtMZEYo7HGSmq6tcy/+HOZFa0gxn/4c5mfyHI/IXQ1E+XayEwd7Q+1gj5S1RVlUikOP2ID+lLqVQJceWFyNZ8qDLyDM3ddq2RdlsgOpgfi7fgPjpwZxmB5J9S9yb1HbkwZyYy/HCN4tmzVkzx70Mp/DWOyP6aB61D8cVM8qJLJf5/VjtAavWpY89JHuZYl92bDZRIfoASfoi1ErNlcbxS5SvhxwPZloxv95vmwMo0/WsQ7fIQMMjY89eL8gDc1xsOof4caL/D2vk/w1Lc95z73oRRNSOysBFXN/ZMufPCrcG1C00OnZeXeOYJM/8+H/yjVTVsLdEN/Al4+jgBNbARDOpRcV48ZO9YR24iFWy31Bzv347vddYYS8IG9Jl/p6Y3p/7aFm1uN4rSUEo3I9oKHXBop6RZ3Vv8q/5zPVm+WjfgEgwWm3egMbEjyOYbgllp8K0oz9ok6BuKp3S++PHtQdr05LLafgKwHsfVw0rGsVbd2ehmnPLI5gPjLwCD2vuNNdG521ZWWVhA4zVyUH8F9O7boRH8aNkhg1WWhD0YL2CG1M0HCNzcEyFHWuqN1bs8xEzF1v7dOs1ged4fJK35MeHZtslQ7GkQznqYkfx7x1uizSz1tIj4QafoHODT4yOvR9fdAelJHBCZ/PH0JAq9yJh6vt8uFHaRm+WLqv1ny8N++dwCNAhLOkWd7Ua3yfsXph3G+NGUWKdNH/8RXxEzDEIcvIEZPL445umG7MvGj/Y6g+cItrx2bz5bwT1uqmyliNqqVtid6xKSNWF6YiUDuOce6G4p1GcqfmBoZ1OKHYG/0lJE7CX9xURSZe3ChNel95pe4zspxLomgdKvMBDFwekhhozzDnYnqtsL5uiAmV2/by2ea3DO3vUaTAUo4kKIlf7E7K9IM0yw0n3V/lSL0AJCWurkFN5c/xkzYdq2jtMnsthdm14zIiVEZIweR4kLalqu8822dBPa6ftuTO5HtlIKg85zHfzwLLxFFcuCnKRvfir28pXW7K5K39FoTHrOo+DdNLEKlyFjV1jx9Sq3ebiGlrcV4NfpQo5UiGvNdijO7UJXQqWv3kmGBfsfKjcd0S+7XLIqepJfkSvkaw/0wmcDVv/X4CPnVZsC+HEqh79makb60hRQWJzTz6Tg8DfwZM+PoAsvepYCM07CzSBX5K/XneAm4kwRl/6nK+ArHucWsVYkTU/yJc+mUXi/Qaz2ZtSmccKNOGHGYlys7Bh8bGjB46trITKHa4x1LCOdwJMYZMpiBHKt5uP050s6BfN+0pUTojlcgqsM74NgbDjm1qcA6y5qYBQmatWHOH5KSmFq7QYpBKdVCz5dCkDP/4R7UWqtn0ktW6WMqxcYiE+ygJ1xDuy1Lw1icK5rdfe1gTgcaUhrljbiGQZRHmzXUpXk0NXshia0ol22NO58wwgbhGNlhWjv3iLl65Ukwsja5mAmyMrGuExxGufldj5Ra5OljojsOD1WCoWD50zUpyLc1nMV+R3XarIeE3Nf/alr+Te4yASxOFwEXzJT7FEd/naLlNCNi92gaMzmxUi8OfvJ7awia/oiNiNhoRTvstmiXRd+m++LjlGL+IZT2GvBJK9w65yXRCuYEzg6WbAuYaMtUXFKgcXjwCXHj8pHN/vDo5M8hWGsE2e7dQbm7/vu9gFm7EgBWTrEzZ6dimjpU/ox4655UQfeEoW1lx0VavGidviFQHxlnWWTK0nztPD1SjL6gg7b72IuORuEhAitdEnTqa4A73XofeBaIqcgVBTmFXuSxd8XvazwzJROeLldKzOx9wrej3/PmoXtwGEPzTPhjD1K7Gv1+uTh6jDY1Vp/Wm2C5VNfOVC8HUz/q4oiu/DRmBGrOayOpiR5PoQx3//0xi0Iv/8ufzO3Irr8WfSswJkWO0WEC5NMQXIux/QOsvEfwlP9vnd4TWIaOzznp3MuawHUvH+j3/pbsej+YPH2qrAmKcHrqohB8J7x9YXhgJMDvp36dPaGk8+9h4+W6f0eAwEeDgj22kBDPsROlYt1ldsQfQtLIjwMzV3D03C7DUMJjvcEc01tGsgxm3fI9w8cmoOhkvLpUe9m/i3TjKIKFxr7mjwDNfNzJWgKHJ0ZNI8aDU5VeG7SQuJWRWuwqHBsefmJFhYsi9Mp656ptz/8oXcNl1rfb/ubSrDm82KB9KMOJt3EZkAq0nkhpeAdRhP7sffaLBLirFi4rbc1srB7PClXgSq/tRwRrZu3uQy/f/n4qZAAe6b9Ajiz/G7DwAAA" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;text-align:center;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">⚙️</a><div style="margin-top:8px;color:#aaa;font-size:0.7rem;">v3.3 © 2026 Claudio</div></div></div></div></div>`);
+    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">⚙️</a><span style="color:#bbb;font-size:0.65rem;">v3.4 © 2026 • Entwickelt von: Claudio</span></div></div></div></div>`);
 });
 
 Router.register('register', () => {
@@ -4251,7 +4337,6 @@ Router.register('register', () => {
                 <label class="form-label">${t('first_name')} *</label>
                 <input type="text" id="register-vorname" class="form-input" placeholder="${placeholder}" autofocus style="font-size:1.2rem;padding:16px;">
             </div>
-            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:16px;margin-bottom:24px;">✔ ${t('register_btn')}</button>
             <div class="form-group">
                 <label class="form-label" style="text-align:center;display:block;">${t('pin_code')} *</label>
                 <div class="pin-display" id="register-pin-display" style="display:flex;justify-content:center;gap:12px;margin:16px 0;">
@@ -4264,8 +4349,9 @@ Router.register('register', () => {
                     <button type="button" class="pin-btn pin-btn-delete" onclick="handleRegisterPinDelete()">❌</button>
                 </div>
             </div>
+            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">✔ ${t('register_btn')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← ${t('back')}</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← ${t('back')}</button>
     </div></div>`);
 });
 
@@ -4294,7 +4380,7 @@ Router.register('name-select', async () => {
     
     const nameListHtml = !gaeste?.length 
         ? `<div class="name-list-empty"><p>${t('no_entries')}</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">${t('back')}</button></div>`
-        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">→</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">${t('back')}</button></div>`;
+        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">←’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">${t('back')}</button></div>`;
     
     UI.render(`<div class="main-content"><div style="max-width:600px;margin:40px auto;"><h1 class="page-title" style="text-align:center;">${t('letter')}: ${window.currentLetter}</h1>${nameListHtml}</div></div>`);
 });
@@ -4318,7 +4404,7 @@ Router.register('pin-entry', () => {
             </div>
             <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;">✔ ${t('login')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">← ${t('back')}</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">← ${t('back')}</button>
     </div></div>`);
 });
 
@@ -4428,7 +4514,7 @@ window.selectGruppe = async (gruppeId, gruppeName) => {
 };
 
 Router.register('admin-login', () => {
-    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;">🔐 Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← Zurück</button></div></div>`);
+    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;">🔐 Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← Zurück</button></div></div>`);
     setTimeout(() => document.getElementById('admin-password')?.focus(), 100);
 });
 
@@ -4472,7 +4558,7 @@ Router.register('admin-dashboard', async () => {
         " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
             <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 2rem;">${isHP ? '🍽️' : '🏠 '}</span>
+                    <span style="font-size: 2rem;">${isHP ? '🍽' : '🏠'}</span>
                     <div>
                         <div style="font-weight: 700; font-size: 1.2rem;">
                             Preismodus: ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
@@ -4518,7 +4604,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                     </div>
                 </div>
-                <span style="font-size: 1.5rem;">→</span>
+                <span style="font-size: 1.5rem;">←’</span>
             </div>
         </div>
         
@@ -4535,7 +4621,7 @@ Router.register('admin-dashboard', async () => {
         " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
             <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 2rem;">🍽️</span>
+                    <span style="font-size: 2rem;">🍽</span>
                     <div>
                         <div style="font-weight: 700; font-size: 1.2rem;">
                             ${aktivesMenu ? 'Tagesmenü aktiv!' : 'Tagesmenü'}
@@ -4547,7 +4633,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                     </div>
                 </div>
-                <span style="font-size: 1.5rem;">→</span>
+                <span style="font-size: 1.5rem;">←’</span>
             </div>
         </div>
         
@@ -4571,7 +4657,7 @@ Router.register('admin-dashboard', async () => {
         
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
-                ⚠  Fehlende Getränke<br><small>(${fehlendeOffen.length} offen)</small>
+                ⚠  Fehlende Getränke<br><small>(${fehlendeOffen.length} offen)</small>
             </button>
             <button class="btn btn-danger" onclick="Router.navigate('admin-umlage')" style="padding:16px;">
                 💰 Umlage buchen<br><small>(auf alle Gäste)</small>
@@ -4581,6 +4667,7 @@ Router.register('admin-dashboard', async () => {
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
             <button class="btn btn-primary" onclick="Router.navigate('admin-guests')" style="padding:24px;">👥 Gästeverwaltung</button>
             <button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:24px;">📦 Artikelverwaltung</button>
+            <button class="btn btn-primary" onclick="Router.navigate('admin-artikel-sortierung')" style="padding:24px;">🔀 Artikel sortieren</button>
             <button class="btn btn-primary" onclick="Router.navigate('admin-gruppen')" style="padding:24px;">🏫 Gruppenverwaltung</button>
         </div>
         
@@ -4647,7 +4734,7 @@ window.repairCategories = async () => {
         8: 7   // Diverses -> Sonstiges
     };
     
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☢',6:'🍬',7:'📦'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
     const katMap = {
         1:'Alkoholfreie Getränke',
         2:'Biere',
@@ -4692,7 +4779,7 @@ Router.register('admin-auffuellliste', async () => {
     
     const total = liste.reduce((s, i) => s + i.menge, 0);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🍺 Auffüllliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">🍺 Auffüllliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:20px;text-align:center;">
@@ -4706,7 +4793,7 @@ Router.register('admin-auffuellliste', async () => {
                 🖨️ Für Thermodrucker drucken
             </button>
             <button class="btn btn-success" onclick="resetAuffuelllisteOhneExport()" style="padding:16px;font-size:1.1rem;background:#27ae60;">
-                ✦ Auffüllliste zurücksetzen<br>
+                ✅ Auffüllliste zurücksetzen<br>
                 <small style="opacity:0.9;">(Getränke wurden aufgefüllt)</small>
             </button>
         </div>
@@ -4715,7 +4802,7 @@ Router.register('admin-auffuellliste', async () => {
             <div style="padding:12px;">
                 <p style="margin:0;color:#856404;font-size:0.85rem;">
                     🖨️ <strong>Tipp:</strong> Damit der Thermodrucker automatisch gewählt wird:<br>
-                    Im Druckdialog → "EPSON TM-T88V" wählen → Häkchen bei "Als Standard speichern"
+                    Im Druckdialog ←’ "EPSON TM-T88V" wählen ←’ Häkchen bei "Als Standard speichern"
                 </p>
             </div>
         </div>
@@ -4899,7 +4986,7 @@ window.resetAuffuelllisteOhneExport = async () => {
     
     try {
         await Buchungen.markAsAufgefuellt();
-        Utils.showToast('✦ Auffüllliste zurückgesetzt', 'success');
+        Utils.showToast('✅ Auffüllliste zurückgesetzt', 'success');
         Router.navigate('admin-auffuellliste');
     } catch(e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -4923,7 +5010,7 @@ Router.register('admin-alle-buchungen', async () => {
     // Sortiert nach Datum (neueste zuerst)
     const sortedDates = Object.keys(byDatum).sort().reverse();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📋 Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">📋 Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:16px;text-align:center;">
@@ -4935,7 +5022,7 @@ Router.register('admin-alle-buchungen', async () => {
         <!-- GRUPPE ABGEREIST BUTTON -->
         <div class="card mb-3" style="background:#e74c3c;color:white;">
             <div style="padding:16px;">
-                <div style="font-weight:700;margin-bottom:8px;">🏠  Gruppe abgereist?</div>
+                <div style="font-weight:700;margin-bottom:8px;">🏠 Gruppe abgereist?</div>
                 <p style="font-size:0.9rem;margin-bottom:12px;opacity:0.9;">
                     Alle Buchungen exportieren und als erledigt markieren.<br>
                     Danach werden nur noch neue Buchungen angezeigt.
@@ -4955,7 +5042,7 @@ Router.register('admin-alle-buchungen', async () => {
                     <h3 style="font-weight:700;margin:0;">📅 ${datum}</h3>
                     <div style="display:flex;align-items:center;gap:12px;">
                         <span style="font-weight:600;color:var(--color-alpine-green);">${buchungen.length} Buchungen • ${Utils.formatCurrency(tagesUmsatz)}</span>
-                        <button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="handleDeleteBuchungenByDate('${datum}')" title="Alle Buchungen dieses Tages löschen">🗘 Tag löschen</button>
+                        <button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="handleDeleteBuchungenByDate('${datum}')" title="Alle Buchungen dieses Tages löschen">🗑 Tag löschen</button>
                     </div>
                 </div>
                 <div class="card-body" style="padding:0;max-height:400px;overflow-y:auto;">
@@ -4983,7 +5070,7 @@ Router.register('admin-alle-buchungen', async () => {
                                     <td style="padding:10px;text-align:center;">
                                         ${b.storniert 
                                             ? '<span style="color:#e74c3c;font-size:0.8rem;">Storniert</span>'
-                                            : `<button class="btn btn-danger" style="padding:4px 12px;font-size:0.8rem;" onclick="handleAdminDeleteBuchung('${b.buchung_id}')">🗘</button>`
+                                            : `<button class="btn btn-danger" style="padding:4px 12px;font-size:0.8rem;" onclick="handleAdminDeleteBuchung('${b.buchung_id}')">🗑</button>`
                                         }
                                     </td>
                                 </tr>
@@ -4998,7 +5085,7 @@ Router.register('admin-alle-buchungen', async () => {
 
 // Gruppe abgereist - Alle Buchungen exportieren und abschließen
 window.handleGruppeAbgereist = async () => {
-    if (!confirm('⚠  ACHTUNG: Gruppe abreisen?\n\nDies wird:\n1. Alle Buchungen für die Registrierkasse exportieren\n2. Alle Buchungen als exportiert markieren\n3. Auffüllliste zurücksetzen\n\nFortfahren?')) return;
+    if (!confirm('⚠  ACHTUNG: Gruppe abreisen?\n\nDies wird:\n1. Alle Buchungen für die Registrierkasse exportieren\n2. Alle Buchungen als exportiert markieren\n3. Auffüllliste zurücksetzen\n\nFortfahren?')) return;
     
     try {
         // 1. Excel Export
@@ -5017,7 +5104,7 @@ window.handleGruppeAbgereist = async () => {
         // 3. Auffüllliste auch zurücksetzen
         await Buchungen.markAsAufgefuellt();
         
-        Utils.showToast('✦ Gruppe abgereist - Alle Buchungen exportiert und abgeschlossen', 'success');
+        Utils.showToast('✅ Gruppe abgereist - Alle Buchungen exportiert und abgeschlossen', 'success');
         Router.navigate('admin-dashboard');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -5077,7 +5164,7 @@ window.handleDeleteBuchungenByDate = async (datum) => {
         }
         
         await DataProtection.createBackup();
-        Utils.showToast(`✦ ${buchungenIds.length} Buchungen vom ${datum} gelöscht`, 'success');
+        Utils.showToast(`✅ ${buchungenIds.length} Buchungen vom ${datum} gelöscht`, 'success');
         Router.navigate('admin-alle-buchungen');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -5098,7 +5185,7 @@ Router.register('admin-fehlende', async () => {
         if (byKat[a.kategorie_id]) byKat[a.kategorie_id].artikel.push(a);
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">⚠  Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">⚠  Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#f39c12;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -5119,7 +5206,7 @@ Router.register('admin-fehlende', async () => {
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span style="font-weight:600;">${Utils.formatCurrency(f.artikel_preis)}</span>
-                        <button class="btn btn-danger" onclick="deleteFehlendes(${f.id})" style="padding:4px 10px;">🗘</button>
+                        <button class="btn btn-danger" onclick="deleteFehlendes(${f.id})" style="padding:4px 10px;">🗑</button>
                     </div>
                 </div>
                 `).join('')}
@@ -5183,7 +5270,7 @@ Router.register('admin-umlage', async () => {
     const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
     const preisProGast = totalGuests > 0 ? Math.ceil((gesamtPreis / totalGuests) * 100) / 100 : gesamtPreis;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">💰 Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">💰 Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-danger);color:white;">
             <div style="padding:20px;text-align:center;">
@@ -5195,7 +5282,7 @@ Router.register('admin-umlage', async () => {
         ${fehlendeOffen.length ? `
         <div class="card mb-3">
             <div class="card-header" style="background:#f39c12;color:white;">
-                <h3 style="margin:0;">⚠  Fehlende Getränke (${fehlendeOffen.length})</h3>
+                <h3 style="margin:0;">⚠  Fehlende Getränke (${fehlendeOffen.length})</h3>
             </div>
             <div class="card-body">
                 ${fehlendeOffen.map(f => `
@@ -5233,7 +5320,7 @@ Router.register('admin-umlage', async () => {
         ` : `
         <div class="card">
             <div class="card-body" style="text-align:center;padding:40px;">
-                <div style="font-size:3rem;margin-bottom:16px;">✦</div>
+                <div style="font-size:3rem;margin-bottom:16px;">✅</div>
                 <h3>Keine fehlenden Getränke</h3>
                 <p style="color:var(--color-stone-dark);">Es gibt nichts umzulegen.</p>
             </div>
@@ -5345,11 +5432,11 @@ Router.register('admin-notfall-export', async () => {
     // Aktuelle letzte ID
     const lastExportId = ExportService.getLastExportId();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🔧 Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">🔧 Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;">
-                <div style="font-weight:700;">⚠  Nur im Notfall verwenden</div>
+                <div style="font-weight:700;">⚠  Nur im Notfall verwenden</div>
                 <div style="font-size:0.9rem;opacity:0.9;">Exportiert Buchungen nach Datum (auch bereits exportierte)</div>
             </div>
         </div>
@@ -5589,17 +5676,8 @@ Router.register('admin-gruppen', async () => {
     const gruppen = await Gruppen.getAll();
     const isAktiv = await Gruppen.isAbfrageAktiv();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">🏫 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
-        <style>
-            .toggle-switch { position:relative;display:inline-block;width:60px;height:34px; }
-            .toggle-switch input { opacity:0;width:0;height:0; }
-            .toggle-slider { position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.3s;border-radius:34px; }
-            .toggle-slider:before { position:absolute;content:"";height:26px;width:26px;left:4px;bottom:4px;background-color:white;transition:.3s;border-radius:50%; }
-            .toggle-switch input:checked + .toggle-slider { background-color:#27ae60; }
-            .toggle-switch input:checked + .toggle-slider:before { transform:translateX(26px); }
-        </style>
-        
         <!-- TOGGLE: Gruppenabfrage aktiv -->
         <div class="card mb-3" style="background:${isAktiv ? 'var(--color-alpine-green)' : '#95a5a6'};color:white;">
             <div style="padding:20px;display:flex;justify-content:space-between;align-items:center;">
@@ -5609,9 +5687,9 @@ Router.register('admin-gruppen', async () => {
                         ${isAktiv ? 'Gäste müssen nach Login eine Gruppe wählen' : 'Keine Gruppenabfrage beim Login'}
                     </div>
                 </div>
-                <label class="toggle-switch">
+                <label class="switch" style="position:relative;display:inline-block;width:60px;height:34px;">
                     <input type="checkbox" id="gruppenToggle" ${isAktiv ? 'checked' : ''} onchange="toggleGruppenAbfrage(this.checked)">
-                    <span class="toggle-slider"></span>
+                    <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:34px;"></span>
                 </label>
             </div>
         </div>
@@ -5630,7 +5708,7 @@ Router.register('admin-gruppen', async () => {
                                 <td style="padding:16px;font-weight:600;font-size:1.1rem;">🏫 ${g.name}</td>
                                 <td style="padding:16px;text-align:right;">
                                     <button class="btn btn-secondary" onclick="showEditGruppeModal(${g.id}, '${g.name}')" style="margin-right:8px;">✔</button>
-                                    <button class="btn btn-danger" onclick="deleteGruppe(${g.id})">🗘</button>
+                                    <button class="btn btn-danger" onclick="deleteGruppe(${g.id})">🗑</button>
                                 </td>
                             </tr>
                         `).join('')}
@@ -5648,7 +5726,7 @@ Router.register('admin-gruppen', async () => {
         ${isAktiv && gruppen.length === 0 ? `
             <div class="card" style="background:#e74c3c;color:white;">
                 <div style="padding:16px;">
-                    ⚠  <strong>Achtung:</strong> Gruppenabfrage ist aktiv, aber keine Gruppen hinterlegt!
+                    ⚠  <strong>Achtung:</strong> Gruppenabfrage ist aktiv, aber keine Gruppen hinterlegt!
                     <br>Gäste können sich nicht anmelden, bis mindestens eine Gruppe existiert.
                 </div>
             </div>
@@ -5677,31 +5755,17 @@ Router.register('admin-gruppen', async () => {
 
 // Toggle Gruppenabfrage
 window.toggleGruppenAbfrage = async (aktiv) => {
-    const toggle = document.getElementById('gruppenToggle');
-    
     if (aktiv) {
         const gruppen = await Gruppen.getAll();
         if (gruppen.length === 0) {
             Utils.showToast('Bitte erst mindestens eine Gruppe anlegen!', 'warning');
-            if (toggle) toggle.checked = false;
+            document.getElementById('gruppenToggle').checked = false;
             return;
         }
     }
-    
-    try {
-        await Gruppen.setAbfrageAktiv(aktiv);
-        Utils.showToast(aktiv ? 'Gruppenabfrage aktiviert' : 'Gruppenabfrage deaktiviert', 'success');
-        
-        // Toggle-Status visuell bestätigen
-        if (toggle) toggle.checked = aktiv;
-        
-        // Seite nach kurzer Verzögerung neu laden um Supabase-Sync zu zeigen
-        setTimeout(() => Router.navigate('admin-gruppen'), 500);
-    } catch (e) {
-        Utils.showToast('Fehler: ' + e.message, 'error');
-        // Bei Fehler: Toggle zurücksetzen
-        if (toggle) toggle.checked = !aktiv;
-    }
+    await Gruppen.setAbfrageAktiv(aktiv);
+    Utils.showToast(aktiv ? 'Gruppenabfrage aktiviert' : 'Gruppenabfrage deaktiviert', 'success');
+    Router.navigate('admin-gruppen');
 };
 
 // Gruppe hinzufügen Modal
@@ -5759,13 +5823,13 @@ Router.register('admin-preismodus', async () => {
     const currentModus = await PreisModus.getModus();
     const isHP = currentModus === PreisModus.HP;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">💰 Preismodus</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">💰 Preismodus</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- AKTUELLER STATUS -->
         <div class="card mb-3" style="background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};color:white;">
             <div style="padding:24px;text-align:center;">
-                <div style="font-size:4rem;margin-bottom:16px;">${isHP ? '🍽️' : '🏠 '}</div>
+                <div style="font-size:4rem;margin-bottom:16px;">${isHP ? '🍽' : '🏠'}</div>
                 <div style="font-size:1.8rem;font-weight:700;margin-bottom:8px;">
                     ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
                 </div>
@@ -5793,7 +5857,7 @@ Router.register('admin-preismodus', async () => {
                         cursor:pointer;
                         transition:all 0.2s;
                     ">
-                        <div style="font-size:2.5rem;margin-bottom:8px;">🏠 </div>
+                        <div style="font-size:2.5rem;margin-bottom:8px;">🏠</div>
                         <div style="font-weight:700;font-size:1.1rem;">Selbstversorger</div>
                         <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">Standard-Preise</div>
                         ${!isHP ? '<div style="margin-top:8px;font-weight:bold;">✔ AKTIV</div>' : ''}
@@ -5808,7 +5872,7 @@ Router.register('admin-preismodus', async () => {
                         cursor:pointer;
                         transition:all 0.2s;
                     ">
-                        <div style="font-size:2.5rem;margin-bottom:8px;">🍽️</div>
+                        <div style="font-size:2.5rem;margin-bottom:8px;">🍽</div>
                         <div style="font-weight:700;font-size:1.1rem;">Halbpension (HP)</div>
                         <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">HP-Preise</div>
                         ${isHP ? '<div style="margin-top:8px;font-weight:bold;">✔ AKTIV</div>' : ''}
@@ -5849,7 +5913,7 @@ Router.register('admin-nachricht', async () => {
     const aktiveNachricht = await GastNachricht.getAktive();
     const verbleibendeZeit = aktiveNachricht ? GastNachricht.getVerbleibendeZeit(aktiveNachricht) : null;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📢 Gäste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">📢 Gäste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- INFO BOX -->
@@ -5977,10 +6041,10 @@ Router.register('admin-nachricht', async () => {
                 <strong>📝 Beispiel-Nachrichten:</strong>
                 <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
                     <button onclick="setBeispiel('Auto mit Kennzeichen W-12345 bitte umparken!')" style="text-align:left;padding:10px;background:white;border:1px solid var(--color-stone-medium);border-radius:8px;cursor:pointer;">
-                        🚔 "Auto mit Kennzeichen W-12345 bitte umparken!"
+                        🚗 "Auto mit Kennzeichen W-12345 bitte umparken!"
                     </button>
                     <button onclick="setBeispiel('Heute Abend 19:00 Uhr gemeinsames Grillen auf der Terrasse!')" style="text-align:left;padding:10px;background:white;border:1px solid var(--color-stone-medium);border-radius:8px;cursor:pointer;">
-                        🎰 "Heute Abend 19:00 Uhr gemeinsames Grillen auf der Terrasse!"
+                        🎉 "Heute Abend 19:00 Uhr gemeinsames Grillen auf der Terrasse!"
                     </button>
                     <button onclick="setBeispiel('Bitte Kühlschrank kontrollieren - es fehlen Getränke!')" style="text-align:left;padding:10px;background:white;border:1px solid var(--color-stone-medium);border-radius:8px;cursor:pointer;">
                         🍺 "Bitte Kühlschrank kontrollieren - es fehlen Getränke!"
@@ -6002,7 +6066,7 @@ Router.register('admin-tagesmenu', async () => {
     
     const menuData = await TagesMenu.getAlleMenus();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">🍽️ Tagesmenü</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">🍽 Tagesmenü</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- INFO BOX -->
@@ -6060,7 +6124,7 @@ Dessert" style="font-size:0.95rem;line-height:1.5;">${menuData.mittag?.text || '
                 
                 <div style="display:flex;gap:12px;">
                     <button class="btn ${menuData.mittag?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleMittagMenu()" style="flex:1;padding:14px;">
-                        ${menuData.mittag?.aktiv ? '❌ Deaktivieren' : '✦ Aktivieren'}
+                        ${menuData.mittag?.aktiv ? '❌ Deaktivieren' : '✅ Aktivieren'}
                     </button>
                     ${menuData.mittag?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('mittag')" style="padding:14px;">👁️ Vorschau</button>` : ''}
                 </div>
@@ -6103,7 +6167,7 @@ Apfelstrudel mit Vanillesauce" style="font-size:0.95rem;line-height:1.5;">${menu
                 
                 <div style="display:flex;gap:12px;">
                     <button class="btn ${menuData.abend?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleAbendMenu()" style="flex:1;padding:14px;">
-                        ${menuData.abend?.aktiv ? '❌ Deaktivieren' : '✦ Aktivieren'}
+                        ${menuData.abend?.aktiv ? '❌ Deaktivieren' : '✅ Aktivieren'}
                     </button>
                     ${menuData.abend?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('abend')" style="padding:14px;">👁️ Vorschau</button>` : ''}
                 </div>
@@ -6272,8 +6336,14 @@ Router.register('admin-cheese', async () => {
             <td style="padding:12px 8px;text-align:right;font-weight:700;color:#27ae60;">${preis}</td>
             <td style="padding:12px 8px;text-align:center;">
                 <button onclick="handleCheeseOrderDone('${o.id}')" style="
-                    padding:8px 16px;background:#27ae60;color:white;border:none;
-                    border-radius:8px;font-size:0.85rem;font-weight:600;cursor:pointer;
+                    padding:8px 16px;
+                    background:#27ae60;
+                    color:white;
+                    border:none;
+                    border-radius:8px;
+                    font-size:0.85rem;
+                    font-weight:600;
+                    cursor:pointer;
                 ">✓ Erledigt</button>
             </td>
         </tr>`;
@@ -6285,6 +6355,7 @@ Router.register('admin-cheese', async () => {
             </td>
         </tr>`;
     
+    // Statistik berechnen
     const totalGrams = orders.reduce((s, o) => s + o.grams, 0);
     const totalRevenue = orders.reduce((s, o) => s + o.total_price_cents, 0);
     
@@ -6299,6 +6370,7 @@ Router.register('admin-cheese', async () => {
         </div>
     </div>
     <div class="main-content">
+        <!-- Statistik -->
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
             <div style="background:linear-gradient(135deg, #f4d03f, #f39c12);padding:16px;border-radius:12px;text-align:center;color:#5d4e37;">
                 <div style="font-size:2rem;font-weight:700;">${orders.length}</div>
@@ -6313,6 +6385,8 @@ Router.register('admin-cheese', async () => {
                 <div style="font-size:0.85rem;">Gesamt Umsatz</div>
             </div>
         </div>
+        
+        <!-- Tabelle -->
         <div class="card" style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;">
                 <thead>
@@ -6330,14 +6404,17 @@ Router.register('admin-cheese', async () => {
                 </tbody>
             </table>
         </div>
+        
         <div style="margin-top:20px;padding:16px;background:#fff3cd;border-radius:10px;font-size:0.9rem;color:#856404;">
             <strong>💡 Hinweis:</strong> Erledigte Bestellungen werden aus dieser Liste entfernt, bleiben aber für Auswertungen in der Datenbank erhalten.
         </div>
     </div>`);
 });
 
+// Käse-Bestellung als erledigt markieren
 window.handleCheeseOrderDone = async (orderId) => {
     if (!confirm('Bestellung wirklich als erledigt markieren?')) return;
+    
     try {
         await CheeseOrders.markAsDone(orderId);
         Utils.showToast('✓ Bestellung erledigt!', 'success');
@@ -6380,7 +6457,7 @@ Router.register('admin-guests', async () => {
                         ausnahmeumlage: g.ausnahmeumlage || false
                     };
                 });
-                console.log('✦ Gäste von Supabase geladen:', guests.length);
+                console.log('✅ Gäste von Supabase geladen:', guests.length);
             }
         } catch(e) {
             console.error('Supabase Gäste laden Exception:', e);
@@ -6416,7 +6493,7 @@ Router.register('admin-guests', async () => {
     const gruppen = await db.gruppen.toArray();
     const gruppenAktiv = gruppen.filter(g => g.aktiv);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">👥 Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <style>
             .switch { position:relative; display:inline-block; width:50px; height:26px; }
@@ -6479,7 +6556,7 @@ Router.register('admin-guests', async () => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
                             const pw = g.passwort || g.passwordHash || g.pin_hash;
-                            const pwDisplay = pw ? pw : '<span style="color:#e74c3c;">⚠  KEINE</span>';
+                            const pwDisplay = pw ? pw : '<span style="color:#e74c3c;">⚠  KEINE</span>';
                             const pwStyle = pw ? 'color:#2c3e50;' : 'color:#e74c3c;';
                             const ausnahme = g.ausnahmeumlage || false;
                             const createdAt = g.created_at || g.createdAt;
@@ -6502,7 +6579,7 @@ Router.register('admin-guests', async () => {
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;white-space:nowrap;">
                                     <button class="btn btn-primary" onclick="adminBuchenFuerGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="Für diesen Gast buchen">🍺</button>
                                     <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
-                                    <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Löschen">🗘</button>
+                                    <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Löschen">🗑</button>
                                 </td>
                             </tr>`;
                         }).join('')}
@@ -6588,7 +6665,7 @@ Router.register('admin-guests-inaktiv', async () => {
         guests = all.filter(g => !g.geloescht && g.aktiv === false);
     }
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">→</button><div class="header-title">📋 Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">←’</button><div class="header-title">📋 Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -6617,7 +6694,7 @@ Router.register('admin-guests-inaktiv', async () => {
                                 <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;">
                                     <button class="btn btn-primary" onclick="reactivateGast('${g.id}', '${name}')" style="padding:6px 12px;" title="Wieder aktivieren">🔄 Reaktivieren</button>
-                                    <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;margin-left:4px;" title="Endgültig löschen">🗘</button>
+                                    <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;margin-left:4px;" title="Endgültig löschen">🗑</button>
                                 </td>
                             </tr>`;
                         }).join('')}
@@ -6730,7 +6807,7 @@ window.reactivateGast = async (id, name) => {
     } catch(e) {}
     
     await DataProtection.createBackup();
-    Utils.showToast(`✦ ${name} wieder aktiviert`, 'success');
+    Utils.showToast(`✅ ${name} wieder aktiviert`, 'success');
     Router.navigate('admin-guests-inaktiv');
 };
 
@@ -6917,7 +6994,7 @@ window.saveGast = async () => {
                 if (error) {
                     console.error('Supabase Update Fehler:', error);
                 } else {
-                    console.log('✦ Gast in Supabase aktualisiert');
+                    console.log('✅ Gast in Supabase aktualisiert');
                 }
             } catch (e) {
                 console.error('Supabase Update Exception:', e);
@@ -6992,7 +7069,7 @@ window.saveGast = async () => {
                 
                 // User ID aus Auth übernehmen
                 finalId = authData.user?.id || finalId;
-                console.log('✦ Supabase Auth User erstellt mit ID:', finalId);
+                console.log('✅ Supabase Auth User erstellt mit ID:', finalId);
                 
                 // 2. Profile aktualisieren mit zusätzlichen Daten
                 const { error: profileError } = await supabaseClient
@@ -7013,7 +7090,7 @@ window.saveGast = async () => {
                 if (profileError) {
                     console.error('Supabase Profile Update Fehler:', profileError);
                 } else {
-                    console.log('✦ Gast-Profil in Supabase aktualisiert');
+                    console.log('✅ Gast-Profil in Supabase aktualisiert');
                 }
                 
             } catch (e) {
@@ -7126,7 +7203,7 @@ window.adminBuchenFuerGast = async (id) => {
                 console.warn('Auth Session für Gast fehlgeschlagen:', error.message);
                 // Trotzdem fortfahren - Buchung wird lokal gespeichert
             } else {
-                console.log('✦ Auth Session für Gast erstellt');
+                console.log('✅ Auth Session für Gast erstellt');
             }
         } catch(e) {
             console.warn('Auth Session Exception:', e);
@@ -7276,7 +7353,7 @@ Router.register('admin-articles', async () => {
             </td>
             <td style="text-align:right;white-space:nowrap;">
                 <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✏️</button>
-                <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">🗘</button>
+                <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">🗑</button>
             </td>
         </tr>`;
     };
@@ -7294,7 +7371,7 @@ Router.register('admin-articles', async () => {
         });
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">→</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←’</button><div class="header-title">📦 Artikelverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <style>
         .switch { position:relative; display:inline-block; width:50px; height:26px; }
         .switch input { opacity:0; width:0; height:0; }
@@ -7331,8 +7408,8 @@ Router.register('admin-articles', async () => {
                                 <th style="padding:12px 8px;text-align:center;">
                                     <div>Preise</div>
                                     <div style="display:flex;gap:8px;justify-content:center;font-size:0.7rem;font-weight:normal;">
-                                        <span style="color:#3498db;">🏠  SV</span>
-                                        <span style="color:#9b59b6;">🍽️ HP</span>
+                                        <span style="color:#3498db;">🏠 SV</span>
+                                        <span style="color:#9b59b6;">🍽 HP</span>
                                     </div>
                                 </th>
                                 <th style="padding:12px 8px;">Kategorie</th>
@@ -7374,6 +7451,330 @@ if (!document.getElementById('table-styles')) {
     `;
     document.head.appendChild(style);
 }
+
+// ================================
+// ARTIKEL-SORTIERUNG (Drag & Drop)
+// Nur aktive Artikel, Speicherung in Supabase
+// ================================
+Router.register('admin-artikel-sortierung', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    
+    // Nur AKTIVE Artikel laden
+    const alleArtikel = await Artikel.getAll();
+    const aktiveArtikel = alleArtikel.filter(a => a.aktiv);
+    const kats = await db.kategorien.toArray();
+    kats.sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
+    
+    // Artikel nach Kategorie gruppieren und sortieren
+    const byCategory = {};
+    kats.forEach(k => byCategory[k.kategorie_id] = []);
+    
+    aktiveArtikel.forEach(a => {
+        const katId = a.kategorie_id || 0;
+        if (!byCategory[katId]) byCategory[katId] = [];
+        byCategory[katId].push(a);
+    });
+    
+    // Innerhalb jeder Kategorie nach Sortierung sortieren
+    Object.keys(byCategory).forEach(katId => {
+        byCategory[katId].sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
+    });
+    
+    const katMap = {};
+    kats.forEach(k => katMap[k.kategorie_id] = k.name);
+    
+    // Kategorien-HTML rendern
+    let kategorienHtml = '';
+    kats.forEach(kat => {
+        const artikelInKat = byCategory[kat.kategorie_id] || [];
+        if (artikelInKat.length === 0) return;
+        
+        let artikelHtml = artikelInKat.map((a, idx) => `
+            <div class="sort-artikel-tile" draggable="true" 
+                 data-artikel-id="${a.artikel_id}" 
+                 data-kategorie-id="${kat.kategorie_id}"
+                 data-sortierung="${a.sortierung || idx * 10}">
+                <div class="sort-artikel-pos">${idx + 1}</div>
+                <div class="sort-artikel-content">
+                    ${a.bild ? `<img src="${a.bild}" class="sort-artikel-img">` : `<div class="sort-artikel-icon">${a.icon || '📦'}</div>`}
+                    <div class="sort-artikel-name">${a.name_kurz || a.name}</div>
+                </div>
+                <div class="sort-artikel-handle">⋮⋮</div>
+            </div>
+        `).join('');
+        
+        kategorienHtml += `
+            <div class="sort-kategorie-block">
+                <div class="sort-kategorie-header">${katMap[kat.kategorie_id] || 'Ohne Kategorie'} (${artikelInKat.length})</div>
+                <div class="sort-artikel-container" data-kategorie-id="${kat.kategorie_id}">
+                    ${artikelHtml}
+                </div>
+            </div>
+        `;
+    });
+    
+    UI.render(`
+        <div class="admin-container" style="max-width:900px;margin:0 auto;padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <div>
+                    <h1 style="font-size:1.5rem;margin:0;">🔀 Artikel sortieren</h1>
+                    <p style="color:#666;font-size:0.9rem;margin:4px 0 0;">Drag & Drop zum Umsortieren (nur aktive Artikel)</p>
+                </div>
+                <button class="btn btn-secondary" onclick="Router.navigate('admin')">← Zurück</button>
+            </div>
+            
+            <div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:8px;padding:12px;margin-bottom:20px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:1.2rem;">💡</span>
+                    <div>
+                        <strong>Hinweis:</strong> Ziehen Sie Artikel innerhalb einer Kategorie um die Reihenfolge zu ändern.
+                        Änderungen werden automatisch in der Cloud gespeichert.
+                    </div>
+                </div>
+            </div>
+            
+            <div id="sortierung-status" style="display:none;position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;font-weight:600;z-index:1000;"></div>
+            
+            <div id="artikel-sortierung-container">
+                ${kategorienHtml}
+            </div>
+            
+            <div style="margin-top:24px;text-align:center;">
+                <button class="btn btn-primary" onclick="speichereSortierungSupabase()" style="padding:16px 32px;font-size:1.1rem;">
+                    💾 Sortierung speichern
+                </button>
+            </div>
+        </div>
+        
+        <style>
+            .sort-kategorie-block {
+                margin-bottom: 24px;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+            .sort-kategorie-header {
+                background: linear-gradient(135deg, var(--color-alpine-green), #3a7ca5);
+                color: white;
+                padding: 12px 16px;
+                font-weight: 700;
+                font-size: 1.1rem;
+            }
+            .sort-artikel-container {
+                padding: 12px;
+                min-height: 60px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .sort-artikel-tile {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background: #f8f9fa;
+                border: 2px solid #e9ecef;
+                border-radius: 8px;
+                padding: 8px 12px;
+                cursor: grab;
+                transition: all 0.2s;
+                min-width: 140px;
+            }
+            .sort-artikel-tile:hover {
+                border-color: var(--color-alpine-green);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            }
+            .sort-artikel-tile.dragging {
+                opacity: 0.5;
+                border-color: #3498db;
+                background: #e3f2fd;
+            }
+            .sort-artikel-tile.drag-over {
+                border-color: #27ae60;
+                background: #e8f5e9;
+                transform: scale(1.02);
+            }
+            .sort-artikel-pos {
+                background: var(--color-alpine-green);
+                color: white;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.75rem;
+                font-weight: 700;
+                flex-shrink: 0;
+            }
+            .sort-artikel-content {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex: 1;
+            }
+            .sort-artikel-img {
+                width: 32px;
+                height: 32px;
+                object-fit: cover;
+                border-radius: 6px;
+            }
+            .sort-artikel-icon {
+                font-size: 1.5rem;
+            }
+            .sort-artikel-name {
+                font-size: 0.85rem;
+                font-weight: 600;
+                color: #333;
+            }
+            .sort-artikel-handle {
+                color: #999;
+                font-size: 1.2rem;
+                cursor: grab;
+            }
+        </style>
+    `);
+    
+    // Drag & Drop initialisieren
+    initArtikelSortierungDragDrop();
+});
+
+// Drag & Drop für Artikel-Sortierung
+function initArtikelSortierungDragDrop() {
+    const containers = document.querySelectorAll('.sort-artikel-container');
+    let draggedItem = null;
+    
+    containers.forEach(container => {
+        const tiles = container.querySelectorAll('.sort-artikel-tile');
+        
+        tiles.forEach(tile => {
+            tile.addEventListener('dragstart', (e) => {
+                draggedItem = tile;
+                tile.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            
+            tile.addEventListener('dragend', () => {
+                tile.classList.remove('dragging');
+                document.querySelectorAll('.sort-artikel-tile').forEach(t => t.classList.remove('drag-over'));
+                draggedItem = null;
+                updatePositionNumbers();
+            });
+            
+            tile.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (draggedItem && draggedItem !== tile) {
+                    // Nur innerhalb derselben Kategorie erlauben
+                    if (draggedItem.dataset.kategorieId === tile.dataset.kategorieId) {
+                        tile.classList.add('drag-over');
+                    }
+                }
+            });
+            
+            tile.addEventListener('dragleave', () => {
+                tile.classList.remove('drag-over');
+            });
+            
+            tile.addEventListener('drop', (e) => {
+                e.preventDefault();
+                tile.classList.remove('drag-over');
+                
+                if (draggedItem && draggedItem !== tile) {
+                    // Nur innerhalb derselben Kategorie
+                    if (draggedItem.dataset.kategorieId === tile.dataset.kategorieId) {
+                        const parent = tile.parentNode;
+                        const allTiles = Array.from(parent.querySelectorAll('.sort-artikel-tile'));
+                        const draggedIdx = allTiles.indexOf(draggedItem);
+                        const dropIdx = allTiles.indexOf(tile);
+                        
+                        if (draggedIdx < dropIdx) {
+                            tile.after(draggedItem);
+                        } else {
+                            tile.before(draggedItem);
+                        }
+                        
+                        updatePositionNumbers();
+                        showSortierungStatus('Reihenfolge geändert - Speichern nicht vergessen!', 'warning');
+                    }
+                }
+            });
+        });
+    });
+}
+
+// Positionsnummern aktualisieren
+function updatePositionNumbers() {
+    document.querySelectorAll('.sort-artikel-container').forEach(container => {
+        const tiles = container.querySelectorAll('.sort-artikel-tile');
+        tiles.forEach((tile, idx) => {
+            const posEl = tile.querySelector('.sort-artikel-pos');
+            if (posEl) posEl.textContent = idx + 1;
+        });
+    });
+}
+
+// Status-Anzeige
+function showSortierungStatus(msg, type) {
+    const status = document.getElementById('sortierung-status');
+    if (!status) return;
+    
+    status.textContent = msg;
+    status.style.display = 'block';
+    status.style.background = type === 'success' ? '#27ae60' : type === 'warning' ? '#f39c12' : '#e74c3c';
+    status.style.color = 'white';
+    
+    if (type === 'success') {
+        setTimeout(() => { status.style.display = 'none'; }, 3000);
+    }
+}
+
+// Sortierung in Supabase speichern
+window.speichereSortierungSupabase = async () => {
+    const status = document.getElementById('sortierung-status');
+    showSortierungStatus('⏳ Speichere...', 'warning');
+    
+    try {
+        const containers = document.querySelectorAll('.sort-artikel-container');
+        const updates = [];
+        
+        containers.forEach(container => {
+            const tiles = container.querySelectorAll('.sort-artikel-tile');
+            tiles.forEach((tile, idx) => {
+                const artikelId = parseInt(tile.dataset.artikelId);
+                const sortierung = (idx + 1) * 10; // 10, 20, 30, ...
+                updates.push({ artikel_id: artikelId, sortierung: sortierung });
+            });
+        });
+        
+        // Zuerst lokal speichern (IndexedDB)
+        for (const upd of updates) {
+            await db.artikel.update(upd.artikel_id, { sortierung: upd.sortierung });
+        }
+        
+        // Dann in Supabase speichern
+        if (supabaseClient && isOnline) {
+            for (const upd of updates) {
+                await supabaseClient
+                    .from('artikel')
+                    .update({ sortierung: upd.sortierung })
+                    .eq('artikel_id', upd.artikel_id);
+            }
+            showSortierungStatus('✅ Sortierung gespeichert (lokal + Cloud)', 'success');
+        } else {
+            showSortierungStatus('✅ Lokal gespeichert (Cloud offline)', 'success');
+        }
+        
+        // Cache invalidieren
+        artikelCache = null;
+        
+        Utils.showToast('Sortierung erfolgreich gespeichert!', 'success');
+        
+    } catch (e) {
+        console.error('Sortierung speichern Fehler:', e);
+        showSortierungStatus('❌ Fehler: ' + e.message, 'error');
+        Utils.showToast('Fehler beim Speichern: ' + e.message, 'error');
+    }
+};
 
 Router.register('dashboard', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
@@ -7520,7 +7921,7 @@ Router.register('buchen', async () => {
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <span style="font-weight:700;font-size:0.9rem;">${Utils.formatCurrency(b.preis * b.menge)}</span>
-                    <button onclick="stornoBuchung('${b.buchung_id}')" style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.85rem;">✢</button>
+                    <button onclick="stornoBuchung('${b.buchung_id}')" style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.85rem;">✕</button>
                 </div>
             </div>
             `).join('') : '<p style="text-align:center;color:#999;padding:15px;font-size:0.9rem;">Noch keine Buchungen</p>'}
@@ -7777,7 +8178,7 @@ window.showMengenModal = async (artikelId) => {
             <div style="color:var(--color-alpine-green);font-size:1.2rem;font-weight:600;margin-bottom:20px;">${Utils.formatCurrency(artikel.preis)} / ${t('per_piece')}</div>
             
             <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:20px;">
-                <button onclick="adjustMenge(-1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">ˆ</button>
+                <button onclick="adjustMenge(-1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">∑</button>
                 <div id="menge-display" style="font-size:2.5rem;font-weight:700;min-width:60px;">1</div>
                 <button onclick="adjustMenge(1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">+</button>
             </div>
@@ -7839,12 +8240,13 @@ window.bucheMitMenge = async (artikelId) => {
 
 // Storno durch Gast
 window.stornoBuchung = async (buchung_id) => {
-    // Direkt stornieren ohne Bestätigung (schneller für Gäste)
-    try {
-        await Buchungen.storno(buchung_id);
-        Router.navigate('buchen');
-    } catch (e) {
-        Utils.showToast(e.message, 'error');
+    if (confirm(i18n.t('cancel_booking'))) {
+        try {
+            await Buchungen.storno(buchung_id);
+            Router.navigate('buchen');
+        } catch (e) {
+            Utils.showToast(e.message, 'error');
+        }
     }
 };
 
@@ -7927,7 +8329,7 @@ window.syncFromCloud = async (silent = false) => {
     try {
         // Lokalen Gäste-Cache löschen
         await db.registeredGuests.clear();
-        console.log('✦ Lokaler Gäste-Cache gelöscht');
+        console.log('✅ Lokaler Gäste-Cache gelöscht');
         
         // Alle Profile von Supabase laden
         const { data: profiles, error } = await supabaseClient
@@ -7941,7 +8343,7 @@ window.syncFromCloud = async (silent = false) => {
             return;
         }
         
-        console.log('✦ Profile von Supabase:', profiles?.length || 0);
+        console.log('✅ Profile von Supabase:', profiles?.length || 0);
         
         // In lokalen Cache speichern
         if (profiles && profiles.length > 0) {
@@ -7965,7 +8367,7 @@ window.syncFromCloud = async (silent = false) => {
             }
         }
         
-        if (!silent) Utils.showToast(`✦ Synchronisiert`, 'success');
+        if (!silent) Utils.showToast(`✅ Synchronisiert`, 'success');
         
         // Seite nur neu laden wenn nicht silent
         if (!silent) Router.navigate('login');
@@ -7984,7 +8386,7 @@ window.clearLocalCache = async () => {
         await db.registeredGuests.clear();
         await db.buchungen.clear();
         localStorage.clear();
-        Utils.showToast('✦ Cache gelöscht - Seite wird neu geladen', 'success');
+        Utils.showToast('✅ Cache gelöscht - Seite wird neu geladen', 'success');
         setTimeout(() => location.reload(), 1000);
     } catch(e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -7999,22 +8401,8 @@ window.handleRegisterSubmit = async () => {
     try { 
         console.log('Registrierung startet...', v.trim(), p.length);
         await RegisteredGuests.register(v.trim(), p); 
-        
-        // WICHTIG: Bei neuer Registrierung hat der Gast noch KEINE Gruppe gewählt!
-        State.selectedGroup = null;
-        
         // Nach Registrierung prüfen ob Gruppe gewählt werden muss
-        const gruppenAktiv = await Gruppen.isAbfrageAktiv();
-        console.log('Gruppen aktiv?', gruppenAktiv, 'State.selectedGroup:', State.selectedGroup);
-        
-        if (gruppenAktiv) {
-            // Gruppenauswahl erforderlich - direkt navigieren
-            console.log('→ Navigiere zu Gruppenauswahl');
-            Router.navigate('gruppe-waehlen');
-        } else {
-            // Direkt zum Buchen
-            Router.navigate('buchen');
-        }
+        setTimeout(async () => await navigateAfterLogin(), 500); 
     } catch(e) {
         console.error('Registrierung Fehler:', e);
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -8056,29 +8444,21 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
             updateData.aktiv_bis = null; // Zeitbegrenzung entfernen
         }
         
-        // Lokal ERST updaten (für schnelle UI-Reaktion)
+        // Direkt DB updaten ohne Toast von Artikel.update
         await db.artikel.update(id, updateData);
         
-        // Dann Supabase updaten
+        // Supabase auch updaten
         if (supabaseClient && isOnline) {
-            try {
-                const { error } = await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
-                if (error) {
-                    console.error('Supabase Artikel-Update Fehler:', error);
-                    // Trotzdem weitermachen - lokal ist schon gespeichert
-                }
-            } catch(e) {
-                console.error('Supabase sync error:', e);
-            }
+            await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
         }
         
-        // Cache invalidieren - erzwingt Neuladen
+        // Cache invalidieren
         artikelCache = null;
-        artikelCacheTime = null;
         
         Utils.showToast(aktiv ? 'Artikel aktiviert' : 'Artikel deaktiviert', 'success');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
+        Router.navigate('admin-articles');
     }
 };
 
@@ -8195,9 +8575,9 @@ window.setZeitbegrenzung = async (artikelId, stunden) => {
             let zeitText = '';
             if (tage > 0) zeitText = `${tage} Tag(e)`;
             else zeitText = `${restStunden} Stunden`;
-            Utils.showToast(`✦ Artikel aktiv für ${zeitText}`, 'success');
+            Utils.showToast(`✅ Artikel aktiv für ${zeitText}`, 'success');
         } else {
-            Utils.showToast('✦ Zeitbegrenzung entfernt', 'success');
+            Utils.showToast('✅ Zeitbegrenzung entfernt', 'success');
         }
         
         // Seite neu laden
@@ -8233,7 +8613,7 @@ window.quickUpdatePreis = async (id, typ, wert) => {
 window.changeArtikelKategorie = async (id, neueKategorieId) => {
     try {
         const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'};
-        const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☢',6:'🍬',7:'📦'};
+        const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
         
         await db.artikel.update(id, { 
             kategorie_id: neueKategorieId,
@@ -8310,7 +8690,7 @@ window.changeArtikelId = async (alteId) => {
         artikelCache = null;
         await DataProtection.createBackup();
         
-        Utils.showToast(`✦ Artikel-ID geändert: ${alteId} → ${neueId}`, 'success');
+        Utils.showToast(`✅ Artikel-ID geändert: ${alteId} ←’ ${neueId}`, 'success');
         Router.navigate('admin-articles');
     } catch (e) {
         console.error('ID ändern Fehler:', e);
@@ -8396,7 +8776,7 @@ window.showAddArticleModal = () => {
         <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;">📦</div>
         <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
         <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;">📷 Foto wählen</button>
-        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✢</button>
+        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✕</button>
     </div>
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" placeholder="z.B. Cola 0.5l"></div>
     <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" placeholder="z.B. Cola"></div>
@@ -8407,11 +8787,11 @@ window.showAddArticleModal = () => {
         <div style="font-weight:600;margin-bottom:12px;">💰 Preise</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#3498db;font-weight:600;">🏠  Selbstversorger (€)</label>
+                <label class="form-label" style="color:#3498db;font-weight:600;">🏠 Selbstversorger (€)</label>
                 <input type="number" id="article-price-sv" class="form-input" placeholder="0.00" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
             </div>
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#9b59b6;font-weight:600;">🍽️ Halbpension (€)</label>
+                <label class="form-label" style="color:#9b59b6;font-weight:600;">🍽 Halbpension (€)</label>
                 <input type="number" id="article-price-hp" class="form-input" placeholder="0.00" step="0.10" min="0" style="border-color:#9b59b6;font-size:1.2rem;font-weight:bold;">
             </div>
         </div>
@@ -8428,15 +8808,6 @@ window.showAddArticleModal = () => {
 window.showEditArticleModal = async id => {
     const a = await Artikel.getById(id);
     if (!a) return;
-    
-    // Aktuelle Position in der Kategorie berechnen (1-basiert)
-    const allArticles = await Artikel.getAll();
-    const artikelInKategorie = allArticles
-        .filter(art => art.kategorie_id === a.kategorie_id)
-        .sort((x, y) => (x.sortierung || 0) - (y.sortierung || 0));
-    const currentPos = artikelInKategorie.findIndex(art => art.artikel_id === a.artikel_id) + 1;
-    const maxPos = artikelInKategorie.length;
-    
     const c = document.getElementById('article-modal-container');
     const hasImage = a.bild && a.bild.startsWith('data:');
     const previewContent = hasImage ? `<img src="${a.bild}" style="width:100%;height:100%;object-fit:cover;">` : (a.icon || '📦');
@@ -8448,7 +8819,7 @@ window.showEditArticleModal = async id => {
         <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;">${previewContent}</div>
         <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
         <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;">📷 Foto wählen</button>
-        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✖</button>
+        <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">✕</button>
     </div>
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" value="${a.name}"></div>
     <div class="form-group"><label class="form-label">Kurzname</label><input type="text" id="article-short" class="form-input" value="${a.name_kurz||''}"></div>
@@ -8459,18 +8830,18 @@ window.showEditArticleModal = async id => {
         <div style="font-weight:600;margin-bottom:12px;">💰 Preise</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#3498db;font-weight:600;">🏠  Selbstversorger (€)</label>
+                <label class="form-label" style="color:#3498db;font-weight:600;">🏠 Selbstversorger (€)</label>
                 <input type="number" id="article-price-sv" class="form-input" value="${preisSV.toFixed(2)}" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
             </div>
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#9b59b6;font-weight:600;">🍽️ Halbpension (€)</label>
+                <label class="form-label" style="color:#9b59b6;font-weight:600;">🍽 Halbpension (€)</label>
                 <input type="number" id="article-price-hp" class="form-input" value="${preisHP.toFixed(2)}" step="0.10" min="0" style="border-color:#9b59b6;font-size:1.2rem;font-weight:bold;">
             </div>
         </div>
     </div>
     
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <div class="form-group"><label class="form-label">Position (1-${maxPos})</label><input type="number" id="article-sort" class="form-input" value="${currentPos}" min="1" max="${maxPos}"><small style="color:var(--color-stone-dark);">Tauscht mit Artikel auf Pos.</small></div>
+        <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" value="${a.sortierung||1}" min="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
         <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'}[i]}</option>`).join('')}</select></div>
     </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
@@ -8497,7 +8868,7 @@ window.handleImagePreview = async (event) => {
 window.clearImagePreview = () => {
     window.currentArticleImage = null;
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☢',6:'🍬',7:'📦'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
     document.getElementById('article-image-preview').innerHTML = iconMap[katId] || '📦';
     document.getElementById('article-image').value = '';
 };
@@ -8507,7 +8878,7 @@ window.saveNewArticle = async () => {
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
     const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'};
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☢',6:'🍬',7:'📦'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
     
     // Beide Preise lesen
     const preisSV = parseFloat(document.getElementById('article-price-sv')?.value) || 0;
@@ -8538,65 +8909,34 @@ window.saveEditArticle = async () => {
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
     const newPos = parseInt(document.getElementById('article-sort')?.value) || 1;
     const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Süßes & Salziges',7:'Sonstiges'};
-    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☢',6:'🍬',7:'📦'};
+    const iconMap = {1:'🥤',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍬',7:'📦'};
     
     // Beide Preise lesen
     const preisSV = parseFloat(document.getElementById('article-price-sv')?.value) || 0;
     const preisHP = parseFloat(document.getElementById('article-price-hp')?.value) || 0;
     
-    // Alten Artikel holen
+    // Alten Artikel holen für Positions-Tausch
     const oldArticle = await Artikel.getById(id);
-    const oldSortierung = oldArticle?.sortierung || 1;
+    const oldPos = oldArticle?.sortierung || 1;
+    const oldKat = oldArticle?.kategorie_id;
     
-    // Alle Artikel in der Ziel-Kategorie holen und nach sortierung sortieren
-    const allArticles = await Artikel.getAll();
-    const artikelInKategorie = allArticles
-        .filter(a => a.kategorie_id === katId)
-        .sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
-    
-    // Finde den aktuellen Artikel an der gewünschten Position (1-basiert)
-    const targetIndex = newPos - 1; // Position 1 = Index 0
-    const artikelAufZielPos = artikelInKategorie[targetIndex];
-    
-    // Berechne die neue Sortierung für den bearbeiteten Artikel
-    let neueSortierung = oldSortierung; // Standard: behalten
-    
-    if (artikelAufZielPos && artikelAufZielPos.artikel_id !== id) {
-        // Es gibt einen anderen Artikel auf der Zielposition
-        // Der bearbeitete Artikel bekommt dessen sortierung
-        neueSortierung = artikelAufZielPos.sortierung;
+    // Wenn Position oder Kategorie geändert wurde, Platztausch prüfen
+    if (oldPos !== newPos || oldKat !== katId) {
+        // Finde Artikel der aktuell auf der neuen Position ist (in der neuen Kategorie)
+        const allArticles = await Artikel.getAll();
+        const artikelAufNeuerPos = allArticles.find(a => 
+            a.artikel_id !== id && 
+            a.kategorie_id === katId && 
+            a.sortierung === newPos
+        );
         
-        console.log(`🔄 Platztausch:`);
-        console.log(`   "${oldArticle.name}" (ID ${id}): sortierung ${oldSortierung} → ${neueSortierung}`);
-        console.log(`   "${artikelAufZielPos.name}" (ID ${artikelAufZielPos.artikel_id}): sortierung ${artikelAufZielPos.sortierung} → ${oldSortierung}`);
-        
-        // ZUERST den anderen Artikel aktualisieren (bekommt die alte Sortierung)
-        try {
-            // Lokal
-            await db.artikel.update(artikelAufZielPos.artikel_id, { sortierung: oldSortierung });
-            
-            // Supabase
-            if (supabaseClient && isOnline) {
-                const { error } = await supabaseClient
-                    .from('artikel')
-                    .update({ sortierung: oldSortierung })
-                    .eq('artikel_id', artikelAufZielPos.artikel_id);
-                
-                if (error) {
-                    console.error('Supabase Fehler beim Tausch-Artikel:', error);
-                } else {
-                    console.log(`✅ "${artikelAufZielPos.name}" in Supabase: sortierung = ${oldSortierung}`);
-                }
-            }
-        } catch(e) {
-            console.error('Fehler beim Aktualisieren des Tausch-Artikels:', e);
+        // Platztausch: Der andere Artikel bekommt die alte Position
+        if (artikelAufNeuerPos) {
+            await db.artikel.update(artikelAufNeuerPos.artikel_id, { sortierung: oldPos });
         }
-        
-        Utils.showToast(`Position getauscht mit "${artikelAufZielPos.name}"`, 'info');
     }
     
-    // DANN den bearbeiteten Artikel aktualisieren
-    const updateData = { 
+    await Artikel.update(id, { 
         name: name.trim(), 
         name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
         sku: document.getElementById('article-sku')?.value?.trim() || null, 
@@ -8605,40 +8945,14 @@ window.saveEditArticle = async () => {
         kategorie_id: katId, 
         kategorie_name: katMap[katId], 
         aktiv: document.getElementById('article-active')?.checked, 
-        sortierung: neueSortierung,
+        sortierung: newPos,
         icon: iconMap[katId],
         bild: window.currentArticleImage || null
-    };
-    
-    try {
-        // Lokal
-        await db.artikel.update(id, updateData);
-        
-        // Supabase
-        if (supabaseClient && isOnline) {
-            const { error } = await supabaseClient
-                .from('artikel')
-                .update(updateData)
-                .eq('artikel_id', id);
-            
-            if (error) {
-                console.error('Supabase Fehler beim Artikel-Update:', error);
-            } else {
-                console.log(`✅ "${name}" in Supabase aktualisiert: sortierung = ${neueSortierung}`);
-            }
-        }
-    } catch(e) {
-        console.error('Fehler beim Aktualisieren des Artikels:', e);
-    }
-    
-    // Cache komplett invalidieren
-    artikelCache = null;
-    artikelCacheTime = null;
-    
-    Utils.showToast('Artikel aktualisiert', 'success');
+    });
     closeArticleModal();
     Router.navigate('admin-articles');
 };
+
 // Init
 (async function initApp() {
     console.log('🚀 Seollerhaus Kassa v3.0 (Supabase) startet...');
@@ -8655,7 +8969,7 @@ window.saveEditArticle = async () => {
         // Supabase initialisieren
         const supabaseReady = initSupabase();
         if (supabaseReady) {
-            console.log('✦ Supabase bereit - Multi-Device Modus');
+            console.log('✅ Supabase bereit - Multi-Device Modus');
             // Artikel von Supabase laden
             try {
                 await Artikel.loadFromSupabase();
@@ -8679,7 +8993,7 @@ window.saveEditArticle = async () => {
                 if (!error && profiles) {
                     // Nur nicht-gelöschte Profile cachen
                     const aktive = profiles.filter(p => p.geloescht !== true);
-                    console.log('✦ Profile geladen:', aktive.length, 'aktiv von', profiles.length, 'gesamt');
+                    console.log('✅ Profile geladen:', aktive.length, 'aktiv von', profiles.length, 'gesamt');
                     
                     for (const p of aktive) {
                         const name = p.display_name || p.first_name;
@@ -8702,7 +9016,7 @@ window.saveEditArticle = async () => {
                 console.error('Profile laden Fehler:', e);
             }
         } else {
-            console.log('⚠  Offline-Modus - Lokale Daten');
+            console.log('⚠  Offline-Modus - Lokale Daten');
         }
     
         // Seed Artikel falls nötig
@@ -8724,7 +9038,7 @@ window.saveEditArticle = async () => {
                 {kategorie_id:6, name:'Süßes & Salziges', sortierung:60},
                 {kategorie_id:7, name:'Sonstiges', sortierung:70}
             ]);
-            console.log('✦ Kategorien automatisch repariert');
+            console.log('✅ Kategorien automatisch repariert');
         } catch(e) {
             console.error('Kategorien init Fehler:', e);
         }
@@ -8777,12 +9091,12 @@ window.openWhatsAppSupport = () => {
     const userName = State.currentUser?.firstName || State.currentUser?.vorname || '';
     
     // Einfache Nachricht
-    const nachricht = `Söllerhaus Kassa - Fehler
+    const nachricht = `
 
 Name: ${userName || '___'}
 Datum: ${datum}
 
-📸 Screenshot:`;
+Screenshot beifügen:`;
     
     // WhatsApp Link öffnen
     const encodedNachricht = encodeURIComponent(nachricht);
