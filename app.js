@@ -93,7 +93,7 @@ db.version(4).stores({
     settings: 'key',
     exports: '++id, timestamp, anzahl_buchungen',
     registeredGuests: '++id, firstName, passwordHash, createdAt, lastLoginAt',
-    fehlendeGetränke: '++id, artikel_id, datum, erstellt_am, uebernommen'
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen'
 });
 
 // Version 5: Gruppen hinzufügen
@@ -105,7 +105,7 @@ db.version(5).stores({
     settings: 'key',
     exports: '++id, timestamp, anzahl_buchungen',
     registeredGuests: '++id, firstName, passwordHash, createdAt, lastLoginAt, group_name',
-    fehlendeGetränke: '++id, artikel_id, datum, erstellt_am, uebernommen',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
     gruppen: '++id, name, aktiv'
 });
 
@@ -118,7 +118,7 @@ db.version(6).stores({
     settings: 'key',
     exports: '++id, timestamp, anzahl_buchungen',
     registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, gelöscht, gelöschtAm, group_name, firstName, passwordHash',
-    fehlendeGetränke: '++id, artikel_id, datum, erstellt_am, uebernommen',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
     gruppen: '++id, name, aktiv'
 });
 
@@ -131,7 +131,7 @@ db.version(7).stores({
     settings: 'key',
     exports: '++id, timestamp, anzahl_buchungen',
     registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, gelöscht, gelöschtAm, group_name, firstName, passwordHash',
-    fehlendeGetränke: '++id, artikel_id, datum, erstellt_am, uebernommen',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
     gruppen: '++id, name, aktiv',
     gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
 });
@@ -145,7 +145,35 @@ db.version(8).stores({
     settings: 'key',
     exports: '++id, timestamp, anzahl_buchungen',
     registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, gelöscht, gelöschtAm, group_name, firstName, passwordHash',
-    fehlendeGetränke: '++id, artikel_id, datum, erstellt_am, uebernommen',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
+    gruppen: '++id, name, aktiv',
+    gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
+});
+
+// Version 9: Schema-Fix
+db.version(9).stores({
+    gäste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
+    artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
+    kategorien: 'kategorie_id, name, sortierung',
+    settings: 'key',
+    exports: '++id, timestamp, anzahl_buchungen',
+    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, gelöscht, gelöschtAm, group_name, firstName, passwordHash',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
+    gruppen: '++id, name, aktiv',
+    gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
+});
+
+// Version 10 - Force rebuild
+db.version(10).stores({
+    gäste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
+    artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
+    kategorien: 'kategorie_id, name, sortierung',
+    settings: 'key',
+    exports: '++id, timestamp, anzahl_buchungen',
+    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, gelöscht, gelöschtAm, group_name, firstName, passwordHash',
+    fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
     gruppen: '++id, name, aktiv',
     gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
 });
@@ -158,7 +186,7 @@ const DataProtection = {
                 buchungen: await db.buchungen.toArray(),
                 registeredGuests: await db.registeredGuests.toArray(),
                 artikel: await db.artikel.toArray(),
-                fehlendeGetränke: await db.fehlendeGetränke.toArray(),
+                fehlendeGetraenke: await db.fehlendeGetraenke.toArray(),
                 timestamp: Date.now(),
                 version: '2.0'
             };
@@ -182,8 +210,8 @@ const DataProtection = {
                 if (backup.buchungen) {
                     for (const b of backup.buchungen) { try { await db.buchungen.add(b); } catch(e) {} }
                 }
-                if (backup.fehlendeGetränke) {
-                    for (const f of backup.fehlendeGetränke) { try { await db.fehlendeGetränke.add(f); } catch(e) {} }
+                if (backup.fehlendeGetraenke) {
+                    for (const f of backup.fehlendeGetraenke) { try { await db.fehlendeGetraenke.add(f); } catch(e) {} }
                 }
                 console.log('✅ Daten wiederhergestellt');
             }
@@ -244,7 +272,7 @@ const DataProtection = {
                 registeredGuests: await db.registeredGuests.toArray(),
                 artikel: await db.artikel.toArray(),
                 kategorien: await db.kategorien.toArray(),
-                fehlendeGetränke: await db.fehlendeGetränke.toArray(),
+                fehlendeGetraenke: await db.fehlendeGetraenke.toArray(),
                 gruppen: await db.gruppen.toArray(),
                 settings: await db.settings.toArray(),
                 exportDatum: new Date().toISOString(),
@@ -412,7 +440,7 @@ const DataProtection = {
             buchungen: (data.buchungen || []).filter(b => !b.storniert).length,
             kategorien: (data.kategorien || []).length,
             gruppen: (data.gruppen || []).length,
-            fehlendeGetränke: (data.fehlendeGetränke || []).length
+            fehlendeGetraenke: (data.fehlendeGetraenke || []).length
         };
         
         const backupDatum = data.exportDatum ? new Date(data.exportDatum).toLocaleString('de-AT') : 'Unbekannt';
@@ -470,8 +498,8 @@ const DataProtection = {
                                 <span> Gruppen <strong>(${stats.gruppen})</strong></span>
                             </label>
                             <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
-                                <input type="checkbox" id="restore-fehlende" ${stats.fehlendeGetränke === 0 ? 'disabled' : ''}>
-                                <span>⚠️ Fehlende <strong>(${stats.fehlendeGetränke})</strong></span>
+                                <input type="checkbox" id="restore-fehlende" ${stats.fehlendeGetraenke === 0 ? 'disabled' : ''}>
+                                <span>⚠️ Fehlende <strong>(${stats.fehlendeGetraenke})</strong></span>
                             </label>
                         </div>
                     </div>
@@ -572,7 +600,7 @@ const DataProtection = {
                 if (options.buchungen) await db.buchungen.clear();
                 if (options.kategorien) await db.kategorien.clear();
                 if (options.gruppen) await db.gruppen.clear();
-                if (options.fehlende) await db.fehlendeGetränke.clear();
+                if (options.fehlende) await db.fehlendeGetraenke.clear();
             }
             
             // Gäste wiederherstellen
@@ -667,17 +695,17 @@ const DataProtection = {
             }
             
             // Fehlende Getränke wiederherstellen
-            if (options.fehlende && data.fehlendeGetränke) {
-                for (const f of data.fehlendeGetränke) {
+            if (options.fehlende && data.fehlendeGetraenke) {
+                for (const f of data.fehlendeGetraenke) {
                     try {
                         if (options.mode === 'merge') {
-                            const existing = await db.fehlendeGetränke.get(f.id);
+                            const existing = await db.fehlendeGetraenke.get(f.id);
                             if (!existing) {
-                                await db.fehlendeGetränke.add(f);
+                                await db.fehlendeGetraenke.add(f);
                                 restored.fehlende++;
                             }
                         } else {
-                            await db.fehlendeGetränke.add(f);
+                            await db.fehlendeGetraenke.add(f);
                             restored.fehlende++;
                         }
                     } catch(e) { /* Duplikat ignorieren */ }
@@ -3196,7 +3224,7 @@ const FehlendeGetränke = {
         
         // Lokal speichern
         for (const item of items) {
-            await db.fehlendeGetränke.add(item);
+            await db.fehlendeGetraenke.add(item);
         }
         
         // Supabase
@@ -3224,12 +3252,12 @@ const FehlendeGetränke = {
             if (data) {
                 // Cache aktualisieren
                 for (const f of data) {
-                    try { await db.fehlendeGetränke.put(f); } catch(e) {}
+                    try { await db.fehlendeGetraenke.put(f); } catch(e) {}
                 }
                 return data;
             }
         }
-        const alle = await db.fehlendeGetränke.toArray();
+        const alle = await db.fehlendeGetraenke.toArray();
         return alle.filter(f => !f.uebernommen).sort((a, b) => b.id - a.id);
     },
     
@@ -3244,7 +3272,7 @@ const FehlendeGetränke = {
                 .single();
             fehlend = data;
         } else {
-            fehlend = await db.fehlendeGetränke.get(id);
+            fehlend = await db.fehlendeGetraenke.get(id);
         }
         
         if (!fehlend || fehlend.uebernommen) throw new Error('Nicht verfügbar');
@@ -3257,7 +3285,7 @@ const FehlendeGetränke = {
         };
         
         // Lokal und Supabase updaten
-        try { await db.fehlendeGetränke.update(id, updateData); } catch(e) {}
+        try { await db.fehlendeGetraenke.update(id, updateData); } catch(e) {}
         if (supabaseClient && isOnline) {
             await supabaseClient.from('fehlende_getraenke').update(updateData).eq('id', id);
         }
@@ -3299,7 +3327,7 @@ const FehlendeGetränke = {
     },
     
     async löschen(id) {
-        try { await db.fehlendeGetränke.delete(id); } catch(e) {}
+        try { await db.fehlendeGetraenke.delete(id); } catch(e) {}
         if (supabaseClient && isOnline) {
             await supabaseClient.from('fehlende_getraenke').delete().eq('id', id);
         }
@@ -5411,7 +5439,7 @@ window.bucheUmlageFürAlle = async () => {
     
     // Alle fehlenden Getränke als umgelegt markieren
     for (const f of fehlendeOffen) {
-        await db.fehlendeGetränke.update(f.id, { 
+        await db.fehlendeGetraenke.update(f.id, { 
             uebernommen: true, 
             uebernommen_am: new Date().toISOString(),
             umgelegt: true
