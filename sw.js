@@ -7284,7 +7284,29 @@ window.exportGästeExcel = async () => {
 
 Router.register('admin-articles', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
-    const articles = await Artikel.getAll();
+    
+    // DIREKT aus Supabase laden (nicht aus Cache!)
+    let articles = [];
+    if (supabaseClient && isOnline) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('artikel')
+                .select('*')
+                .order('sortierung');
+            if (!error && data) {
+                articles = data;
+                console.log('✅ Artikelverwaltung: ' + data.length + ' Artikel aus Supabase geladen');
+            }
+        } catch(e) {
+            console.error('Supabase Fehler:', e);
+        }
+    }
+    
+    // Fallback: lokale Datenbank
+    if (articles.length === 0) {
+        articles = await Artikel.getAll();
+    }
+    
     const kats = await db.kategorien.toArray();
     const katMap = {};
     kats.forEach(k => katMap[k.kategorie_id] = k.name);
