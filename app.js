@@ -2891,30 +2891,34 @@ const Buchungen = {
             
             // Umlagen ausfiltern
             const bs = (data || []).filter(b => !b.ist_umlage);
-        
-        const byArtikel = {};
-        for (const b of bs) {
-            const key = b.artikel_id;
-            if (!byArtikel[key]) {
-                const artikel = await Artikel.getById(b.artikel_id);
-                byArtikel[key] = {
-                    artikel_id: b.artikel_id,
-                    name: b.artikel_name,
-                    kategorie_id: artikel?.kategorie_id || 0,
-                    kategorie_name: artikel?.kategorie_name || 'Sonstiges',
-                    menge: 0
-                };
+            
+            const byArtikel = {};
+            for (const b of bs) {
+                const key = b.artikel_id;
+                if (!byArtikel[key]) {
+                    const artikel = await Artikel.getById(b.artikel_id);
+                    byArtikel[key] = {
+                        artikel_id: b.artikel_id,
+                        name: b.artikel_name,
+                        kategorie_id: artikel?.kategorie_id || 0,
+                        kategorie_name: artikel?.kategorie_name || 'Sonstiges',
+                        menge: 0
+                    };
+                }
+                byArtikel[key].menge += b.menge;
             }
-            byArtikel[key].menge += b.menge;
+            
+            const liste = Object.values(byArtikel);
+            liste.sort((a, b) => {
+                if (a.kategorie_id !== b.kategorie_id) return a.kategorie_id - b.kategorie_id;
+                return b.menge - a.menge;
+            });
+            
+            return liste;
+        } catch(e) {
+            console.error('❌ getAuffüllliste error:', e);
+            return [];
         }
-        
-        const liste = Object.values(byArtikel);
-        liste.sort((a, b) => {
-            if (a.kategorie_id !== b.kategorie_id) return a.kategorie_id - b.kategorie_id;
-            return b.menge - a.menge;
-        });
-        
-        return liste;
     },
     
     // Nur Auffüllliste zurücksetzen (NICHT Export!)
