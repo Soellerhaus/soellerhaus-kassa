@@ -269,7 +269,7 @@ const DataProtection = {
                         fehlende_getraenke: fehlende.data || []
                     };
                     data.quelle = 'lokal+supabase';
-                    console.log('â˜ï¸ Supabase-Daten im Backup:', {
+                    console.log('✅ Supabase-Daten im Backup:', {
                         profiles: data.supabase.profiles.length,
                         buchungen: data.supabase.buchungen.length,
                         artikel: data.supabase.artikel.length
@@ -330,7 +330,7 @@ const DataProtection = {
                             <span style="font-weight:600;">${lastBackupText}</span>
                         </div>
                         <div style="font-size:0.85rem;color:#888;margin-top:12px;">
-                            â„¹ï¸ Das Backup enthaelt alle Gaeste, Artikel, Buchungen und Einstellungen 
+                            � Das Backup enthaelt alle Gaeste, Artikel, Buchungen und Einstellungen 
                             ${isOnline ? '(inkl. Cloud-Daten von Supabase)' : '(nur lokale Daten - offline)'}.
                         </div>
                     </div>
@@ -478,7 +478,7 @@ const DataProtection = {
                     
                     <!-- Modus -->
                     <div style="padding:0 20px 20px;">
-                        <h3 style="margin:0 0 12px 0;color:#2C5F7C;">[!]™ï¸ Wiederherstellungs-Modus</h3>
+                        <h3 style="margin:0 0 12px 0;color:#2C5F7C;">🔐 Wiederherstellungs-Modus</h3>
                         <div style="display:flex;flex-direction:column;gap:8px;">
                             <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fff3cd;border:2px solid #ffc107;border-radius:8px;cursor:pointer;">
                                 <input type="radio" name="restore-mode" value="merge" checked style="margin-top:3px;">
@@ -560,7 +560,7 @@ const DataProtection = {
         document.getElementById('restore-modal')?.remove();
         
         // Fortschrittsanzeige
-        Utils.showToast('â³ Wiederherstellung laeuft...', 'info');
+        Utils.showToast('⏳ Wiederherstellung laeuft...', 'info');
         
         try {
             let restored = { gaeste: 0, artikel: 0, buchungen: 0, kategorien: 0, gruppen: 0, fehlende: 0 };
@@ -906,7 +906,7 @@ const GastNachricht = {
         };
         
         const icons = {
-            info: 'â„¹ï¸',
+            info: '�',
             warnung: '[!]ï¸',
             dringend: ''
         };
@@ -1465,7 +1465,7 @@ const CheeseOrders = {
                                 font-weight:bold;
                                 color:#f39c12;
                                 cursor:pointer;
-                            ">âˆ’</button>
+                            "></button>
                             <div style="text-align:center;min-width:100px;">
                                 <div id="cheese-grams-display" style="font-size:2rem;font-weight:700;color:#333;">100</div>
                                 <div style="font-size:0.9rem;color:#666;">Gramm</div>
@@ -2275,7 +2275,7 @@ const RegisteredGuests = {
             }
             
             if (!pinSaved) {
-                console.error('âŒ PIN konnte nicht in Supabase gespeichert werden!');
+                console.error(' PIN konnte nicht in Supabase gespeichert werden!');
             }
             
             // Profile laden zur Bestaetigung
@@ -2460,7 +2460,7 @@ const RegisteredGuests = {
                     .order('display_name');
                 
                 if (error) {
-                    console.error('âŒ Supabase Fehler:', error);
+                    console.error(' Supabase Fehler:', error);
                 } else if (data) {
                     // Client-seitig filtern: Buchstabe + nicht geloescht + aktiv
                     const filtered = data.filter(p => {
@@ -2490,7 +2490,7 @@ const RegisteredGuests = {
                     return [];
                 }
             } catch(e) {
-                console.error('âŒ Supabase error:', e);
+                console.error(' Supabase error:', e);
             }
         }
         
@@ -2725,7 +2725,7 @@ const Buchungen = {
                 try {
                     const { error } = await supabaseClient.from('buchungen').insert(b);
                     if (error) {
-                        console.error('âŒ Supabase insert error:', error.message);
+                        console.error(' Supabase insert error:', error.message);
                         await db.buchungen.update(b.buchung_id, { sync_status: 'pending' });
                     }
                 } catch(e) {
@@ -3061,7 +3061,7 @@ const SyncManager = {
                     const { error } = await supabaseClient.from('buchungen').insert(buchungData);
                     
                     if (error) {
-                        console.error('âŒ Sync error:', b.buchung_id, error.message);
+                        console.error(' Sync error:', b.buchung_id, error.message);
                         failed++;
                     } else {
                         await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
@@ -3069,12 +3069,12 @@ const SyncManager = {
                         console.log('[OK] Synced:', b.buchung_id);
                     }
                 } catch(e) {
-                    console.error('âŒ Sync exception:', e);
+                    console.error(' Sync exception:', e);
                     failed++;
                 }
             }
         } catch(e) {
-            console.error('âŒ SyncManager error:', e);
+            console.error(' SyncManager error:', e);
         }
         
         this.isSyncing = false;
@@ -3740,7 +3740,7 @@ const Artikel = {
                     } catch(e) {}
                 }
                 deaktiviert++;
-                console.log(`â° Artikel "${a.name}" automatisch deaktiviert (abgelaufen)`);
+                console.log(`⏰ Artikel "${a.name}" automatisch deaktiviert (abgelaufen)`);
             }
         }
         
@@ -4322,7 +4322,7 @@ Router.register('login', async () => {
     // Sprachauswahl Button mit WhatsApp (nur auf Startseite)
     const langBtn = i18n.renderLangButtonWithWhatsApp();
     
-    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,UklGRhASAABXRUJQVlA4WAoAAAAwAAAAKwEAMwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZBTFBI0wEAAAEPMP8REUJys22R5HyIA3MjhD8N75XKhOAARgPtNS3K69EhDFYngPf/gPi8UFBdcgAR/Z8AACirwxH17A9Rz3KMbwf5dZDz/0RXf4hr2MupAR7h8hQk2hgAApXMlKkiSCQKXfrH9AjlSkG2aCHTVaKQRikTtldcj7RK2sZlwk287pnGMBAy6ZUn+q2PpK2k4Vz0UEA9ssNt8tlWYeSZEzKRXbLNaeQ6YJFFp2yyzV4nRq5DZaMOGaSAibxxI52y27KHRVr2erQFNIu8oL3d5cmTTv7HHcABTfaQGQ/UsEPZkNtOEqDSjFGy6NZNLwBKN9dmIg0K/RTpI0nEDdAic8ky5Xq+9ppHZLiA9lQAcgc7UwJQmZcpdJJT00kECj8PWWQGRA9FcqUHGiSeZ4RzzQL7ZdL21AJtrpmp4oC6g53K+9ReId3UOuZ6No+9DeCYbpjeUyR3tYvvqEkdRXL30ObKgM8OTxTZVbTnjEzkQoae9DB0xxPXDVYyS142ok8bjTRk6IWxiijJY1EU20hMpTAiUdSqbQxoXBIpI8oTP9ErTyGLkuafShmLVK68+8eQXklUCpR+v0ZXGJDpUegi6cmlMmTBMlJpEhegAomYdBgsAWgOAFZQOCBGDgAA8EUAnQEqLAE0AD5RJI5Fo6IhEooGHDgFBLIBkgEDJAB2139O3fkB+QHyvVX+9fhD+i+0TyJ5E8uXkL++/mX/WPoT6Ifzf/sfcD/wX9a6Q/mA/Tf/o/6r3Of7h/ov7t7qP2J/zv6gfIB/Rf5h6yP/A9k/+u/732L/5V/Z//P64v68/CL+2n7h+0H/89Y78W/1j8XPBr/DflF2FGqXmX9LehH1KRl8muAF698A/aZ5z5gXrv9c76zUg73+wB/L/6L6L/4/wTPrP+59gL+Lf1T/nf4j15f+n/I+cr8u/xv/k9wT+R/0z/pf3n2qvWt+4vsL/qh/3GI6wAjRj9bMz7HBIzvWJRfblmeKxHz0t2F/QbdlgbQjS+e6KaJGvTwNut9lMjrfGREAQ55sZ4GsQ0R5P78FUEoELeXfFK4ICs/57Irep4bLZHxZ2eC55Puspd8wFwf0dzGnxfL2O3YXhSb26aaSoZcrwZ1fnVcoghDJi/BuhkBWHrIhKHlU/dUrZpqo/wDLl1HrQy3ZAGsaOtCuTvdm/dpHtrxFwMO7qjA3Y1E7ExaxGeYUrY+g5PZN3NI8JrmZqGRg2s5RPrtik7+rJ/FD0CO1MXgzGW0OxiuO+DafE52X/ACUhlqx9LbKqNoRE3UmRheu8NpUz5bh/PQwdq+yNEudSjeCjk8P9FIkWwWJU7AKwULj7Qer7iaAGNME88BEjomKT0tHFK12Btr0DcxEem6Rcw7l8PLAiudqrZrw6JaPeTPVGAD++oDstng5indz+W6cz7srqPIq/nHE58jAsViyXg2TOmuYIp5WhRzL8/xOOcDb9j/jhvRWkPdafKk4EW1hFFJ18nJpYr+Pnzw+1SnD2y5vFYWojn5pNjnl6+eBU6GBjK55GdXW8S11wyWCfA8ckes78+7+AubbKrZnLcAvMu6KHyUTSDD/hqqOut2P/1lHzNBWVh600xdznmVUHZ5B//2Gec+qqka3uap7R7LvMTM4TF3Ozbk7Fqbtpa7gh8jhe5MW3kNQMH8TOF07vHC+9t0CSR6wolbbzRGehUhlL1lL+oYmb9f/bc4CH8yJq66BoEsnUl7kPDwbcdBiqjsFLyToQbMQopgju5Gfn81+BwID7eN3nsHX/opP/9GI//+ilIVCm9pY3C5FwqiMESZQrWYkpmGpvr/+tO14evMmfrvb//7BIp76TESDJU7amA7Rfv7lFGsUi+bBguDC6LHXPCSGsbjE9wmikSbVq9SDIk9J8lRsXKQDiyItL48X4/6VUJ8uprEZrs+Cbpb9dQ4dDiWIGcI9hOcCSTXQ3logKfD6QErT3RRWrfOSZhj7CdcubtBtevqqNd7765p8df3KONDf2jtEM/Z+vsZyD88h6w7nxCqEfF+GP/iZzsq5+JDYspyzq2nL/W59iEjZUphyL1WuFG+XBEB0/cX1HMdklyZW2fPQOZ8ml97qkSgL8dBJx9//ukmFXUr+NqG8cbf5D8AUOx5sVYolpEbHzoPMVlu3bisTVfvjiwSzaz/R4H2C8y3BREeL4nrYUYECfMMULNhnhl9pXZcK8uhyFPBZBhfCsFwOSNukbjqBBaQKZYTTM26qFs2uGLNg1umIHHnyF9PvEgSKc0rmoA6iseC2LwSnkZEJkAJmJtc3yl/y+4ClyYwckDFrMwm84p9vXP8MD7xEuzAS10i7CgdKYNWxpVDTl0Xm5iWjAdWmbfm36FygNDe3stWfwHjHEZIIOqyglhR8QsQ+66TTIiXa1O1002ezTjklzQuCvLBgK+mmV3/4eGDARqpgjj9RaamqLH2RuOCyzp4T3fzW+7sL057wTXo3bnWA5LcaMKjSvaOJqtCOpJ9HXDkxjVHekYjYNO6Lb8hkNs9qnHR+tvcq8U+5aopZzrgfj46I7907wgSP1LBr7jytYQMecmXzRnfVR6RgVuxpIt6o1ciPP5ZG7zfjLxq3IotmNJmTkktsJC0+vJRRySHfiB28d1HVi2iWBARGheYu/fPhMPeie0ABWGPWN676JJkbaGZdDj5GD9DykoH2f+IwTZ+6hQAGF1n70s9EzffN32c9p75x746ECTl8P5X+udHzBNRyXCVLhKO0gqI0b6Z1OMRJH5puyeVWpK643OuQ1gnH4DzjhWOstzVjlG/208mC5NDxn46cIWsFhkyRXwle++Qdn7/AbrHRsZxBEiACzzV1WcWscoSz5y3fnXsqwAW9lPJ/w9F9XHIj67bV0+RDBm+t3Oa4BUNt99buEbkgnYeJNNZS7bET8GH3+/47gzmNdQiNZ8JaOOhPFz8OuyhQp0PLHldpM0CuGzNBVl/E4mlGUD04sgKI+LBRr44/1bah/Xcb5VRaBGur7v/ybxPlQ/mj//hOVdjvIEyD48ghebMOgv066iBYFEnatkHHN8n03EeYjrtjnuUfng1RhgTBgbueXq0kgOwN+0w1V7WxOBCBLogyuTK+e/JjMzbeaGFfh6oXlNaHTRpYec5+fSiuAzS8hai9MsjIYsr7bB//9KNH1NmTjJhjWoyAoEPgJ8k9/ovASQniQCpJWoppv4KAsusREuJu2jVEWTk4n2gcR3m0+qG0tlvVVZXZSFpnkGfJwcaKiambNVuvAAVqtMZEYo7HGSmq6tcy/+HOZFa0gxn/4c5mfyHI/IXQ1E+XayEwd7Q+1gj5S1RVlUikOP2ID+lLqVQJceWFyNZ8qDLyDM3ddq2RdlsgOpgfi7fgPjpwZxmB5J9S9yb1HbkwZyYy/HCN4tmzVkzx70Mp/DWOyP6aB61D8cVM8qJLJf5/VjtAavWpY89JHuZYl92bDZRIfoASfoi1ErNlcbxS5SvhxwPZloxv95vmwMo0/WsQ7fIQMMjY89eL8gDc1xsOof4caL/D2vk/w1Lc95z73oRRNSOysBFXN/ZMufPCrcG1C00OnZeXeOYJM/8+H/yjVTVsLdEN/Al4+jgBNbARDOpRcV48ZO9YR24iFWy31Bzv347vddYYS8IG9Jl/p6Y3p/7aFm1uN4rSUEo3I9oKHXBop6RZ3Vv8q/5zPVm+WjfgEgwWm3egMbEjyOYbgllp8K0oz9ok6BuKp3S++PHtQdr05LLafgKwHsfVw0rGsVbd2ehmnPLI5gPjLwCD2vuNNdG521ZWWVhA4zVyUH8F9O7boRH8aNkhg1WWhD0YL2CG1M0HCNzcEyFHWuqN1bs8xEzF1v7dOs1ged4fJK35MeHZtslQ7GkQznqYkfx7x1uizSz1tIj4QafoHODT4yOvR9fdAelJHBCZ/PH0JAq9yJh6vt8uFHaRm+WLqv1ny8N++dwCNAhLOkWd7Ua3yfsXph3G+NGUWKdNH/8RXxEzDEIcvIEZPL445umG7MvGj/Y6g+cItrx2bz5bwT1uqmyliNqqVtid6xKSNWF6YiUDuOce6G4p1GcqfmBoZ1OKHYG/0lJE7CX9xURSZe3ChNel95pe4zspxLomgdKvMBDFwekhhozzDnYnqtsL5uiAmV2/by2ea3DO3vUaTAUo4kKIlf7E7K9IM0yw0n3V/lSL0AJCWurkFN5c/xkzYdq2jtMnsthdm14zIiVEZIweR4kLalqu8822dBPa6ftuTO5HtlIKg85zHfzwLLxFFcuCnKRvfir28pXW7K5K39FoTHrOo+DdNLEKlyFjV1jx9Sq3ebiGlrcV4NfpQo5UiGvNdijO7UJXQqWv3kmGBfsfKjcd0S+7XLIqepJfkSvkaw/0wmcDVv/X4CPnVZsC+HEqh79makb60hRQWJzTz6Tg8DfwZM+PoAsvepYCM07CzSBX5K/XneAm4kwRl/6nK+ArHucWsVYkTU/yJc+mUXi/Qaz2ZtSmccKNOGHGYlys7Bh8bGjB46trITKHa4x1LCOdwJMYZMpiBHKt5uP050s6BfN+0pUTojlcgqsM74NgbDjm1qcA6y5qYBQmatWHOH5KSmFq7QYpBKdVCz5dCkDP/4R7UWqtn0ktW6WMqxcYiE+ygJ1xDuy1Lw1icK5rdfe1gTgcaUhrljbiGQZRHmzXUpXk0NXshia0ol22NO58wwgbhGNlhWjv3iLl65Ukwsja5mAmyMrGuExxGufldj5Ra5OljojsOD1WCoWD50zUpyLc1nMV+R3XarIeE3Nf/alr+Te4yASxOFwEXzJT7FEd/naLlNCNi92gaMzmxUi8OfvJ7awia/oiNiNhoRTvstmiXRd+m++LjlGL+IZT2GvBJK9w65yXRCuYEzg6WbAuYaMtUXFKgcXjwCXHj8pHN/vDo5M8hWGsE2e7dQbm7/vu9gFm7EgBWTrEzZ6dimjpU/ox4655UQfeEoW1lx0VavGidviFQHxlnWWTK0nztPD1SjL6gg7b72IuORuEhAitdEnTqa4A73XofeBaIqcgVBTmFXuSxd8XvazwzJROeLldKzOx9wrej3/PmoXtwGEPzTPhjD1K7Gv1+uTh6jDY1Vp/Wm2C5VNfOVC8HUz/q4oiu/DRmBGrOayOpiR5PoQx3//0xi0Iv/8ufzO3Irr8WfSswJkWO0WEC5NMQXIux/QOsvEfwlP9vnd4TWIaOzznp3MuawHUvH+j3/pbsej+YPH2qrAmKcHrqohB8J7x9YXhgJMDvp36dPaGk8+9h4+W6f0eAwEeDgj22kBDPsROlYt1ldsQfQtLIjwMzV3D03C7DUMJjvcEc01tGsgxm3fI9w8cmoOhkvLpUe9m/i3TjKIKFxr7mjwDNfNzJWgKHJ0ZNI8aDU5VeG7SQuJWRWuwqHBsefmJFhYsi9Mp656ptz/8oXcNl1rfb/ubSrDm82KB9KMOJt3EZkAq0nkhpeAdRhP7sffaLBLirFi4rbc1srB7PClXgSq/tRwRrZu3uQy/f/n4qZAAe6b9Ajiz/G7DwAAA" alt="Soellerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">[!]™ï¸</a><span style="color:#bbb;font-size:0.65rem;">v3.4 Â© 2026 * Entwickelt von: Claudio</span></div></div></div></div>`);
+    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Soellerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">🔐</a><span style="color:#bbb;font-size:0.65rem;">v3.4 © 2026 * Entwickelt von: Claudio</span></div></div></div></div>`);
 });
 
 Router.register('register', () => {
@@ -4346,10 +4346,10 @@ Router.register('register', () => {
                     ${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pin-btn" onclick="handleRegisterPinInput('${n}')">${n}</button>`).join('')}
                     <button type="button" class="pin-btn" style="visibility:hidden;"></button>
                     <button type="button" class="pin-btn" onclick="handleRegisterPinInput('0')">0</button>
-                    <button type="button" class="pin-btn pin-btn-delete" onclick="handleRegisterPinDelete()">âŒ</button>
+                    <button type="button" class="pin-btn pin-btn-delete" onclick="handleRegisterPinDelete()"></button>
                 </div>
             </div>
-            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">âœ” ${t('register_btn')}</button>
+            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;"> ${t('register_btn')}</button>
         </div>
         <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()"><-Â ${t('back')}</button>
     </div></div>`);
@@ -4400,9 +4400,9 @@ Router.register('pin-entry', () => {
                 ${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pin-btn" onclick="handleLoginPinInput('${n}')">${n}</button>`).join('')}
                 <button type="button" class="pin-btn" style="visibility:hidden;"></button>
                 <button type="button" class="pin-btn" onclick="handleLoginPinInput('0')">0</button>
-                <button type="button" class="pin-btn pin-btn-delete" onclick="handleLoginPinDelete()">âŒ</button>
+                <button type="button" class="pin-btn pin-btn-delete" onclick="handleLoginPinDelete()"></button>
             </div>
-            <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;">âœ” ${t('login')}</button>
+            <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;"> ${t('login')}</button>
         </div>
         <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()"><-Â ${t('back')}</button>
     </div></div>`);
@@ -4568,7 +4568,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                     </div>
                 </div>
-                <span style="font-size: 1.5rem;">[!]™ï¸</span>
+                <span style="font-size: 1.5rem;">🔐</span>
             </div>
         </div>
         
@@ -5028,7 +5028,7 @@ Router.register('admin-alle-buchungen', async () => {
                     Danach werden nur noch neue Buchungen angezeigt.
                 </p>
                 <button class="btn" onclick="handleGruppeAbgereist()" style="background:white;color:#e74c3c;font-weight:700;padding:12px 24px;">
-                    âœˆ Gruppe abreisen & Alle Buchungen abschliessen
+                     Gruppe abreisen & Alle Buchungen abschliessen
                 </button>
             </div>
         </div>
@@ -5490,7 +5490,7 @@ Router.register('admin-notfall-export', async () => {
         
         <div class="card" style="background:#f8f9fa;">
             <div style="padding:16px;">
-                <strong>â„¹ Info:</strong><br>
+                <strong> Info:</strong><br>
                 <small style="color:#888;">
                     * Verfuegbare Tage: ${alleDaten.length}<br>
                     * Aeltestes Datum: ${alleDaten[alleDaten.length-1] || '-'}<br>
@@ -5707,7 +5707,7 @@ Router.register('admin-gruppen', async () => {
                             <tr style="border-bottom:1px solid var(--color-stone-medium);">
                                 <td style="padding:16px;font-weight:600;font-size:1.1rem;"> ${g.name}</td>
                                 <td style="padding:16px;text-align:right;">
-                                    <button class="btn btn-secondary" onclick="showEditGruppeModal(${g.id}, '${g.name}')" style="margin-right:8px;">âœ”</button>
+                                    <button class="btn btn-secondary" onclick="showEditGruppeModal(${g.id}, '${g.name}')" style="margin-right:8px;"></button>
                                     <button class="btn btn-danger" onclick="deleteGruppe(${g.id})"></button>
                                 </td>
                             </tr>
@@ -5860,7 +5860,7 @@ Router.register('admin-preismodus', async () => {
                         <div style="font-size:2.5rem;margin-bottom:8px;"> </div>
                         <div style="font-weight:700;font-size:1.1rem;">Selbstversorger</div>
                         <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">Standard-Preise</div>
-                        ${!isHP ? '<div style="margin-top:8px;font-weight:bold;">âœ” AKTIV</div>' : ''}
+                        ${!isHP ? '<div style="margin-top:8px;font-weight:bold;"> AKTIV</div>' : ''}
                     </button>
                     
                     <button onclick="setPreismodus('hp')" style="
@@ -5875,7 +5875,7 @@ Router.register('admin-preismodus', async () => {
                         <div style="font-size:2.5rem;margin-bottom:8px;"></div>
                         <div style="font-weight:700;font-size:1.1rem;">Halbpension (HP)</div>
                         <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">HP-Preise</div>
-                        ${isHP ? '<div style="margin-top:8px;font-weight:bold;">âœ” AKTIV</div>' : ''}
+                        ${isHP ? '<div style="margin-top:8px;font-weight:bold;"> AKTIV</div>' : ''}
                     </button>
                 </div>
             </div>
@@ -5946,7 +5946,7 @@ Router.register('admin-nachricht', async () => {
             <div class="card-body">
                 <div style="background:var(--color-stone-light);padding:16px;border-radius:8px;margin-bottom:16px;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '' : aktiveNachricht.typ === 'warnung' ? '[!]ï¸' : 'â„¹ï¸'}</span>
+                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '' : aktiveNachricht.typ === 'warnung' ? '[!]ï¸' : '�'}</span>
                         <span style="background:${aktiveNachricht.typ === 'dringend' ? '#e74c3c' : aktiveNachricht.typ === 'warnung' ? '#f39c12' : '#3498db'};color:white;padding:2px 10px;border-radius:12px;font-size:0.85rem;font-weight:600;">
                             ${aktiveNachricht.typ === 'dringend' ? 'DRINGEND' : aktiveNachricht.typ === 'warnung' ? 'Warnung' : 'Info'}
                         </span>
@@ -5962,13 +5962,13 @@ Router.register('admin-nachricht', async () => {
                         <div style="font-weight:600;">${new Date(aktiveNachricht.erstellt_am).toLocaleString('de-AT')}</div>
                     </div>
                     <div style="text-align:center;padding:12px;background:#fff3cd;border-radius:8px;">
-                        <div style="font-size:0.85rem;color:#856404;">â±ï¸ Verbleibend</div>
+                        <div style="font-size:0.85rem;color:#856404;">🕐 Verbleibend</div>
                         <div style="font-weight:700;color:#856404;font-size:1.1rem;">${verbleibendeZeit}</div>
                     </div>
                 </div>
                 
                 <button class="btn btn-danger btn-block" onclick="deaktiviereNachricht()" style="padding:16px;font-size:1.1rem;">
-                    âŒ Nachricht jetzt deaktivieren
+                     Nachricht jetzt deaktivieren
                 </button>
             </div>
         </div>
@@ -5990,7 +5990,7 @@ Router.register('admin-nachricht', async () => {
         <!-- NEUE NACHRICHT ERSTELLEN -->
         <div class="card">
             <div class="card-header" style="background:var(--color-alpine-green);color:white;">
-                <h2 class="card-title" style="margin:0;color:white;">âœï¸ Neue Nachricht erstellen</h2>
+                <h2 class="card-title" style="margin:0;color:white;">✏️ Neue Nachricht erstellen</h2>
             </div>
             <div class="card-body">
                 <div class="form-group">
@@ -6004,7 +6004,7 @@ Router.register('admin-nachricht', async () => {
                     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
                         <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('info')">
                             <input type="radio" name="nachricht-typ" value="info" checked style="display:none;">
-                            <span style="font-size:2rem;margin-bottom:8px;">â„¹ï¸</span>
+                            <span style="font-size:2rem;margin-bottom:8px;">�</span>
                             <span style="font-weight:600;">Info</span>
                             <span style="font-size:0.8rem;color:var(--color-stone-dark);">Normal</span>
                         </label>
@@ -6124,7 +6124,7 @@ Dessert" style="font-size:0.95rem;line-height:1.5;">${menuData.mittag?.text || '
                 
                 <div style="display:flex;gap:12px;">
                     <button class="btn ${menuData.mittag?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleMittagMenu()" style="flex:1;padding:14px;">
-                        ${menuData.mittag?.aktiv ? 'âŒ Deaktivieren' : '[OK] Aktivieren'}
+                        ${menuData.mittag?.aktiv ? ' Deaktivieren' : '[OK] Aktivieren'}
                     </button>
                     ${menuData.mittag?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('mittag')" style="padding:14px;"> Vorschau</button>` : ''}
                 </div>
@@ -6167,7 +6167,7 @@ Apfelstrudel mit Vanillesauce" style="font-size:0.95rem;line-height:1.5;">${menu
                 
                 <div style="display:flex;gap:12px;">
                     <button class="btn ${menuData.abend?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleAbendMenu()" style="flex:1;padding:14px;">
-                        ${menuData.abend?.aktiv ? 'âŒ Deaktivieren' : '[OK] Aktivieren'}
+                        ${menuData.abend?.aktiv ? ' Deaktivieren' : '[OK] Aktivieren'}
                     </button>
                     ${menuData.abend?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('abend')" style="padding:14px;"> Vorschau</button>` : ''}
                 </div>
@@ -6344,7 +6344,7 @@ Router.register('admin-cheese', async () => {
                     font-size:0.85rem;
                     font-weight:600;
                     cursor:pointer;
-                ">âœ“ Erledigt</button>
+                "> Erledigt</button>
             </td>
         </tr>`;
     }).join('') : `
@@ -6417,7 +6417,7 @@ window.handleCheeseOrderDone = async (orderId) => {
     
     try {
         await CheeseOrders.markAsDone(orderId);
-        Utils.showToast('âœ“ Bestellung erledigt!', 'success');
+        Utils.showToast(' Bestellung erledigt!', 'success');
         Router.navigate('admin-cheese');
     } catch (error) {
         Utils.showToast('Fehler: ' + error.message, 'error');
@@ -6578,7 +6578,7 @@ Router.register('admin-guests', async () => {
                                 </td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;white-space:nowrap;">
                                     <button class="btn btn-primary" onclick="adminBuchenFuerGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="Fuer diesen Gast buchen"></button>
-                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">âœï¸</button>
+                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
                                     <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Loeschen"></button>
                                 </td>
                             </tr>`;
@@ -7304,11 +7304,11 @@ Router.register('admin-articles', async () => {
             
             if (diffMs > 0) {
                 if (diffTage > 0) {
-                    zeitInfo = `<div style="font-size:0.7rem;color:#e67e22;margin-top:2px;">â° ${diffTage}T uebrig</div>`;
+                    zeitInfo = `<div style="font-size:0.7rem;color:#e67e22;margin-top:2px;">⏰ ${diffTage}T uebrig</div>`;
                 } else if (diffStunden > 0) {
-                    zeitInfo = `<div style="font-size:0.7rem;color:#e74c3c;margin-top:2px;">â° ${diffStunden}h uebrig</div>`;
+                    zeitInfo = `<div style="font-size:0.7rem;color:#e74c3c;margin-top:2px;">⏰ ${diffStunden}h uebrig</div>`;
                 } else {
-                    zeitInfo = `<div style="font-size:0.7rem;color:#e74c3c;margin-top:2px;">â° <1h uebrig</div>`;
+                    zeitInfo = `<div style="font-size:0.7rem;color:#e74c3c;margin-top:2px;">⏰ <1h uebrig</div>`;
                 }
             }
         }
@@ -7356,12 +7356,12 @@ Router.register('admin-articles', async () => {
                         <span class="slider"></span>
                     </label>
                     ${zeitInfo}
-                    <button onclick="showZeitbegrenzungModal(${a.artikel_id}, '${a.name.replace(/'/g, "\\'")}')" style="font-size:0.65rem;padding:2px 6px;border:1px solid #ddd;border-radius:4px;background:#f8f9fa;cursor:pointer;margin-top:2px;" title="Zeitbegrenzung setzen">â°</button>
+                    <button onclick="showZeitbegrenzungModal(${a.artikel_id}, '${a.name.replace(/'/g, "\\'")}')" style="font-size:0.65rem;padding:2px 6px;border:1px solid #ddd;border-radius:4px;background:#f8f9fa;cursor:pointer;margin-top:2px;" title="Zeitbegrenzung setzen">⏰</button>
                 </div>
             </td>
             <td style="text-align:right;white-space:nowrap;">
-                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">âœï¸</button>
-                <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;"></button>
+                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✏️</button>
+                <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">🗑️</button>
             </td>
         </tr>`;
     };
@@ -7740,7 +7740,7 @@ function showSortierungStatus(msg, type) {
 // Sortierung in Supabase speichern
 window.speichereSortierungSupabase = async () => {
     const status = document.getElementById('sortierung-status');
-    showSortierungStatus('â³ Speichere...', 'warning');
+    showSortierungStatus('⏳ Speichere...', 'warning');
     
     try {
         const containers = document.querySelectorAll('.sort-artikel-container');
@@ -7780,7 +7780,7 @@ window.speichereSortierungSupabase = async () => {
         
     } catch (e) {
         console.error('Sortierung speichern Fehler:', e);
-        showSortierungStatus('âŒ Fehler: ' + e.message, 'error');
+        showSortierungStatus(' Fehler: ' + e.message, 'error');
         Utils.showToast('Fehler beim Speichern: ' + e.message, 'error');
     }
 };
@@ -7941,7 +7941,7 @@ Router.register('buchen', async () => {
                 <strong style="font-size:1.2rem;color:var(--color-alpine-green);">${Utils.formatCurrency(sessionTotal)}</strong>
             </div>
             <button onclick="handleGastAbmelden()" style="width:100%;background:var(--color-alpine-green);color:white;border:none;border-radius:10px;padding:12px;font-size:1rem;font-weight:700;cursor:pointer;">
-                âœ” Fertig & Abmelden
+                 Fertig & Abmelden
             </button>
         </div>
     </div>
@@ -7961,7 +7961,7 @@ Router.register('buchen', async () => {
                 </div>
                 <div style="text-align:right;color:white;">
                     <div style="font-size:1.3rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
-                    <div id="buchungen-arrow" style="font-size:1rem;">â–¼</div>
+                    <div id="buchungen-arrow" style="font-size:1rem;"></div>
                 </div>
             </div>
             <div id="buchungen-details" style="display:none;background:white;padding:12px;max-height:250px;overflow-y:auto;">
@@ -8042,10 +8042,10 @@ window.toggleBuchungsDetails = () => {
     const arrow = document.getElementById('buchungen-arrow');
     if (details.style.display === 'none') {
         details.style.display = 'block';
-        arrow.textContent = 'â–²';
+        arrow.textContent = '';
     } else {
         details.style.display = 'none';
-        arrow.textContent = 'â–¼';
+        arrow.textContent = '';
     }
 };
 
@@ -8187,7 +8187,7 @@ window.showMengenModal = async (artikelId) => {
             <div style="color:var(--color-alpine-green);font-size:1.2rem;font-weight:600;margin-bottom:20px;">${Utils.formatCurrency(artikel.preis)} / ${t('per_piece')}</div>
             
             <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:20px;">
-                <button onclick="adjustMenge(-1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">âˆ‘</button>
+                <button onclick="adjustMenge(-1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;"></button>
                 <div id="menge-display" style="font-size:2.5rem;font-weight:700;min-width:60px;">1</div>
                 <button onclick="adjustMenge(1)" style="width:50px;height:50px;border-radius:50%;border:2px solid var(--color-stone-medium);background:white;font-size:1.5rem;font-weight:bold;cursor:pointer;">+</button>
             </div>
@@ -8200,7 +8200,7 @@ window.showMengenModal = async (artikelId) => {
             
             <div style="display:flex;gap:12px;">
                 <button onclick="closeMengenModal()" style="flex:1;padding:14px;border:2px solid var(--color-stone-medium);border-radius:12px;background:white;font-weight:600;cursor:pointer;">${t('cancel')}</button>
-                <button onclick="bucheMitMenge(${artikelId})" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--color-alpine-green);color:white;font-weight:700;font-size:1.1rem;cursor:pointer;">âœ” ${t('book')}</button>
+                <button onclick="bucheMitMenge(${artikelId})" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--color-alpine-green);color:white;font-weight:700;font-size:1.1rem;cursor:pointer;"> ${t('book')}</button>
             </div>
         </div>
     </div>`;
@@ -8347,7 +8347,7 @@ window.syncFromCloud = async (silent = false) => {
             .order('display_name');
         
         if (error) {
-            console.error('âŒ Supabase Fehler:', error);
+            console.error(' Supabase Fehler:', error);
             if (!silent) Utils.showToast('Sync fehlgeschlagen: ' + error.message, 'error');
             return;
         }
@@ -8382,7 +8382,7 @@ window.syncFromCloud = async (silent = false) => {
         if (!silent) Router.navigate('login');
         
     } catch(e) {
-        console.error('âŒ Sync Fehler:', e);
+        console.error(' Sync Fehler:', e);
         if (!silent) Utils.showToast('Sync fehlgeschlagen: ' + e.message, 'error');
     }
 };
@@ -8493,7 +8493,7 @@ window.showZeitbegrenzungModal = (artikelId, artikelName) => {
         ">
             <div style="padding: 20px; border-bottom: 1px solid #eee;">
                 <h3 style="margin: 0; display: flex; align-items: center; gap: 10px;">
-                    <span>â°</span> Zeitbegrenzung
+                    <span>⏰</span> Zeitbegrenzung
                 </h3>
                 <p style="margin: 8px 0 0; color: #666; font-size: 0.9rem;">
                     "${artikelName}"
@@ -8507,10 +8507,10 @@ window.showZeitbegrenzungModal = (artikelId, artikelName) => {
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <button onclick="setZeitbegrenzung(${artikelId}, 6)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
-                        â±ï¸ 6 Stunden
+                        🕐 6 Stunden
                     </button>
                     <button onclick="setZeitbegrenzung(${artikelId}, 12)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
-                        â±ï¸ 12 Stunden
+                        🕐 12 Stunden
                     </button>
                     <button onclick="setZeitbegrenzung(${artikelId}, 24)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
                          1 Tag
@@ -8528,7 +8528,7 @@ window.showZeitbegrenzungModal = (artikelId, artikelName) => {
                 
                 <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee;">
                     <button onclick="setZeitbegrenzung(${artikelId}, 0)" class="btn btn-block" style="padding: 14px; background: #27ae60; color: white; border: none;">
-                        â™¾ï¸ Keine Begrenzung (dauerhaft aktiv)
+                        � Keine Begrenzung (dauerhaft aktiv)
                     </button>
                 </div>
             </div>
@@ -9119,7 +9119,7 @@ window.saveEditArticle = async () => {
         
     } catch(e) {
         // Bei JEDEM Fehler: App trotzdem zeigen!
-        console.error('âŒ KRITISCHER INIT FEHLER:', e);
+        console.error(' KRITISCHER INIT FEHLER:', e);
         showApp();
         Router.init();
         Utils.showToast('Ladefehler - bitte neu laden', 'error');
