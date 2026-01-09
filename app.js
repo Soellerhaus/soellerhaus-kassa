@@ -27,10 +27,10 @@ function initSupabase() {
                 detectSessionInUrl: false
             }
         });
-        console.log('[OK] Supabase Client initialisiert');
+        console.log('✅ Supabase Client initialisiert');
         return true;
     }
-    console.warn('[!]Supabase nicht verfuegbar - Offline-Modus');
+    console.warn('⚠Supabase nicht verfuegbar - Offline-Modus');
     return false;
 }
 
@@ -47,7 +47,7 @@ async function syncPendingData() {
                 }
             } catch (e) { console.error('Sync error:', e); }
         }
-        if (pending.length > 0) console.log(`[OK] ${pending.length} Buchungen synchronisiert`);
+        if (pending.length > 0) console.log(`✅ ${pending.length} Buchungen synchronisiert`);
     } catch (e) { console.error('syncPendingData error:', e); }
 }
 
@@ -185,7 +185,7 @@ const DataProtection = {
                 if (backup.fehlendeGetraenke) {
                     for (const f of backup.fehlendeGetraenke) { try { await db.fehlendeGetraenke.add(f); } catch(e) {} }
                 }
-                console.log('[OK] Daten wiederhergestellt');
+                console.log('✅ Daten wiederhergestellt');
             }
         } catch (e) { console.error(e); }
     },
@@ -300,7 +300,7 @@ const DataProtection = {
             // Backup-Datum speichern
             this.setLastBackupDate();
             
-            Utils.showToast(`[OK] Vollstaendiges Backup erstellt!\n${data.statistik.anzahlGaeste} Gaeste, ${data.statistik.anzahlArtikel} Artikel, ${data.statistik.anzahlBuchungen} Buchungen`, 'success');
+            Utils.showToast(`✅ Vollstaendiges Backup erstellt!\n${data.statistik.anzahlGaeste} Gaeste, ${data.statistik.anzahlArtikel} Artikel, ${data.statistik.anzahlBuchungen} Buchungen`, 'success');
             return true;
         } catch (e) {
             console.error('Backup Fehler:', e);
@@ -330,7 +330,7 @@ const DataProtection = {
                             <span style="font-weight:600;">${lastBackupText}</span>
                         </div>
                         <div style="font-size:0.85rem;color:#888;margin-top:12px;">
-                            � Das Backup enthaelt alle Gaeste, Artikel, Buchungen und Einstellungen 
+                             Das Backup enthaelt alle Gaeste, Artikel, Buchungen und Einstellungen 
                             ${isOnline ? '(inkl. Cloud-Daten von Supabase)' : '(nur lokale Daten - offline)'}.
                         </div>
                     </div>
@@ -471,14 +471,14 @@ const DataProtection = {
                             </label>
                             <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
                                 <input type="checkbox" id="restore-fehlende" ${stats.fehlendeGetraenke === 0 ? 'disabled' : ''}>
-                                <span>[!]ï¸ Fehlende <strong>(${stats.fehlendeGetraenke})</strong></span>
+                                <span>⚠️ Fehlende <strong>(${stats.fehlendeGetraenke})</strong></span>
                             </label>
                         </div>
                     </div>
                     
                     <!-- Modus -->
                     <div style="padding:0 20px 20px;">
-                        <h3 style="margin:0 0 12px 0;color:#2C5F7C;">🔐 Wiederherstellungs-Modus</h3>
+                        <h3 style="margin:0 0 12px 0;color:#2C5F7C;">⚙️ Wiederherstellungs-Modus</h3>
                         <div style="display:flex;flex-direction:column;gap:8px;">
                             <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fff3cd;border:2px solid #ffc107;border-radius:8px;cursor:pointer;">
                                 <input type="radio" name="restore-mode" value="merge" checked style="margin-top:3px;">
@@ -500,7 +500,7 @@ const DataProtection = {
                     <!-- Warnung -->
                     <div style="padding:0 20px 20px;">
                         <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;display:flex;align-items:flex-start;gap:10px;">
-                            <span style="font-size:1.5rem;">[!]ï¸</span>
+                            <span style="font-size:1.5rem;">⚠</span>
                             <div style="font-size:0.85rem;color:#856404;">
                                 <strong>Wichtig:</strong> Erstellen Sie vor der Wiederherstellung ein aktuelles Backup der bestehenden Daten!
                             </div>
@@ -699,7 +699,7 @@ const DataProtection = {
             if (restored.gruppen > 0) summary.push(`${restored.gruppen} Gruppen`);
             if (restored.fehlende > 0) summary.push(`${restored.fehlende} Fehlende`);
             
-            Utils.showToast(`[OK] Wiederherstellung erfolgreich!\n${summary.join(', ') || 'Keine neuen Daten'}`, 'success');
+            Utils.showToast(`✅ Wiederherstellung erfolgreich!\n${summary.join(', ') || 'Keine neuen Daten'}`, 'success');
             
             // Seite neu laden um Aenderungen anzuzeigen
             setTimeout(() => {
@@ -906,8 +906,8 @@ const GastNachricht = {
         };
         
         const icons = {
-            info: '�',
-            warnung: '[!]ï¸',
+            info: '',
+            warnung: '⚠',
             dringend: ''
         };
         
@@ -1483,7 +1483,7 @@ const CheeseOrders = {
                         </div>
                         <div style="text-align:center;margin-top:8px;font-size:0.85rem;color:#888;">
                             Min: 100g * Max: 1kg * Schritte: 50g<br>
-                            <span style="color:#e67e22;">[!]–ï¸ Grammzahl ist ca.-Angabe (Richtwert)</span>
+                            <span style="color:#e67e22;">⚠– Grammzahl ist ca.-Angabe (Richtwert)</span>
                         </div>
                     </div>
                     
@@ -1555,7 +1555,7 @@ const CheeseOrders = {
                         margin-bottom:20px;
                         font-size:0.85rem;
                     ">
-                        <div style="font-weight:600;color:#856404;margin-bottom:8px;">[!]ï¸ Wichtige Hinweise:</div>
+                        <div style="font-weight:600;color:#856404;margin-bottom:8px;">⚠️ Wichtige Hinweise:</div>
                         <ul style="margin:0;padding-left:20px;color:#856404;line-height:1.6;">
                             <li>Grammzahl ist <strong>ca.-Angabe</strong> (Kaese wird frisch geschnitten)</li>
                             <li>Abholung <strong>nur am Abreisetag</strong> beim Check-out</li>
@@ -1680,7 +1680,7 @@ const CheeseOrders = {
                         max-width:350px;
                         box-shadow:0 20px 60px rgba(0,0,0,0.3);
                     ">
-                        <div style="font-size:4rem;margin-bottom:16px;">[OK]</div>
+                        <div style="font-size:4rem;margin-bottom:16px;">✅</div>
                         <h2 style="color:#27ae60;margin:0 0 12px;">Bestellung erfolgreich!</h2>
                         <p style="color:#666;margin:0 0 20px;line-height:1.5;">
                             Ihr Kaese wird fuer Sie vorbereitet.<br>
@@ -2212,7 +2212,7 @@ const RegisteredGuests = {
             }
             
             const userId = authData.user.id;
-            console.log('[OK] Auth SignUp OK, User ID:', userId);
+            console.log('✅ Auth SignUp OK, User ID:', userId);
             
             // Warte auf Trigger (Profile wird automatisch erstellt)
             await new Promise(r => setTimeout(r, 1000));
@@ -2242,7 +2242,7 @@ const RegisteredGuests = {
                             .eq('id', userId);
                         
                         if (!updateError) {
-                            console.log('[OK] PIN in Profile gespeichert (Update)');
+                            console.log('✅ PIN in Profile gespeichert (Update)');
                             pinSaved = true;
                             break;
                         }
@@ -2263,7 +2263,7 @@ const RegisteredGuests = {
                             });
                         
                         if (!insertError) {
-                            console.log('[OK] PIN in Profile gespeichert (Insert)');
+                            console.log('✅ PIN in Profile gespeichert (Insert)');
                             pinSaved = true;
                             break;
                         }
@@ -2314,7 +2314,7 @@ const RegisteredGuests = {
                 if (loginError) {
                     console.warn('Login nach Registrierung fehlgeschlagen:', loginError);
                 } else {
-                    console.log('[OK] Session nach Registrierung aktiv');
+                    console.log('✅ Session nach Registrierung aktiv');
                 }
             } catch(e) {
                 console.warn('Login-Versuch fehlgeschlagen:', e);
@@ -2471,7 +2471,7 @@ const RegisteredGuests = {
                         return startsWithLetter && isNotDeleted && isActive;
                     });
                     
-                    console.log('[OK] Gefunden fuer', letter + ':', filtered.length);
+                    console.log('✅ Gefunden fuer', letter + ':', filtered.length);
                     
                     if (filtered.length > 0) {
                         const cnt = {};
@@ -2736,7 +2736,7 @@ const Buchungen = {
             erstellteBuchungen.push(b);
         }
         
-        console.log('[OK]', menge, 'Einzelbuchung(en) erstellt fuer:', artikel.name);
+        console.log('✅', menge, 'Einzelbuchung(en) erstellt fuer:', artikel.name);
         
         // Ampel aktualisieren
         setTimeout(() => SyncManager.updateUI(), 200);
@@ -3027,7 +3027,7 @@ const SyncManager = {
             // Session pruefen
             const { data: sessionData } = await supabaseClient.auth.getSession();
             if (!sessionData?.session) {
-                console.log('[!]ï¸ SyncManager: Keine Session');
+                console.log('⚠️ SyncManager: Keine Session');
                 this.isSyncing = false;
                 return { synced: 0, failed: 0, noSession: true };
             }
@@ -3066,7 +3066,7 @@ const SyncManager = {
                     } else {
                         await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
                         synced++;
-                        console.log('[OK] Synced:', b.buchung_id);
+                        console.log('✅ Synced:', b.buchung_id);
                     }
                 } catch(e) {
                     console.error(' Sync exception:', e);
@@ -3080,7 +3080,7 @@ const SyncManager = {
         this.isSyncing = false;
         
         if (synced > 0) {
-            console.log(`[OK] SyncManager: ${synced} synchronisiert, ${failed} fehlgeschlagen`);
+            console.log(`✅ SyncManager: ${synced} synchronisiert, ${failed} fehlgeschlagen`);
             this.updateUI();
         }
         
@@ -3123,7 +3123,7 @@ const SyncManager = {
         
         let message = '';
         if (status === 'green') {
-            message = '[OK] Alle deine Buchungen sind erfolgreich synchronisiert!';
+            message = '✅ Alle deine Buchungen sind erfolgreich synchronisiert!';
         } else if (status === 'yellow') {
             message = ` ${pending} Buchung(en) warten noch auf Upload.\n\nDie App versucht automatisch, diese hochzuladen.`;
         } else {
@@ -3711,7 +3711,7 @@ const Artikel = {
                 await db.artikel.bulkAdd(data);
                 artikelCache = data;
                 artikelCacheTime = Date.now();
-                console.log('[OK] Artikel von Supabase geladen:', data.length);
+                console.log('✅ Artikel von Supabase geladen:', data.length);
                 return true;
             } else {
                 console.log('Supabase hat keine Artikel, nutze lokale Daten');
@@ -4011,7 +4011,7 @@ const Artikel = {
                 if (error) {
                     console.error('Supabase upsert error:', error);
                 } else {
-                    console.log('[OK] Artikel nach Supabase synchronisiert');
+                    console.log('✅ Artikel nach Supabase synchronisiert');
                 }
             } catch(e) {
                 console.error('Supabase sync error:', e);
@@ -4019,7 +4019,7 @@ const Artikel = {
         }
         
         await DataProtection.createBackup();
-        const msg = `[OK] ${imp} neu, ${upd} aktualisiert, ${skip} uebersprungen`;
+        const msg = `✅ ${imp} neu, ${upd} aktualisiert, ${skip} uebersprungen`;
         console.log(msg);
         Utils.showToast(msg, 'success');
         return {imp, upd, skip};
@@ -4309,7 +4309,7 @@ Router.register('login', async () => {
     const fehlendeHtml = fehlendeList.length ? `
     <div style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:24px;color:white;max-width:600px;margin:0 auto 24px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <span style="font-size:1.3rem;">[!]</span>
+            <span style="font-size:1.3rem;">⚠</span>
             <div style="font-weight:700;">${t('missing_drinks')}</div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
@@ -4322,7 +4322,7 @@ Router.register('login', async () => {
     // Sprachauswahl Button mit WhatsApp (nur auf Startseite)
     const langBtn = i18n.renderLangButtonWithWhatsApp();
     
-    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Soellerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">🔐</a><span style="color:#bbb;font-size:0.65rem;">v3.4 © 2026 * Entwickelt von: Claudio</span></div></div></div></div>`);
+    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Soellerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">⚙️</a><span style="color:#bbb;font-size:0.65rem;">v3.4 © 2026 • Entwickelt von: Claudio</span></div></div></div></div>`);
 });
 
 Router.register('register', () => {
@@ -4568,7 +4568,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                     </div>
                 </div>
-                <span style="font-size: 1.5rem;">🔐</span>
+                <span style="font-size: 1.5rem;">⚙️</span>
             </div>
         </div>
         
@@ -4657,7 +4657,7 @@ Router.register('admin-dashboard', async () => {
         
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
-                [!]Fehlende Getraenke<br><small>(${fehlendeOffen.length} offen)</small>
+                ⚠Fehlende Getraenke<br><small>(${fehlendeOffen.length} offen)</small>
             </button>
             <button class="btn btn-danger" onclick="Router.navigate('admin-umlage')" style="padding:16px;">
                  Umlage buchen<br><small>(auf alle Gaeste)</small>
@@ -4793,7 +4793,7 @@ Router.register('admin-auffuellliste', async () => {
                  Fuer Thermodrucker drucken
             </button>
             <button class="btn btn-success" onclick="resetAuffuelllisteOhneExport()" style="padding:16px;font-size:1.1rem;background:#27ae60;">
-                [OK] Auffuellliste zuruecksetzen<br>
+                ✅ Auffuellliste zuruecksetzen<br>
                 <small style="opacity:0.9;">(Getraenke wurden aufgefuellt)</small>
             </button>
         </div>
@@ -4986,7 +4986,7 @@ window.resetAuffuelllisteOhneExport = async () => {
     
     try {
         await Buchungen.markAsAufgefuellt();
-        Utils.showToast('[OK] Auffuellliste zurueckgesetzt', 'success');
+        Utils.showToast('✅ Auffuellliste zurueckgesetzt', 'success');
         Router.navigate('admin-auffuellliste');
     } catch(e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -5085,7 +5085,7 @@ Router.register('admin-alle-buchungen', async () => {
 
 // Gruppe abgereist - Alle Buchungen exportieren und abschliessen
 window.handleGruppeAbgereist = async () => {
-    if (!confirm('[!]ACHTUNG: Gruppe abreisen?\n\nDies wird:\n1. Alle Buchungen fuer die Registrierkasse exportieren\n2. Alle Buchungen als exportiert markieren\n3. Auffuellliste zuruecksetzen\n\nFortfahren?')) return;
+    if (!confirm('⚠ACHTUNG: Gruppe abreisen?\n\nDies wird:\n1. Alle Buchungen fuer die Registrierkasse exportieren\n2. Alle Buchungen als exportiert markieren\n3. Auffuellliste zuruecksetzen\n\nFortfahren?')) return;
     
     try {
         // 1. Excel Export
@@ -5104,7 +5104,7 @@ window.handleGruppeAbgereist = async () => {
         // 3. Auffuellliste auch zuruecksetzen
         await Buchungen.markAsAufgefuellt();
         
-        Utils.showToast('[OK] Gruppe abgereist - Alle Buchungen exportiert und abgeschlossen', 'success');
+        Utils.showToast('✅ Gruppe abgereist - Alle Buchungen exportiert und abgeschlossen', 'success');
         Router.navigate('admin-dashboard');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -5125,7 +5125,7 @@ window.handleAdminDeleteBuchung = async (buchungId) => {
 
 // Alle Buchungen eines Tages ENDGUeLTIG loeschen
 window.handleDeleteBuchungenByDate = async (datum) => {
-    if (!confirm(`[!]ï¸ ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGUeLTIG geloescht!\n\nDies kann nicht rueckgaengig gemacht werden.\n\nFortfahren?`)) return;
+    if (!confirm(`⚠️ ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGUeLTIG geloescht!\n\nDies kann nicht rueckgaengig gemacht werden.\n\nFortfahren?`)) return;
     
     try {
         // Buchungen von diesem Datum laden
@@ -5164,7 +5164,7 @@ window.handleDeleteBuchungenByDate = async (datum) => {
         }
         
         await DataProtection.createBackup();
-        Utils.showToast(`[OK] ${buchungenIds.length} Buchungen vom ${datum} geloescht`, 'success');
+        Utils.showToast(`✅ ${buchungenIds.length} Buchungen vom ${datum} geloescht`, 'success');
         Router.navigate('admin-alle-buchungen');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -5185,7 +5185,7 @@ Router.register('admin-fehlende', async () => {
         if (byKat[a.kategorie_id]) byKat[a.kategorie_id].artikel.push(a);
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')"><-'</button><div class="header-title">[!]Fehlende Getraenke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')"><-'</button><div class="header-title">⚠Fehlende Getraenke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#f39c12;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -5282,7 +5282,7 @@ Router.register('admin-umlage', async () => {
         ${fehlendeOffen.length ? `
         <div class="card mb-3">
             <div class="card-header" style="background:#f39c12;color:white;">
-                <h3 style="margin:0;">[!]Fehlende Getraenke (${fehlendeOffen.length})</h3>
+                <h3 style="margin:0;">⚠Fehlende Getraenke (${fehlendeOffen.length})</h3>
             </div>
             <div class="card-body">
                 ${fehlendeOffen.map(f => `
@@ -5320,7 +5320,7 @@ Router.register('admin-umlage', async () => {
         ` : `
         <div class="card">
             <div class="card-body" style="text-align:center;padding:40px;">
-                <div style="font-size:3rem;margin-bottom:16px;">[OK]</div>
+                <div style="font-size:3rem;margin-bottom:16px;">✅</div>
                 <h3>Keine fehlenden Getraenke</h3>
                 <p style="color:var(--color-stone-dark);">Es gibt nichts umzulegen.</p>
             </div>
@@ -5436,7 +5436,7 @@ Router.register('admin-notfall-export', async () => {
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;">
-                <div style="font-weight:700;">[!]Nur im Notfall verwenden</div>
+                <div style="font-weight:700;">⚠Nur im Notfall verwenden</div>
                 <div style="font-size:0.9rem;opacity:0.9;">Exportiert Buchungen nach Datum (auch bereits exportierte)</div>
             </div>
         </div>
@@ -5726,7 +5726,7 @@ Router.register('admin-gruppen', async () => {
         ${isAktiv && gruppen.length === 0 ? `
             <div class="card" style="background:#e74c3c;color:white;">
                 <div style="padding:16px;">
-                    [!]<strong>Achtung:</strong> Gruppenabfrage ist aktiv, aber keine Gruppen hinterlegt!
+                    ⚠<strong>Achtung:</strong> Gruppenabfrage ist aktiv, aber keine Gruppen hinterlegt!
                     <br>Gaeste koennen sich nicht anmelden, bis mindestens eine Gruppe existiert.
                 </div>
             </div>
@@ -5946,7 +5946,7 @@ Router.register('admin-nachricht', async () => {
             <div class="card-body">
                 <div style="background:var(--color-stone-light);padding:16px;border-radius:8px;margin-bottom:16px;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '' : aktiveNachricht.typ === 'warnung' ? '[!]ï¸' : '�'}</span>
+                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '' : aktiveNachricht.typ === 'warnung' ? '⚠' : ''}</span>
                         <span style="background:${aktiveNachricht.typ === 'dringend' ? '#e74c3c' : aktiveNachricht.typ === 'warnung' ? '#f39c12' : '#3498db'};color:white;padding:2px 10px;border-radius:12px;font-size:0.85rem;font-weight:600;">
                             ${aktiveNachricht.typ === 'dringend' ? 'DRINGEND' : aktiveNachricht.typ === 'warnung' ? 'Warnung' : 'Info'}
                         </span>
@@ -6004,13 +6004,13 @@ Router.register('admin-nachricht', async () => {
                     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
                         <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('info')">
                             <input type="radio" name="nachricht-typ" value="info" checked style="display:none;">
-                            <span style="font-size:2rem;margin-bottom:8px;">�</span>
+                            <span style="font-size:2rem;margin-bottom:8px;"></span>
                             <span style="font-weight:600;">Info</span>
                             <span style="font-size:0.8rem;color:var(--color-stone-dark);">Normal</span>
                         </label>
                         <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('warnung')">
                             <input type="radio" name="nachricht-typ" value="warnung" style="display:none;">
-                            <span style="font-size:2rem;margin-bottom:8px;">[!]ï¸</span>
+                            <span style="font-size:2rem;margin-bottom:8px;">⚠</span>
                             <span style="font-weight:600;">Warnung</span>
                             <span style="font-size:0.8rem;color:var(--color-stone-dark);">Auffaellig</span>
                         </label>
@@ -6029,7 +6029,7 @@ Router.register('admin-nachricht', async () => {
                 
                 ${aktiveNachricht ? `
                 <p style="text-align:center;margin-top:12px;color:#e74c3c;font-size:0.9rem;">
-                    [!]ï¸ Die aktuelle Nachricht wird ersetzt!
+                    ⚠️ Die aktuelle Nachricht wird ersetzt!
                 </p>
                 ` : ''}
             </div>
@@ -6124,7 +6124,7 @@ Dessert" style="font-size:0.95rem;line-height:1.5;">${menuData.mittag?.text || '
                 
                 <div style="display:flex;gap:12px;">
                     <button class="btn ${menuData.mittag?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleMittagMenu()" style="flex:1;padding:14px;">
-                        ${menuData.mittag?.aktiv ? ' Deaktivieren' : '[OK] Aktivieren'}
+                        ${menuData.mittag?.aktiv ? ' Deaktivieren' : '✅ Aktivieren'}
                     </button>
                     ${menuData.mittag?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('mittag')" style="padding:14px;"> Vorschau</button>` : ''}
                 </div>
@@ -6167,7 +6167,7 @@ Apfelstrudel mit Vanillesauce" style="font-size:0.95rem;line-height:1.5;">${menu
                 
                 <div style="display:flex;gap:12px;">
                     <button class="btn ${menuData.abend?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleAbendMenu()" style="flex:1;padding:14px;">
-                        ${menuData.abend?.aktiv ? ' Deaktivieren' : '[OK] Aktivieren'}
+                        ${menuData.abend?.aktiv ? ' Deaktivieren' : '✅ Aktivieren'}
                     </button>
                     ${menuData.abend?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('abend')" style="padding:14px;"> Vorschau</button>` : ''}
                 </div>
@@ -6457,7 +6457,7 @@ Router.register('admin-guests', async () => {
                         ausnahmeumlage: g.ausnahmeumlage || false
                     };
                 });
-                console.log('[OK] Gaeste von Supabase geladen:', guests.length);
+                console.log('✅ Gaeste von Supabase geladen:', guests.length);
             }
         } catch(e) {
             console.error('Supabase Gaeste laden Exception:', e);
@@ -6468,7 +6468,7 @@ Router.register('admin-guests', async () => {
     if (guests.length === 0) {
         guests = await db.registeredGuests.toArray();
         guests = guests.filter(g => !g.geloescht && g.aktiv !== false);
-        console.log('[!]ï¸ Gaeste von lokalem Cache geladen:', guests.length);
+        console.log('⚠️ Gaeste von lokalem Cache geladen:', guests.length);
     }
     
     // Inaktive Gaeste zaehlen (fuer Button)
@@ -6556,7 +6556,7 @@ Router.register('admin-guests', async () => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehoerig';
                             const pw = g.passwort || g.passwordHash || g.pin_hash;
-                            const pwDisplay = pw ? pw : '<span style="color:#e74c3c;">[!]KEINE</span>';
+                            const pwDisplay = pw ? pw : '<span style="color:#e74c3c;">⚠KEINE</span>';
                             const pwStyle = pw ? 'color:#2c3e50;' : 'color:#e74c3c;';
                             const ausnahme = g.ausnahmeumlage || false;
                             const createdAt = g.created_at || g.createdAt;
@@ -6807,7 +6807,7 @@ window.reactivateGast = async (id, name) => {
     } catch(e) {}
     
     await DataProtection.createBackup();
-    Utils.showToast(`[OK] ${name} wieder aktiviert`, 'success');
+    Utils.showToast(`✅ ${name} wieder aktiviert`, 'success');
     Router.navigate('admin-guests-inaktiv');
 };
 
@@ -6994,7 +6994,7 @@ window.saveGast = async () => {
                 if (error) {
                     console.error('Supabase Update Fehler:', error);
                 } else {
-                    console.log('[OK] Gast in Supabase aktualisiert');
+                    console.log('✅ Gast in Supabase aktualisiert');
                 }
             } catch (e) {
                 console.error('Supabase Update Exception:', e);
@@ -7069,7 +7069,7 @@ window.saveGast = async () => {
                 
                 // User ID aus Auth uebernehmen
                 finalId = authData.user?.id || finalId;
-                console.log('[OK] Supabase Auth User erstellt mit ID:', finalId);
+                console.log('✅ Supabase Auth User erstellt mit ID:', finalId);
                 
                 // 2. Profile aktualisieren mit zusaetzlichen Daten
                 const { error: profileError } = await supabaseClient
@@ -7090,7 +7090,7 @@ window.saveGast = async () => {
                 if (profileError) {
                     console.error('Supabase Profile Update Fehler:', profileError);
                 } else {
-                    console.log('[OK] Gast-Profil in Supabase aktualisiert');
+                    console.log('✅ Gast-Profil in Supabase aktualisiert');
                 }
                 
             } catch (e) {
@@ -7203,7 +7203,7 @@ window.adminBuchenFuerGast = async (id) => {
                 console.warn('Auth Session fuer Gast fehlgeschlagen:', error.message);
                 // Trotzdem fortfahren - Buchung wird lokal gespeichert
             } else {
-                console.log('[OK] Auth Session fuer Gast erstellt');
+                console.log('✅ Auth Session fuer Gast erstellt');
             }
         } catch(e) {
             console.warn('Auth Session Exception:', e);
@@ -7768,9 +7768,9 @@ window.speichereSortierungSupabase = async () => {
                     .update({ sortierung: upd.sortierung })
                     .eq('artikel_id', upd.artikel_id);
             }
-            showSortierungStatus('[OK] Sortierung gespeichert (lokal + Cloud)', 'success');
+            showSortierungStatus('✅ Sortierung gespeichert (lokal + Cloud)', 'success');
         } else {
-            showSortierungStatus('[OK] Lokal gespeichert (Cloud offline)', 'success');
+            showSortierungStatus('✅ Lokal gespeichert (Cloud offline)', 'success');
         }
         
         // Cache invalidieren
@@ -7988,7 +7988,7 @@ Router.register('buchen', async () => {
         ${fehlendeOffen.length ? `
         <div style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:14px;padding:14px;margin-bottom:16px;color:white;">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-                <span style="font-size:1.3rem;">[!]ï¸</span>
+                <span style="font-size:1.3rem;">⚠</span>
                 <div>
                     <div style="font-weight:700;font-size:1rem;">${t('missing_drinks_yesterday')}</div>
                     <div style="font-size:0.85rem;opacity:0.9;">${t('please_take_if_forgot')}</div>
@@ -8338,7 +8338,7 @@ window.syncFromCloud = async (silent = false) => {
     try {
         // Lokalen Gaeste-Cache loeschen
         await db.registeredGuests.clear();
-        console.log('[OK] Lokaler Gaeste-Cache geloescht');
+        console.log('✅ Lokaler Gaeste-Cache geloescht');
         
         // Alle Profile von Supabase laden
         const { data: profiles, error } = await supabaseClient
@@ -8352,7 +8352,7 @@ window.syncFromCloud = async (silent = false) => {
             return;
         }
         
-        console.log('[OK] Profile von Supabase:', profiles?.length || 0);
+        console.log('✅ Profile von Supabase:', profiles?.length || 0);
         
         // In lokalen Cache speichern
         if (profiles && profiles.length > 0) {
@@ -8376,7 +8376,7 @@ window.syncFromCloud = async (silent = false) => {
             }
         }
         
-        if (!silent) Utils.showToast(`[OK] Synchronisiert`, 'success');
+        if (!silent) Utils.showToast(`✅ Synchronisiert`, 'success');
         
         // Seite nur neu laden wenn nicht silent
         if (!silent) Router.navigate('login');
@@ -8395,7 +8395,7 @@ window.clearLocalCache = async () => {
         await db.registeredGuests.clear();
         await db.buchungen.clear();
         localStorage.clear();
-        Utils.showToast('[OK] Cache geloescht - Seite wird neu geladen', 'success');
+        Utils.showToast('✅ Cache geloescht - Seite wird neu geladen', 'success');
         setTimeout(() => location.reload(), 1000);
     } catch(e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -8528,7 +8528,7 @@ window.showZeitbegrenzungModal = (artikelId, artikelName) => {
                 
                 <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee;">
                     <button onclick="setZeitbegrenzung(${artikelId}, 0)" class="btn btn-block" style="padding: 14px; background: #27ae60; color: white; border: none;">
-                        � Keine Begrenzung (dauerhaft aktiv)
+                         Keine Begrenzung (dauerhaft aktiv)
                     </button>
                 </div>
             </div>
@@ -8584,9 +8584,9 @@ window.setZeitbegrenzung = async (artikelId, stunden) => {
             let zeitText = '';
             if (tage > 0) zeitText = `${tage} Tag(e)`;
             else zeitText = `${restStunden} Stunden`;
-            Utils.showToast(`[OK] Artikel aktiv fuer ${zeitText}`, 'success');
+            Utils.showToast(`✅ Artikel aktiv fuer ${zeitText}`, 'success');
         } else {
-            Utils.showToast('[OK] Zeitbegrenzung entfernt', 'success');
+            Utils.showToast('✅ Zeitbegrenzung entfernt', 'success');
         }
         
         // Seite neu laden
@@ -8671,7 +8671,7 @@ window.changeArtikelId = async (alteId) => {
         return;
     }
     
-    const neueIdStr = prompt(`[!]ï¸ ACHTUNG: Artikel-ID aendern\n\nDiese ID wird fuer die Registrierkasse verwendet!\nNur aendern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
+    const neueIdStr = prompt(`⚠️ ACHTUNG: Artikel-ID aendern\n\nDiese ID wird fuer die Registrierkasse verwendet!\nNur aendern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
     
     if (neueIdStr === null) return; // Abgebrochen
     
@@ -8694,7 +8694,7 @@ window.changeArtikelId = async (alteId) => {
     }
     
     // Bestaetigung einholen
-    if (!confirm(`[!]ï¸ LETZTE WARNUNG!\n\nArtikel-ID wirklich aendern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
+    if (!confirm(`⚠️ LETZTE WARNUNG!\n\nArtikel-ID wirklich aendern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
         return;
     }
     
@@ -8715,7 +8715,7 @@ window.changeArtikelId = async (alteId) => {
         artikelCache = null;
         await DataProtection.createBackup();
         
-        Utils.showToast(`[OK] Artikel-ID geaendert: ${alteId} <-' ${neueId}`, 'success');
+        Utils.showToast(`✅ Artikel-ID geaendert: ${alteId} <-' ${neueId}`, 'success');
         Router.navigate('admin-articles');
     } catch (e) {
         console.error('ID aendern Fehler:', e);
@@ -9013,7 +9013,7 @@ window.saveEditArticle = async () => {
         // Supabase initialisieren
         const supabaseReady = initSupabase();
         if (supabaseReady) {
-            console.log('[OK] Supabase bereit - Multi-Device Modus');
+            console.log('✅ Supabase bereit - Multi-Device Modus');
             // Artikel von Supabase laden
             try {
                 await Artikel.loadFromSupabase();
@@ -9037,7 +9037,7 @@ window.saveEditArticle = async () => {
                 if (!error && profiles) {
                     // Nur nicht-geloeschte Profile cachen
                     const aktive = profiles.filter(p => p.geloescht !== true);
-                    console.log('[OK] Profile geladen:', aktive.length, 'aktiv von', profiles.length, 'gesamt');
+                    console.log('✅ Profile geladen:', aktive.length, 'aktiv von', profiles.length, 'gesamt');
                     
                     for (const p of aktive) {
                         const name = p.display_name || p.first_name;
@@ -9060,7 +9060,7 @@ window.saveEditArticle = async () => {
                 console.error('Profile laden Fehler:', e);
             }
         } else {
-            console.log('[!]Offline-Modus - Lokale Daten');
+            console.log('⚠Offline-Modus - Lokale Daten');
         }
     
         // Seed Artikel falls noetig
@@ -9082,7 +9082,7 @@ window.saveEditArticle = async () => {
                 {kategorie_id:6, name:'Suesses & Salziges', sortierung:60},
                 {kategorie_id:7, name:'Sonstiges', sortierung:70}
             ]);
-            console.log('[OK] Kategorien automatisch repariert');
+            console.log('✅ Kategorien automatisch repariert');
         } catch(e) {
             console.error('Kategorien init Fehler:', e);
         }
