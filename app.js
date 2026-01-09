@@ -3174,16 +3174,19 @@ const Gruppen = {
         // Erst von Supabase laden (Single Source of Truth)
         if (supabaseClient && isOnline) {
             try {
-                const { data } = await supabaseClient
+                const { data, error } = await supabaseClient
                     .from('settings')
                     .select('value')
                     .eq('key', 'gruppenAbfrageAktiv')
                     .single();
                 
-                if (data !== null) {
+                if (!error && data !== null) {
+                    // Wert kann Boolean oder String sein
+                    const isActive = data.value === true || data.value === 'true';
+                    console.log('📊 Gruppenabfrage aus Supabase:', data.value, '→', isActive);
                     // Lokal cachen
-                    await db.settings.put({ key: 'gruppenAbfrageAktiv', value: data.value });
-                    return data.value === true;
+                    await db.settings.put({ key: 'gruppenAbfrageAktiv', value: isActive });
+                    return isActive;
                 }
             } catch(e) {
                 console.log('Gruppen-Einstellung von Supabase laden:', e.message);
@@ -3191,7 +3194,9 @@ const Gruppen = {
         }
         // Fallback: Lokal
         const setting = await db.settings.get('gruppenAbfrageAktiv');
-        return setting?.value === true;
+        const isActive = setting?.value === true || setting?.value === 'true';
+        console.log('📊 Gruppenabfrage lokal:', setting?.value, '→', isActive);
+        return isActive;
     },
     
     async setAbfrageAktiv(aktiv) {
@@ -3205,13 +3210,13 @@ const Gruppen = {
                     .from('settings')
                     .select('key')
                     .eq('key', 'gruppenAbfrageAktiv')
-                    .single();
+                    .maybeSingle();
                 
                 if (existing) {
-                    // Update
+                    // Update - OHNE updated_at falls Spalte nicht existiert
                     const { error } = await supabaseClient
                         .from('settings')
-                        .update({ value: boolValue, updated_at: new Date().toISOString() })
+                        .update({ value: boolValue })
                         .eq('key', 'gruppenAbfrageAktiv');
                     
                     if (error) throw error;
@@ -3227,6 +3232,7 @@ const Gruppen = {
             } catch(e) {
                 console.error('Supabase settings error:', e);
                 Utils.showToast('Fehler beim Speichern in Supabase: ' + e.message, 'error');
+                return; // Nicht lokal speichern wenn Supabase fehlschlägt
             }
         }
         // Lokal speichern
