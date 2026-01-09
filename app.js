@@ -259,14 +259,14 @@ const DataProtection = {
                         supabaseClient.from('profiles').select('*'),
                         supabaseClient.from('buchungen').select('*'),
                         supabaseClient.from('artikel').select('*'),
-                        supabaseClient.from('fehlende_getränke').select('*')
+                        supabaseClient.from('fehlende_getraenke').select('*')
                     ]);
                     
                     data.supabase = {
                         profiles: profiles.data || [],
                         buchungen: buchungen.data || [],
                         artikel: artikel.data || [],
-                        fehlende_getränke: fehlende.data || []
+                        fehlende_getraenke: fehlende.data || []
                     };
                     data.quelle = 'lokal+supabase';
                     console.log('✅ Supabase-Daten im Backup:', {
@@ -3202,7 +3202,7 @@ const FehlendeGetränke = {
         // Supabase
         if (supabaseClient && isOnline) {
             try {
-                const { error } = await supabaseClient.from('fehlende_getränke').insert(items);
+                const { error } = await supabaseClient.from('fehlende_getraenke').insert(items);
                 if (error) console.error('Fehlende Getränke Supabase error:', error);
             } catch(e) {
                 console.error('Fehlende Getränke sync error:', e);
@@ -3216,7 +3216,7 @@ const FehlendeGetränke = {
     async getOffene() {
         if (supabaseClient && isOnline) {
             const { data } = await supabaseClient
-                .from('fehlende_getränke')
+                .from('fehlende_getraenke')
                 .select('*')
                 .eq('uebernommen', false)
                 .order('id', { ascending: false });
@@ -3238,7 +3238,7 @@ const FehlendeGetränke = {
         
         if (supabaseClient && isOnline) {
             const { data } = await supabaseClient
-                .from('fehlende_getränke')
+                .from('fehlende_getraenke')
                 .select('*')
                 .eq('id', id)
                 .single();
@@ -3259,7 +3259,7 @@ const FehlendeGetränke = {
         // Lokal und Supabase updaten
         try { await db.fehlendeGetränke.update(id, updateData); } catch(e) {}
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('fehlende_getränke').update(updateData).eq('id', id);
+            await supabaseClient.from('fehlende_getraenke').update(updateData).eq('id', id);
         }
         
         // Buchung erstellen
@@ -3301,7 +3301,7 @@ const FehlendeGetränke = {
     async löschen(id) {
         try { await db.fehlendeGetränke.delete(id); } catch(e) {}
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('fehlende_getränke').delete().eq('id', id);
+            await supabaseClient.from('fehlende_getraenke').delete().eq('id', id);
         }
         await DataProtection.createBackup();
         Utils.showToast('Gelöscht', 'success');
