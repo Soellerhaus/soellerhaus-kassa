@@ -8552,7 +8552,18 @@ window.saveEditArticle = async () => {
         
         // Platztausch: Der andere Artikel bekommt die alte Position
         if (artikelAufNeuerPos) {
+            console.log(`🔄 Platztausch: Artikel ${artikelAufNeuerPos.name} (ID ${artikelAufNeuerPos.artikel_id}) bekommt Position ${oldPos}`);
             await db.artikel.update(artikelAufNeuerPos.artikel_id, { sortierung: oldPos });
+            
+            // Auch in Supabase aktualisieren!
+            if (supabaseClient && isOnline) {
+                try {
+                    await supabaseClient.from('artikel').update({ sortierung: oldPos }).eq('artikel_id', artikelAufNeuerPos.artikel_id);
+                    console.log('✅ Platztausch in Supabase gespeichert');
+                } catch(e) {
+                    console.error('Supabase Platztausch Fehler:', e);
+                }
+            }
         }
     }
     
