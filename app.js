@@ -3640,9 +3640,10 @@ const Artikel = {
         // Erst abgelaufene Artikel cleanup
         await this.cleanupAbgelaufene();
         
-        // Von Supabase laden wenn online UND (Cache null ODER älter als 30 Sekunden)
+        // Von Supabase laden wenn online UND (Cache null ODER älter als 5 Sekunden)
+        // Kurzer Cache für schnelle Synchronisation zwischen Geräten!
         const cacheAge = artikelCacheTime ? (Date.now() - artikelCacheTime) : Infinity;
-        if (supabaseClient && isOnline && (!artikelCache || cacheAge > 30000)) {
+        if (supabaseClient && isOnline && (!artikelCache || cacheAge > 5000)) {
             await this.loadFromSupabase();
         }
         
@@ -8005,16 +8006,22 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
             updateData.aktiv_bis = null; // Zeitbegrenzung entfernen
         }
         
-        // Direkt DB updaten ohne Toast von Artikel.update
-        await db.artikel.update(id, updateData);
-        
-        // Supabase auch updaten
+        // ERST Supabase updaten (Single Source of Truth)
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
+            const { error } = await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
+            if (error) {
+                console.error('Supabase Artikel-Update Fehler:', error);
+                throw new Error('Sync fehlgeschlagen');
+            }
+            console.log('✅ Artikel in Supabase aktualisiert:', id, aktiv);
         }
         
-        // Cache invalidieren
+        // Dann lokal updaten
+        await db.artikel.update(id, updateData);
+        
+        // Cache invalidieren - erzwingt Neuladen von Supabase
         artikelCache = null;
+        artikelCacheTime = null;
         
         Utils.showToast(aktiv ? 'Artikel aktiviert' : 'Artikel deaktiviert', 'success');
     } catch (e) {
