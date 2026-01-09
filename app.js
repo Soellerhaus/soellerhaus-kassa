@@ -4337,6 +4337,7 @@ Router.register('register', () => {
                 <label class="form-label">${t('first_name')} *</label>
                 <input type="text" id="register-vorname" class="form-input" placeholder="${placeholder}" autofocus style="font-size:1.2rem;padding:16px;">
             </div>
+            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-bottom:24px;">Registrieren</button>
             <div class="form-group">
                 <label class="form-label" style="text-align:center;display:block;">${t('pin_code')} *</label>
                 <div class="pin-display" id="register-pin-display" style="display:flex;justify-content:center;gap:12px;margin:16px 0;">
@@ -4349,9 +4350,9 @@ Router.register('register', () => {
                     <button type="button" class="pin-btn pin-btn-delete" onclick="handleRegisterPinDelete()"></button>
                 </div>
             </div>
-            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;"> ${t('register_btn')}</button>
+            <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-top:24px;">Registrieren</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()"><-Â ${t('back')}</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← ${t('back')}</button>
     </div></div>`);
 });
 
@@ -4404,7 +4405,7 @@ Router.register('pin-entry', () => {
             </div>
             <button class="btn btn-primary btn-block" onclick="handlePinLogin()" style="margin-top:16px;"> ${t('login')}</button>
         </div>
-        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()"><-Â ${t('back')}</button>
+        <button class="btn btn-secondary btn-block mt-3" onclick="handlePinCancel()">← ${t('back')}</button>
     </div></div>`);
 });
 
@@ -4514,7 +4515,7 @@ window.selectGruppe = async (gruppeId, gruppeName) => {
 };
 
 Router.register('admin-login', () => {
-    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;"> Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()"><-Â Zurueck</button></div></div>`);
+    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;"> Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">← Zurueck</button></div></div>`);
     setTimeout(() => document.getElementById('admin-password')?.focus(), 100);
 });
 
@@ -6362,7 +6363,7 @@ Router.register('admin-cheese', async () => {
     UI.render(`
     <div class="app-header">
         <div class="header-left">
-            <button class="btn btn-secondary" onclick="Router.navigate('admin-dashboard')"><- Zurueck</button>
+            <button class="btn btn-secondary" onclick="Router.navigate('admin-dashboard')">← Zurueck</button>
         </div>
         <div class="header-title"> Kaese-Bestellungen</div>
         <div class="header-right">
@@ -7529,7 +7530,7 @@ Router.register('admin-artikel-sortierung', async () => {
                     <h1 style="font-size:1.5rem;margin:0;"> Artikel sortieren</h1>
                     <p style="color:#666;font-size:0.9rem;margin:4px 0 0;">Drag & Drop zum Umsortieren (nur aktive Artikel)</p>
                 </div>
-                <button class="btn btn-secondary" onclick="Router.navigate('admin')"><- Zurueck</button>
+                <button class="btn btn-secondary" onclick="Router.navigate('admin')">← Zurueck</button>
             </div>
             
             <div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:8px;padding:12px;margin-bottom:20px;">
