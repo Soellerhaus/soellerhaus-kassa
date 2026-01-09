@@ -4774,21 +4774,40 @@ Router.register('admin-auffüllliste', async () => {
 
 // Auffüllliste drucken - für Thermodrucker optimiert
 window.printAuffüllliste = async () => {
-    const liste = await Buchungen.getAuffüllliste();
-    
-    // Nach Kategorie gruppieren
-    const byKat = {};
-    liste.forEach(item => {
-        if (!byKat[item.kategorie_name]) byKat[item.kategorie_name] = [];
-        byKat[item.kategorie_name].push(item);
-    });
-    
-    const total = liste.reduce((s, i) => s + i.menge, 0);
-    const datum = new Date().toLocaleDateString('de-AT');
-    const zeit = new Date().toLocaleTimeString('de-AT', {hour:'2-digit', minute:'2-digit'});
-    
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+    try {
+        console.log('🖨️ printAuffüllliste gestartet...');
+        
+        if (!supabaseClient || !isOnline) {
+            Utils.showToast('Keine Internetverbindung!', 'error');
+            return;
+        }
+        
+        const liste = await Buchungen.getAuffüllliste();
+        console.log('✅ Auffüllliste für Druck geladen:', liste.length, 'Positionen');
+        
+        if (liste.length === 0) {
+            Utils.showToast('Keine Getränke zum Auffüllen', 'info');
+            return;
+        }
+        
+        // Nach Kategorie gruppieren
+        const byKat = {};
+        liste.forEach(item => {
+            if (!byKat[item.kategorie_name]) byKat[item.kategorie_name] = [];
+            byKat[item.kategorie_name].push(item);
+        });
+        
+        const total = liste.reduce((s, i) => s + i.menge, 0);
+        const datum = new Date().toLocaleDateString('de-AT');
+        const zeit = new Date().toLocaleTimeString('de-AT', {hour:'2-digit', minute:'2-digit'});
+        
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            Utils.showToast('Popup-Blocker aktiv! Bitte Popups erlauben.', 'error');
+            return;
+        }
+        
+        printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -4920,6 +4939,11 @@ window.printAuffüllliste = async () => {
     setTimeout(() => {
         printWindow.print();
     }, 300);
+    
+    } catch(e) {
+        console.error('❌ printAuffüllliste Fehler:', e);
+        Utils.showToast('Fehler beim Drucken: ' + e.message, 'error');
+    }
 };
 
 // Nur Auffüllliste zurücksetzen (NICHT Export!)
