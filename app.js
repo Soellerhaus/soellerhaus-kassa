@@ -5105,8 +5105,33 @@ window.resetAuffülllisteOhneExport = async () => {
 Router.register('admin-alle-buchungen', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
+    // Alle aktiven Gäste laden für Dropdown
+    let alleGäste = [];
+    if (supabaseClient && isOnline) {
+        const { data } = await supabaseClient
+            .from('profiles')
+            .select('id, vorname, display_name')
+            .eq('geloescht', false)
+            .eq('aktiv', true)
+            .order('vorname');
+        if (data) alleGäste = data.map(g => ({ id: g.id, name: g.display_name || g.vorname }));
+    }
+    if (alleGäste.length === 0) {
+        const local = await db.registeredGuests.toArray();
+        alleGäste = local.filter(g => !g.gelöscht && g.aktiv !== false)
+            .map(g => ({ id: g.id, name: g.nachname || g.firstName }));
+    }
+    
+    // Ausgewählter Gast aus State
+    const selectedGastId = State.selectedGastFilter || '';
+    
     // Alle Buchungen laden (inkl. stornierte zur Anzeige)
-    const bs = await Buchungen.getAll({ includeStorniert: true });
+    let bs = await Buchungen.getAll({ includeStorniert: true });
+    
+    // Filter nach Gast wenn ausgewählt
+    if (selectedGastId) {
+        bs = bs.filter(b => b.user_id === selectedGastId || b.gast_id === selectedGastId);
+    }
     
     // Nach Datum gruppieren
     const byDatum = {};
@@ -5118,28 +5143,39 @@ Router.register('admin-alle-buchungen', async () => {
     // Sortiert nach Datum (neueste zuerst)
     const sortedDates = Object.keys(byDatum).sort().reverse();
     
+    // Gesamtsumme und Gastname
+    const gesamtSumme = bs.filter(b => !b.storniert).reduce((s,b) => s + b.preis * b.menge, 0);
+    const selectedGastName = alleGäste.find(g => g.id === selectedGastId)?.name || 'Alle Gäste';
+    
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title"> Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
-        <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
-            <div style="padding:16px;text-align:center;">
-                <div style="font-size:1.5rem;font-weight:700;">${bs.length} Buchungen</div>
-                <div>Nach Datum sortiert (neueste zuerst)</div>
+        <!-- GÄSTE FILTER -->
+        <div class="card mb-3" style="background:#fffde7;">
+            <div style="padding:16px;">
+                <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+                    <div style="flex:1;min-width:200px;">
+                        <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:4px;">Gast auswählen:</label>
+                        <select id="gast-filter" class="form-input" style="width:100%;padding:12px;font-size:1rem;" onchange="filterBuchungenByGast(this.value)">
+                            <option value="">-- Alle Gäste --</option>
+                            ${alleGäste.map(g => `<option value="${g.id}" ${g.id === selectedGastId ? 'selected' : ''}>${g.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    ${selectedGastId ? `
+                        <button class="btn btn-primary" onclick="showAddBuchungForGastModal('${selectedGastId}', '${selectedGastName}')" style="padding:12px 20px;">
+                            + Buchung hinzufügen
+                        </button>
+                    ` : ''}
+                </div>
             </div>
         </div>
         
-        <!-- GRUPPE ABGEREIST BUTTON -->
-        <div class="card mb-3" style="background:#e74c3c;color:white;">
-            <div style="padding:16px;">
-                <div style="font-weight:700;margin-bottom:8px;">  Gruppe abgereist?</div>
-                <p style="font-size:0.9rem;margin-bottom:12px;opacity:0.9;">
-                    Alle Buchungen exportieren und als erledigt markieren.<br>
-                    Danach werden nur noch neue Buchungen angezeigt.
-                </p>
-                <button class="btn" onclick="handleGruppeAbgereist()" style="background:white;color:#e74c3c;font-weight:700;padding:12px 24px;">
-                     Gruppe abreisen & Alle Buchungen abschließen
-                </button>
+        <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
+            <div style="padding:16px;text-align:center;">
+                <div style="font-size:1.5rem;font-weight:700;">${bs.length} Buchungen</div>
+                <div>${selectedGastId ? selectedGastName : 'Alle Gäste'} | Summe: ${Utils.formatCurrency(gesamtSumme)}</div>
             </div>
         </div>
+        
         
         ${sortedDates.length ? sortedDates.map(datum => {
             const buchungen = byDatum[datum].sort((a,b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
@@ -5192,28 +5228,115 @@ Router.register('admin-alle-buchungen', async () => {
 });
 
 // Gruppe abgereist - Alle Buchungen exportieren und abschließen
-window.handleGruppeAbgereist = async () => {
-    if (!confirm('⚠ACHTUNG: Gruppe abreisen?\n\nDies wird:\n1. Alle Buchungen für die Registrierkasse exportieren\n2. Alle Buchungen als exportiert markieren\n3. Auffüllliste zurücksetzen\n\nFortfahren?')) return;
+// Filter Buchungen nach Gast
+window.filterBuchungenByGast = (gastId) => {
+    State.selectedGastFilter = gastId;
+    Router.navigate('admin-alle-buchungen');
+};
+
+// Modal zum Hinzufügen von Buchungen öffnen
+window.showAddBuchungForGastModal = async (gastId, gastName) => {
+    const modalHtml = `
+    <div id="add-buchung-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;justify-content:center;align-items:center;">
+        <div style="background:white;padding:24px;border-radius:12px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
+            <h3 style="margin-bottom:16px;">Buchung hinzufügen für ${gastName}</h3>
+            <input type="hidden" id="modal-gast-id" value="${gastId}">
+            <input type="hidden" id="modal-gast-name" value="${gastName}">
+            
+            <div style="margin-bottom:16px;">
+                <label style="font-weight:600;">Artikel suchen:</label>
+                <input type="text" id="artikel-search-modal" class="form-input" placeholder="Artikelname eingeben..." oninput="searchArtikelForBuchungModal(this.value)" style="margin-top:4px;">
+            </div>
+            
+            <div id="artikel-results-modal" style="max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;">
+                <p style="padding:20px;text-align:center;color:#888;">Artikel suchen...</p>
+            </div>
+            
+            <div style="display:flex;gap:12px;margin-top:24px;">
+                <button class="btn btn-secondary" onclick="closeAddBuchungModal()" style="flex:1;padding:14px;">Abbrechen</button>
+            </div>
+        </div>
+    </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('artikel-search-modal').focus();
+};
+
+window.closeAddBuchungModal = () => {
+    const modal = document.getElementById('add-buchung-modal');
+    if (modal) modal.remove();
+};
+
+// Artikel suchen für Modal
+window.searchArtikelForBuchungModal = async (query) => {
+    const resultsDiv = document.getElementById('artikel-results-modal');
+    
+    if (!query || query.length < 1) {
+        resultsDiv.innerHTML = '<p style="padding:20px;text-align:center;color:#888;">Artikel suchen...</p>';
+        return;
+    }
+    
+    const artikel = await Artikel.getAll({ aktiv: true, search: query });
+    
+    if (artikel.length === 0) {
+        resultsDiv.innerHTML = '<p style="padding:20px;text-align:center;color:#888;">Keine Artikel gefunden</p>';
+        return;
+    }
+    
+    resultsDiv.innerHTML = artikel.slice(0, 20).map(a => `
+        <div style="padding:12px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="addBuchungForSelectedGast(${a.artikel_id})" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='white'">
+            <div>
+                <div style="font-weight:600;">${a.icon || ''} ${a.name}</div>
+                <div style="font-size:0.85rem;color:#666;">${a.kategorie_name || ''}</div>
+            </div>
+            <div style="font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(a.preis)}</div>
+        </div>
+    `).join('');
+};
+
+// Buchung für ausgewählten Gast hinzufügen
+window.addBuchungForSelectedGast = async (artikelId) => {
+    const gastId = document.getElementById('modal-gast-id').value;
+    const gastName = document.getElementById('modal-gast-name').value;
     
     try {
-        // 1. Excel Export
-        await ExportService.exportBuchungenExcel();
+        const artikel = await Artikel.getById(artikelId);
+        if (!artikel) throw new Error('Artikel nicht gefunden');
         
-        // 2. Alle als exportiert markieren
-        const bs = await Buchungen.getAll({ exportiert: false });
-        for (const b of bs) {
-            const update = { exportiert: true, exportiert_am: new Date().toISOString() };
-            try { await db.buchungen.update(b.buchung_id, update); } catch(e) {}
-            if (supabaseClient && isOnline) {
-                await supabaseClient.from('buchungen').update(update).eq('buchung_id', b.buchung_id);
+        // Buchung erstellen
+        const buchung = {
+            buchung_id: Utils.uuid(),
+            user_id: gastId,
+            gast_id: gastId,
+            gast_vorname: gastName,
+            artikel_id: artikel.artikel_id,
+            artikel_name: artikel.name,
+            preis: artikel.preis,
+            menge: 1,
+            datum: new Date().toLocaleDateString('de-AT'),
+            uhrzeit: new Date().toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            erstellt_am: new Date().toISOString(),
+            storniert: false,
+            exportiert: false,
+            aufgefuellt: false,
+            group_name: 'keiner Gruppe zugehoerig'
+        };
+        
+        // In Supabase speichern
+        if (supabaseClient && isOnline) {
+            const { error } = await supabaseClient.from('buchungen').insert(buchung);
+            if (error) {
+                console.error('Supabase Buchung Fehler:', error);
+                throw new Error(error.message);
             }
         }
         
-        // 3. Auffüllliste auch zurücksetzen
-        await Buchungen.markAsAufgefuellt();
+        // Lokal speichern
+        try { await db.buchungen.add(buchung); } catch(e) {}
         
-        Utils.showToast('✅ Gruppe abgereist - Alle Buchungen exportiert und abgeschlossen', 'success');
-        Router.navigate('admin-dashboard');
+        Utils.showToast(`${artikel.name} für ${gastName} gebucht`, 'success');
+        closeAddBuchungModal();
+        Router.navigate('admin-alle-buchungen');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
     }
