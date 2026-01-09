@@ -2501,28 +2501,9 @@ const RegisteredGuests = {
             }
         }
         
-        // Fallback: Lokale Daten wenn offline
-        const local = await db.registeredGuests.toArray();
-        const filtered = local.filter(g => {
-            if (g.gelöscht === true) return false;
-            if (g.aktiv === false) return false;  // Nur aktive Gäste
-            const name = (g.nachname || g.firstName || '').toUpperCase();
-            return name.startsWith(letter.toUpperCase());
-        });
-        
-        // Deduplizierung auch für lokale Daten
-        const seenNames = new Set();
-        const deduplicated = filtered.filter(g => {
-            const name = (g.nachname || g.firstName || '').toUpperCase().trim();
-            if (seenNames.has(name)) return false;
-            seenNames.add(name);
-            return true;
-        });
-        
-        return deduplicated.sort((a,b) => (a.nachname || a.firstName || '').localeCompare(b.nachname || b.firstName || '')).map(g => { 
-            const name = g.nachname || g.firstName;
-            return {...g, firstName: name, displayName: name}; 
-        });
+        // Fallback: Fehler wenn offline
+        console.error('❌ Keine Verbindung zu Supabase');
+        return [];
     },
     
     async getAll() { 
@@ -2714,14 +2695,14 @@ const Buchungen = {
             ist_umlage: false
         };
         
-        // Session prüfen - OHNE Session keine Buchung erlaubt!
-        let hasSession = false;
-        if (supabaseClient && isOnline) {
-            const { data: sessionData } = await supabaseClient.auth.getSession();
-            hasSession = !!sessionData?.session;
+        // WICHTIG: Nur Supabase - kein lokaler Fallback!
+        if (!supabaseClient || !isOnline) {
+            throw new Error('Keine Internetverbindung. Bitte später nochmal versuchen.');
         }
         
-        if (!hasSession) {
+        // Session prüfen
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        if (!sessionData?.session) {
             throw new Error('Verbindungsfehler. Bitte abmelden, neu anmelden und nochmal versuchen.');
         }
         
@@ -2735,86 +2716,65 @@ const Buchungen = {
                 erstellt_am: new Date().toISOString()
             };
             
-            // Direkt nach Supabase (Session ist vorhanden)
-            try {
-                const { error } = await supabaseClient.from('buchungen').insert(b);
-                if (error) {
-                    console.error('❌ Supabase insert error:', error.message);
-                    // Trotzdem lokal speichern für späteren Sync
-                    await db.buchungen.add({...b, sync_status: 'pending'});
-                } else {
-                    console.log('✅ Buchung nach Supabase:', b.buchung_id);
-                    await db.buchungen.add({...b, sync_status: 'synced'});
-                }
-            } catch(e) {
-                console.error('❌ Supabase exception:', e);
-                await db.buchungen.add({...b, sync_status: 'pending'});
+            // NUR Supabase - kein lokaler Fallback!
+            const { error } = await supabaseClient.from('buchungen').insert(b);
+            if (error) {
+                console.error('❌ Supabase insert error:', error.message);
+                throw new Error('Buchung fehlgeschlagen. Bitte nochmal versuchen.');
             }
             
+            console.log('✅ Buchung nach Supabase:', b.buchung_id);
             erstellteBuchungen.push(b);
         }
         
         console.log('✅', menge, 'Einzelbuchung(en) erstellt für:', artikel.name);
-        
-        // Ampel aktualisieren
-        setTimeout(() => SyncManager.updateUI(), 200);
-        
-        // Bei pending Buchungen: Retry im Hintergrund
-        const pendingCount = await SyncManager.getPendingCount();
-        if (pendingCount > 0) {
-            setTimeout(() => SyncManager.syncPending(), 3000); // Nach 3 Sek nochmal versuchen
-        }
-        
-        await DataProtection.createBackup();
         return erstellteBuchungen[0];
     },
 
     async storno(buchung_id) {
-        // Lokal laden
-        const allBs = await db.buchungen.toArray();
-        let b = allBs.find(x => x.buchung_id === buchung_id);
-        
-        // Falls nicht lokal, von Supabase laden
-        if (!b && supabaseClient && isOnline) {
-            const { data } = await supabaseClient.from('buchungen').select('*').eq('buchung_id', buchung_id).single();
-            b = data;
+        // NUR über Supabase
+        if (!supabaseClient || !isOnline) {
+            throw new Error('Keine Internetverbindung. Bitte später nochmal versuchen.');
         }
         
-        if (!b) throw new Error('Buchung nicht gefunden');
+        // Buchung von Supabase laden
+        const { data: b, error } = await supabaseClient
+            .from('buchungen')
+            .select('*')
+            .eq('buchung_id', buchung_id)
+            .single();
+        
+        if (error || !b) throw new Error('Buchung nicht gefunden');
         if (!State.isAdmin && b.fix) throw new Error('Buchung bereits abgeschlossen');
         
         const update = { storniert: true, storniert_am: new Date().toISOString() };
         
-        // Lokal updaten
-        try { await db.buchungen.update(buchung_id, update); } catch(e) {}
+        // NUR Supabase updaten
+        const { error: updateError } = await supabaseClient
+            .from('buchungen')
+            .update(update)
+            .eq('buchung_id', buchung_id);
         
-        // Supabase updaten
-        if (supabaseClient && isOnline) {
-            await supabaseClient.from('buchungen').update(update).eq('buchung_id', buchung_id);
+        if (updateError) {
+            throw new Error('Stornierung fehlgeschlagen. Bitte nochmal versuchen.');
         }
         
-        await DataProtection.createBackup();
         Utils.showToast('Buchung storniert', 'success');
     },
     
     async fixSessionBuchungen() {
         if (!State.sessionId) return;
+        if (!supabaseClient || !isOnline) return;
+        
         const userId = State.currentUser?.id || State.currentUser?.gast_id;
         
         try {
-            // Supabase: RPC Funktion nutzen
-            if (supabaseClient && isOnline && userId) {
+            // NUR Supabase
+            if (userId) {
                 await supabaseClient.rpc('fix_session_buchungen', {
                     p_session_id: State.sessionId,
                     p_user_id: userId
                 });
-            }
-            
-            // Lokal auch updaten
-            const allBs = await db.buchungen.toArray();
-            const bs = allBs.filter(b => b.session_id === State.sessionId);
-            for (const b of bs) {
-                if (!b.storniert) await db.buchungen.update(b.buchung_id, { fix: true });
             }
             
             await DataProtection.createBackup();
@@ -2824,118 +2784,113 @@ const Buchungen = {
     },
     
     async getByGast(id, limit=null) {
-        // Supabase bevorzugen wenn online
-        if (supabaseClient && isOnline) {
-            let query = supabaseClient
-                .from('buchungen')
-                .select('*')
-                .eq('user_id', id)
-                .eq('storniert', false)
-                .order('erstellt_am', { ascending: false });
-            
-            if (limit) query = query.limit(limit);
-            const { data } = await query;
-            
-            if (data) {
-                // Cache updaten
-                for (const b of data) {
-                    try { await db.buchungen.put({ ...b, gast_id: b.user_id }); } catch(e) {}
-                }
-                return data.map(b => ({ ...b, gast_id: b.user_id }));
-            }
+        // NUR Supabase!
+        if (!supabaseClient || !isOnline) {
+            console.error('❌ Keine Verbindung zu Supabase');
+            return [];
         }
         
-        // Fallback: Lokal
-        let r = await db.buchungen.where('gast_id').equals(id).reverse().toArray();
-        r = r.filter(b => !b.storniert);
-        return limit ? r.slice(0, limit) : r;
+        let query = supabaseClient
+            .from('buchungen')
+            .select('*')
+            .eq('user_id', id)
+            .eq('storniert', false)
+            .order('erstellt_am', { ascending: false });
+        
+        if (limit) query = query.limit(limit);
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error('❌ getByGast error:', error);
+            return [];
+        }
+        
+        return (data || []).map(b => ({ ...b, gast_id: b.user_id }));
     },
     
     async getSessionBuchungen() {
         if (!State.sessionId) return [];
+        if (!supabaseClient || !isOnline) return [];
         
         try {
-            // Session-Buchungen immer lokal (sind gerade erst erstellt)
-            const allBs = await db.buchungen.toArray();
-            const r = allBs.filter(b => b.session_id === State.sessionId && !b.storniert);
-            return r.reverse();
+            // Session-Buchungen von Supabase
+            const { data, error } = await supabaseClient
+                .from('buchungen')
+                .select('*')
+                .eq('session_id', State.sessionId)
+                .eq('storniert', false)
+                .order('erstellt_am', { ascending: false });
+            
+            if (error) {
+                console.error('❌ getSessionBuchungen error:', error);
+                return [];
+            }
+            
+            return data || [];
         } catch (e) {
-            console.error('getSessionBuchungen error:', e);
+            console.error('❌ getSessionBuchungen error:', e);
             return [];
         }
     },
     
     async getAll(filter={}) {
-        // Wenn online, immer von Supabase laden
-        if (supabaseClient && isOnline) {
-            try {
-                let query = supabaseClient.from('buchungen').select('*');
-                
-                if (filter.exportiert !== undefined) {
-                    query = query.eq('exportiert', filter.exportiert);
-                }
-                if (filter.datum) {
-                    query = query.eq('datum', filter.datum);
-                }
-                if (filter.includeStorniert !== true) {
-                    query = query.eq('storniert', false);
-                }
-                
-                query = query.order('erstellt_am', { ascending: false });
-                
-                const { data, error } = await query;
-                if (error) {
-                    console.error('Buchungen.getAll Supabase error:', error);
-                } else if (data) {
-                    console.log('Buchungen von Supabase geladen:', data.length);
-                    // Cache aktualisieren
-                    for (const b of data) {
-                        try { await db.buchungen.put({ ...b, gast_id: b.user_id }); } catch(e) {}
-                    }
-                    return data.map(b => ({ ...b, gast_id: b.user_id }));
-                }
-            } catch(e) {
-                console.error('Buchungen.getAll error:', e);
-            }
+        // NUR Supabase - kein lokaler Fallback!
+        if (!supabaseClient || !isOnline) {
+            console.error('❌ Keine Verbindung zu Supabase');
+            return [];
         }
         
-        // Fallback: Lokal
-        console.log('Buchungen von lokaler DB laden...');
-        let r = await db.buchungen.toArray();
-        if (filter.exportiert !== undefined) r = r.filter(b => b.exportiert === filter.exportiert);
-        if (filter.datum) r = r.filter(b => b.datum === filter.datum);
-        if (filter.includeStorniert !== true) r = r.filter(b => !b.storniert);
-        console.log('Lokale Buchungen:', r.length);
-        return r.reverse();
+        try {
+            let query = supabaseClient.from('buchungen').select('*');
+            
+            if (filter.exportiert !== undefined) {
+                query = query.eq('exportiert', filter.exportiert);
+            }
+            if (filter.datum) {
+                query = query.eq('datum', filter.datum);
+            }
+            if (filter.includeStorniert !== true) {
+                query = query.eq('storniert', false);
+            }
+            
+            query = query.order('erstellt_am', { ascending: false });
+            
+            const { data, error } = await query;
+            if (error) {
+                console.error('❌ Buchungen.getAll Supabase error:', error);
+                return [];
+            }
+            
+            console.log('✅ Buchungen von Supabase geladen:', data.length);
+            return data.map(b => ({ ...b, gast_id: b.user_id }));
+        } catch(e) {
+            console.error('❌ Buchungen.getAll error:', e);
+            return [];
+        }
     },
     
     async getAuffüllliste() {
-        // Auffüllliste: Nur Buchungen die NICHT aufgefuellt sind (unabhaengig von Export!)
-        // WICHTIG: Umlagen NIE auf Auffüllliste anzeigen!
-        let bs = [];
+        // NUR Supabase!
+        if (!supabaseClient || !isOnline) {
+            console.error('❌ Keine Verbindung zu Supabase');
+            return [];
+        }
         
-        if (supabaseClient && isOnline) {
-            try {
-                const { data } = await supabaseClient
-                    .from('buchungen')
-                    .select('*')
-                    .eq('storniert', false)
-                    .or('aufgefuellt.is.null,aufgefuellt.eq.false')
-                    .order('erstellt_am', { ascending: false });
-                if (data) {
-                    // Umlagen ausfiltern
-                    bs = data.filter(b => !b.ist_umlage);
-                }
-            } catch(e) {
-                console.error('getAuffüllliste error:', e);
+        try {
+            const { data, error } = await supabaseClient
+                .from('buchungen')
+                .select('*')
+                .eq('storniert', false)
+                .or('aufgefuellt.is.null,aufgefuellt.eq.false')
+                .order('erstellt_am', { ascending: false });
+            
+            if (error) {
+                console.error('❌ getAuffüllliste error:', error);
+                return [];
             }
-        }
-        
-        // Fallback: Lokal
-        if (bs.length === 0) {
-            const all = await db.buchungen.toArray();
-            bs = all.filter(b => !b.storniert && !b.aufgefuellt && !b.ist_umlage);
-        }
+            
+            // Umlagen ausfiltern
+            const bs = (data || []).filter(b => !b.ist_umlage);
         
         const byArtikel = {};
         for (const b of bs) {
@@ -2964,35 +2919,31 @@ const Buchungen = {
     
     // Nur Auffüllliste zurücksetzen (NICHT Export!)
     async markAsAufgefuellt() {
-        let bs = [];
-        
-        if (supabaseClient && isOnline) {
-            const { data } = await supabaseClient
-                .from('buchungen')
-                .select('buchung_id')
-                .eq('storniert', false)
-                .or('aufgefuellt.is.null,aufgefuellt.eq.false');
-            if (data) bs = data;
-        } else {
-            const all = await db.buchungen.toArray();
-            bs = all.filter(b => !b.storniert && !b.aufgefuellt);
+        // NUR Supabase!
+        if (!supabaseClient || !isOnline) {
+            throw new Error('Keine Internetverbindung. Bitte später nochmal versuchen.');
         }
         
-        const ids = bs.map(b => b.buchung_id);
+        const { data, error } = await supabaseClient
+            .from('buchungen')
+            .select('buchung_id')
+            .eq('storniert', false)
+            .or('aufgefuellt.is.null,aufgefuellt.eq.false');
+        
+        if (error) {
+            console.error('❌ markAsAufgefuellt error:', error);
+            throw new Error('Fehler beim Laden der Buchungen.');
+        }
+        
+        const ids = (data || []).map(b => b.buchung_id);
         const update = { aufgefuellt: true, aufgefuellt_am: new Date().toISOString() };
         
+        // NUR Supabase updaten
         for (const id of ids) {
-            try { await db.buchungen.update(id, update); } catch(e) {}
+            await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
         }
         
-        if (supabaseClient && isOnline) {
-            for (const id of ids) {
-                await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
-            }
-        }
-        
-        await DataProtection.createBackup();
-        console.log(`${ids.length} Buchungen als aufgefuellt markiert`);
+        console.log(`✅ ${ids.length} Buchungen als aufgefuellt markiert`);
     },
     
     // Legacy - nicht mehr benutzen
@@ -3001,12 +2952,14 @@ const Buchungen = {
     },
     
     async markAsExported(ids) { 
+        // NUR Supabase!
+        if (!supabaseClient || !isOnline) {
+            throw new Error('Keine Internetverbindung. Bitte später nochmal versuchen.');
+        }
+        
+        const update = { exportiert: true, exportiert_am: new Date().toISOString() };
         for (const id of ids) {
-            const update = { exportiert: true, exportiert_am: new Date().toISOString() };
-            await db.buchungen.update(id, update);
-            if (supabaseClient && isOnline) {
-                await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
-            }
+            await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
         }
     }
 };
@@ -3018,118 +2971,20 @@ const SyncManager = {
     syncInterval: null,
     isSyncing: false,
     
-    // Status: 'green' = alles OK, 'yellow' = pending, 'red' = offline
+    // Status: 'green' = online, 'red' = offline (kein 'yellow' mehr - alles geht direkt zu Supabase)
     async getStatus() {
-        const pending = await this.getPendingCount();
-        if (!isOnline) return { status: 'red', pending, message: 'Offline' };
-        if (pending > 0) return { status: 'yellow', pending, message: `${pending} warten` };
-        return { status: 'green', pending: 0, message: 'Synchronisiert' };
+        if (!isOnline) return { status: 'red', pending: 0, message: 'Offline' };
+        return { status: 'green', pending: 0, message: 'Verbunden' };
     },
     
-    // Anzahl pending Buchungen
+    // Nicht mehr benötigt - aber für Kompatibilität behalten
     async getPendingCount() {
-        try {
-            const alle = await db.buchungen.toArray();
-            return alle.filter(b => b.sync_status === 'pending' && !b.storniert).length;
-        } catch(e) { return 0; }
+        return 0; // Keine pending Buchungen mehr - alles geht direkt zu Supabase
     },
     
-    // Pending Buchungen synchronisieren
+    // Nicht mehr benötigt - aber für Kompatibilität behalten
     async syncPending() {
-        if (this.isSyncing || !isOnline || !supabaseClient) return { synced: 0, failed: 0 };
-        
-        this.isSyncing = true;
-        let synced = 0, failed = 0;
-        
-        try {
-            // Session prüfen - ohne Session kein Sync
-            const { data: sessionData } = await supabaseClient.auth.getSession();
-            if (!sessionData?.session) {
-                console.log('⚠️ SyncManager: Keine Session - Sync nicht möglich');
-                this.isSyncing = false;
-                return { synced: 0, failed: 0, noSession: true };
-            }
-            
-            // Pending Buchungen laden
-            const alle = await db.buchungen.toArray();
-            const pending = alle.filter(b => b.sync_status === 'pending' && !b.storniert);
-            
-            console.log(`🔄 SyncManager: ${pending.length} pending Buchungen`);
-            
-            if (pending.length === 0) {
-                this.isSyncing = false;
-                return { synced: 0, failed: 0 };
-            }
-            
-            for (const b of pending) {
-                try {
-                    // Prüfen ob schon in Supabase existiert
-                    const { data: existing } = await supabaseClient
-                        .from('buchungen')
-                        .select('buchung_id')
-                        .eq('buchung_id', b.buchung_id)
-                        .single();
-                    
-                    if (existing) {
-                        // Schon vorhanden, nur lokal updaten
-                        await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
-                        synced++;
-                        continue;
-                    }
-                    
-                    // Upload zu Supabase - nur erlaubte Felder senden
-                    const buchungData = {
-                        buchung_id: b.buchung_id,
-                        user_id: b.user_id || b.gast_id,
-                        gast_id: b.gast_id || b.user_id,
-                        gast_vorname: b.gast_vorname || b.gastname || '',
-                        artikel_id: b.artikel_id,
-                        artikel_name: b.artikel_name,
-                        preis: b.preis,
-                        menge: b.menge || 1,
-                        datum: b.datum,
-                        uhrzeit: b.uhrzeit,
-                        erstellt_am: b.erstellt_am,
-                        storniert: b.storniert || false,
-                        exportiert: b.exportiert || false,
-                        aufgefuellt: b.aufgefuellt || false,
-                        group_name: b.group_name || 'keiner Gruppe zugehoerig',
-                        session_id: b.session_id || null
-                    };
-                    
-                    const { error } = await supabaseClient.from('buchungen').insert(buchungData);
-                    
-                    if (error) {
-                        console.error(' Sync error:', b.buchung_id, error.message, error.details);
-                        // Bei bestimmten Fehlern trotzdem als synced markieren
-                        if (error.message.includes('duplicate') || error.code === '23505') {
-                            await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
-                            synced++;
-                        } else {
-                            failed++;
-                        }
-                    } else {
-                        await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
-                        synced++;
-                        console.log('✅ Synced:', b.buchung_id);
-                    }
-                } catch(e) {
-                    console.error(' Sync exception:', e);
-                    failed++;
-                }
-            }
-        } catch(e) {
-            console.error(' SyncManager error:', e);
-        }
-        
-        this.isSyncing = false;
-        
-        if (synced > 0) {
-            console.log(`✅ SyncManager: ${synced} synchronisiert, ${failed} fehlgeschlagen`);
-            this.updateUI();
-        }
-        
-        return { synced, failed };
+        return { synced: 0, failed: 0 };
     },
     
     // Ampel-HTML generieren
@@ -3142,73 +2997,50 @@ const SyncManager = {
         const ampelEl = document.getElementById('sync-ampel');
         if (!ampelEl) return;
         
-        const { status, pending, message } = await this.getStatus();
+        const { status, message } = await this.getStatus();
         
         const colors = {
             green: '#27ae60',
-            yellow: '#f39c12', 
             red: '#e74c3c'
         };
         
         const icons = {
-            green: '',
-            yellow: '',
-            red: ''
+            green: '🟢',
+            red: '🔴'
         };
         
         ampelEl.innerHTML = `${icons[status]} <span style="color:${colors[status]};font-weight:600;">${message}</span>`;
-        ampelEl.title = status === 'green' ? 'Alle Buchungen synchronisiert' : 
-                        status === 'yellow' ? `${pending} Buchung(en) warten auf Upload` :
-                        'Offline - Buchungen werden lokal gespeichert';
+        ampelEl.title = status === 'green' ? 'Mit Supabase verbunden' : 'Offline - Keine Buchungen möglich';
     },
     
     // Details Modal anzeigen
     async showDetails() {
-        const { status, pending } = await this.getStatus();
+        const { status } = await this.getStatus();
         
         let message = '';
         if (status === 'green') {
-            message = '✅ Alle deine Buchungen sind erfolgreich synchronisiert!';
-        } else if (status === 'yellow') {
-            message = ` ${pending} Buchung(en) warten noch auf Upload.\n\nDie App versucht automatisch, diese hochzuladen.\n\nKlicke nochmal um Sync zu erzwingen.`;
+            message = '✅ Mit Supabase verbunden - Alle Buchungen werden direkt synchronisiert!';
         } else {
-            message = ' Du bist offline.\n\nDeine Buchungen werden lokal gespeichert und automatisch hochgeladen, sobald du wieder online bist.';
+            message = '🔴 Du bist offline.\n\nBitte stelle eine Internetverbindung her um zu buchen.';
         }
         
-        Utils.showToast(message, status === 'green' ? 'success' : 'info');
-        
-        // Bei pending: Sofort Sync versuchen
-        if (status === 'yellow') {
-            console.log('🔄 Manueller Sync gestartet...');
-            const result = await this.syncPending();
-            console.log('✅ Sync abgeschlossen:', result);
-            // Status aktualisieren
-            setTimeout(() => this.updateUI(), 500);
-        }
+        Utils.showToast(message, status === 'green' ? 'success' : 'error');
     },
     
-    // Hintergrund-Sync starten (alle 60 Sekunden)
+    // Hintergrund-Sync (nur noch UI Update)
     startBackgroundSync() {
         if (this.syncInterval) return;
         
-        console.log(' SyncManager: Background sync gestartet');
-        
-        // Sofort einmal synchronisieren
-        this.syncPending();
+        console.log('🔄 SyncManager: Status-Check gestartet');
         this.updateUI();
         
-        // Dann alle 60 Sekunden
-        this.syncInterval = setInterval(async () => {
-            const pending = await this.getPendingCount();
-            if (pending > 0 && isOnline) {
-                console.log(' Background sync check...');
-                await this.syncPending();
-            }
+        // Alle 30 Sekunden Status prüfen
+        this.syncInterval = setInterval(() => {
             this.updateUI();
-        }, 60000);
+        }, 30000);
     },
     
-    // Hintergrund-Sync stoppen
+    // Stoppen
     stopBackgroundSync() {
         if (this.syncInterval) {
             clearInterval(this.syncInterval);
