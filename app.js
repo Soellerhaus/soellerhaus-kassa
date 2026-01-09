@@ -2869,7 +2869,7 @@ const Buchungen = {
         }
     },
     
-    async getAuffüllliste() {
+    async getAuffuellliste() {
         // NUR Supabase!
         if (!supabaseClient || !isOnline) {
             console.error('❌ Keine Verbindung zu Supabase');
@@ -2885,7 +2885,7 @@ const Buchungen = {
                 .order('erstellt_am', { ascending: false });
             
             if (error) {
-                console.error('❌ getAuffüllliste error:', error);
+                console.error('❌ getAuffuellliste error:', error);
                 return [];
             }
             
@@ -2916,7 +2916,7 @@ const Buchungen = {
             
             return liste;
         } catch(e) {
-            console.error('❌ getAuffüllliste error:', e);
+            console.error('❌ getAuffuellliste error:', e);
             return [];
         }
     },
@@ -2951,7 +2951,7 @@ const Buchungen = {
     },
     
     // Legacy - nicht mehr benutzen
-    async resetAuffüllliste() {
+    async resetAuffuellliste() {
         await this.markAsAufgefuellt();
     },
     
@@ -4479,7 +4479,7 @@ Router.register('admin-dashboard', async () => {
     } catch(e) { console.error('bs error:', e); }
     
     try {
-        auffüllListe = await Buchungen.getAuffüllliste();
+        auffüllListe = await Buchungen.getAuffuellliste();
     } catch(e) { console.error('auffüllliste error:', e); }
     
     try {
@@ -4599,7 +4599,7 @@ Router.register('admin-dashboard', async () => {
         </div>
         
         <!-- AUFFUeLLLISTE -->
-        <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffüllliste')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;">
+        <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;">
              Auffüllliste drucken<br>
             <small style="opacity:0.9;">(${auffüllAnzahl} Getränke zum Auffüllen)</small>
         </button>
@@ -4727,7 +4727,7 @@ window.repairCategories = async () => {
 };
 
 // Auffüllliste Route
-Router.register('admin-auffüllliste', async () => {
+Router.register('admin-auffuellliste', async () => {
     console.log('📋 Auffüllliste Route - isAdmin:', State.isAdmin);
     if (!State.isAdmin) { 
         console.log('⚠️ Nicht als Admin eingeloggt, leite zum Login');
@@ -4737,7 +4737,7 @@ Router.register('admin-auffüllliste', async () => {
     
     let liste = [];
     try {
-        liste = await Buchungen.getAuffüllliste();
+        liste = await Buchungen.getAuffuellliste();
         console.log('✅ Auffüllliste geladen:', liste.length, 'Positionen');
     } catch(e) {
         console.error('❌ Auffüllliste Fehler:', e);
@@ -4763,10 +4763,10 @@ Router.register('admin-auffüllliste', async () => {
         </div>
         
         <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
-            <button class="btn btn-primary" onclick="printAuffüllliste()" style="padding:16px;font-size:1.1rem;">
+            <button class="btn btn-primary" onclick="printAuffuellliste()" style="padding:16px;font-size:1.1rem;">
                  Für Thermodrucker drucken
             </button>
-            <button class="btn btn-success" onclick="resetAuffülllisteOhneExport()" style="padding:16px;font-size:1.1rem;background:#27ae60;">
+            <button class="btn btn-success" onclick="resetAuffuelllisteOhneExport()" style="padding:16px;font-size:1.1rem;background:#27ae60;">
                 ✅ Auffüllliste zurücksetzen<br>
                 <small style="opacity:0.9;">(Getränke wurden aufgefuellt)</small>
             </button>
@@ -4805,16 +4805,16 @@ Router.register('admin-auffüllliste', async () => {
 });
 
 // Auffüllliste drucken - für Thermodrucker optimiert
-window.printAuffüllliste = async () => {
+window.printAuffuellliste = async () => {
     try {
-        console.log('🖨️ printAuffüllliste gestartet...');
+        console.log('🖨️ printAuffuellliste gestartet...');
         
         if (!supabaseClient || !isOnline) {
             Utils.showToast('Keine Internetverbindung!', 'error');
             return;
         }
         
-        const liste = await Buchungen.getAuffüllliste();
+        const liste = await Buchungen.getAuffuellliste();
         console.log('✅ Auffüllliste für Druck geladen:', liste.length, 'Positionen');
         
         if (liste.length === 0) {
@@ -4973,19 +4973,19 @@ window.printAuffüllliste = async () => {
     }, 300);
     
     } catch(e) {
-        console.error('❌ printAuffüllliste Fehler:', e);
+        console.error('❌ printAuffuellliste Fehler:', e);
         Utils.showToast('Fehler beim Drucken: ' + e.message, 'error');
     }
 };
 
 // Nur Auffüllliste zurücksetzen (NICHT Export!)
-window.resetAuffülllisteOhneExport = async () => {
+window.resetAuffuelllisteOhneExport = async () => {
     if (!confirm('Auffüllliste zurücksetzen?\n\nDie Getränke wurden aufgefuellt und die Liste wird auf 0 gesetzt.\n\n(Dies hat keinen Einfluss auf den Registrierkasse-Export)')) return;
     
     try {
         await Buchungen.markAsAufgefuellt();
         Utils.showToast('✅ Auffüllliste zurückgesetzt', 'success');
-        Router.navigate('admin-auffüllliste');
+        Router.navigate('admin-auffuellliste');
     } catch(e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
     }
