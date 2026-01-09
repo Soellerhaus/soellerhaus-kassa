@@ -5376,7 +5376,7 @@ Router.register('admin-fehlende', async () => {
                             ${kat.artikel.map(a => `
                             <button class="btn btn-secondary" onclick="addFehlendesGetraenk(${a.artikel_id})" style="padding:12px 8px;text-align:center;">
                                 <div style="font-size:1.5rem;">${a.icon||''}</div>
-                                <div style="font-size:0.85rem;font-weight:500;">${a.name_kurz||a.name}</div>
+                                <div style="font-size:0.85rem;font-weight:500;">${a.name}</div>
                                 <div style="font-size:0.8rem;color:var(--color-stone-dark);">${Utils.formatCurrency(a.preis)}</div>
                             </button>
                             `).join('')}
@@ -7734,7 +7734,7 @@ Router.register('admin-artikel-sortierung', async () => {
                 <div class="sort-artikel-pos">${idx + 1}</div>
                 <div class="sort-artikel-content">
                     ${a.bild ? `<img src="${a.bild}" class="sort-artikel-img">` : `<div class="sort-artikel-icon">${a.icon || ''}</div>`}
-                    <div class="sort-artikel-name">${a.name_kurz || a.name}</div>
+                    <div class="sort-artikel-name">${a.name}</div>
                 </div>
                 <div class="sort-artikel-handle">......</div>
             </div>
@@ -8239,7 +8239,7 @@ Router.register('buchen', async () => {
             <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')">${t('cat_all')}</div>
         </div>
         <div class="artikel-grid">
-            ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${renderTileContent(a)}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
+            ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${renderTileContent(a)}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
         </div>
     </div>`);
 });
@@ -8297,7 +8297,7 @@ window.bucheArtikelDirekt = async (id) => {
         const a = await Artikel.getById(id);
         if (!a) { Utils.showToast(i18n.t('article_not_found'), 'error'); return; }
         await Buchungen.create(a, 1);
-        Utils.showToast(`${a.name_kurz||a.name} ${i18n.t('booked')}`, 'success');
+        Utils.showToast(`${a.name} ${i18n.t('booked')}`, 'success');
         Router.navigate('buchen');
     } catch (e) {
         Utils.showToast(e.message || i18n.t('booking_error'), 'error');
@@ -8468,7 +8468,7 @@ window.bucheMitMenge = async (artikelId) => {
         await Buchungen.create(artikel, menge);
         
         closeMengenModal();
-        Utils.showToast(`${menge}x ${artikel.name_kurz||artikel.name} ${i18n.t('booked')}`, 'success');
+        Utils.showToast(`${menge}x ${artikel.name} ${i18n.t('booked')}`, 'success');
         Router.navigate('buchen');
     } catch (e) {
         Utils.showToast(e.message || i18n.t('booking_error'), 'error');
@@ -9042,7 +9042,7 @@ window.searchArtikel = Utils.debounce(async q => {
         const content = (a.bild && a.bild.startsWith('data:')) 
             ? `<img src="${a.bild}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">`
             : `<div class="artikel-icon">${a.icon||''}</div>`;
-        return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${content}<div class="artikel-name">${a.name_kurz||a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`;
+        return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${content}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`;
     };
     if (grid) grid.innerHTML = arts.map(renderTile).join('') || '<p class="text-muted" style="grid-column:1/-1;text-align:center;">Keine Ergebnisse</p>';
 }, 300);
