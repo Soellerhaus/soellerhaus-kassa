@@ -3099,23 +3099,29 @@ const FehlendeGetränke = {
     },
     
     async getOffene() {
-        if (supabaseClient && isOnline) {
-            const { data } = await supabaseClient
+        // NUR Supabase!
+        if (!supabaseClient || !isOnline) {
+            console.error('❌ Keine Verbindung zu Supabase');
+            return [];
+        }
+        
+        try {
+            const { data, error } = await supabaseClient
                 .from('fehlende_getraenke')
                 .select('*')
                 .eq('uebernommen', false)
                 .order('id', { ascending: false });
             
-            if (data) {
-                // Cache aktualisieren
-                for (const f of data) {
-                    try { await db.fehlendeGetraenke.put(f); } catch(e) {}
-                }
-                return data;
+            if (error) {
+                console.error('❌ getOffene error:', error);
+                return [];
             }
+            
+            return data || [];
+        } catch(e) {
+            console.error('❌ getOffene error:', e);
+            return [];
         }
-        const alle = await db.fehlendeGetraenke.toArray();
-        return alle.filter(f => !f.uebernommen).sort((a, b) => b.id - a.id);
     },
     
     async uebernehmen(id, gastId, gastName) {
@@ -4449,15 +4455,41 @@ Router.register('admin-login', () => {
 
 Router.register('admin-dashboard', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
-    const guests = await RegisteredGuests.getAll();
-    const artCount = await db.artikel.count();
-    const bs = await Buchungen.getAll();
-    const heute = Utils.getBuchungsDatum(); // 7:00-7:00 Periode
+    
+    // NUR Supabase - keine lokalen DB Aufrufe!
+    let guests = [];
+    let artCount = 0;
+    let bs = [];
+    let auffüllListe = [];
+    let fehlendeOffen = [];
+    
+    try {
+        guests = await RegisteredGuests.getAll();
+    } catch(e) { console.error('guests error:', e); }
+    
+    try {
+        if (supabaseClient && isOnline) {
+            const { count } = await supabaseClient.from('artikel').select('*', { count: 'exact', head: true });
+            artCount = count || 0;
+        }
+    } catch(e) { console.error('artCount error:', e); }
+    
+    try {
+        bs = await Buchungen.getAll();
+    } catch(e) { console.error('bs error:', e); }
+    
+    try {
+        auffüllListe = await Buchungen.getAuffüllliste();
+    } catch(e) { console.error('auffüllliste error:', e); }
+    
+    try {
+        fehlendeOffen = await FehlendeGetränke.getOffene();
+    } catch(e) { console.error('fehlende error:', e); }
+    
+    const heute = Utils.getBuchungsDatum();
     const heuteB = bs.filter(b => b.datum === heute);
     const nichtExp = bs.filter(b => !b.exportiert);
-    const auffüllListe = await Buchungen.getAuffüllliste();
     const auffüllAnzahl = auffüllListe.reduce((s, i) => s + i.menge, 0);
-    const fehlendeOffen = await FehlendeGetränke.getOffene();
     
     // Aktive Nachricht laden
     const aktiveNachricht = await GastNachricht.getAktive();
