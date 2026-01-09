@@ -2700,10 +2700,12 @@ const Buchungen = {
             throw new Error('Keine Internetverbindung. Bitte später nochmal versuchen.');
         }
         
-        // Session prüfen
-        const { data: sessionData } = await supabaseClient.auth.getSession();
-        if (!sessionData?.session) {
-            throw new Error('Verbindungsfehler. Bitte abmelden, neu anmelden und nochmal versuchen.');
+        // Session prüfen - ABER Admin darf immer buchen!
+        if (!State.isAdmin) {
+            const { data: sessionData } = await supabaseClient.auth.getSession();
+            if (!sessionData?.session) {
+                throw new Error('Verbindungsfehler. Bitte abmelden, neu anmelden und nochmal versuchen.');
+            }
         }
         
         // LOOP: Für jede Einheit eine separate Buchung erstellen
