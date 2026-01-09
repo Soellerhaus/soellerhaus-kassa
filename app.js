@@ -7839,13 +7839,12 @@ window.bucheMitMenge = async (artikelId) => {
 
 // Storno durch Gast
 window.stornoBuchung = async (buchung_id) => {
-    if (confirm(i18n.t('cancel_booking'))) {
-        try {
-            await Buchungen.storno(buchung_id);
-            Router.navigate('buchen');
-        } catch (e) {
-            Utils.showToast(e.message, 'error');
-        }
+    // Direkt stornieren ohne Bestätigung (schneller für Gäste)
+    try {
+        await Buchungen.storno(buchung_id);
+        Router.navigate('buchen');
+    } catch (e) {
+        Utils.showToast(e.message, 'error');
     }
 };
 
