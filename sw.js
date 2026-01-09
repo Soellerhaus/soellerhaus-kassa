@@ -701,9 +701,9 @@ const DataProtection = {
             
             Utils.showToast(`✅ Wiederherstellung erfolgreich!\n${summary.join(', ') || 'Keine neuen Daten'}`, 'success');
             
-            // Seite neu laden um Aenderungen anzuzeigen
+            // Seite neu laden um Änderungen anzuzeigen
             setTimeout(() => {
-                if (confirm('Seite neu laden um alle Aenderungen anzuzeigen?')) {
+                if (confirm('Seite neu laden um alle Änderungen anzuzeigen?')) {
                     location.reload();
                 }
             }, 1000);
@@ -6177,7 +6177,7 @@ Apfelstrudel mit Vanillesauce" style="font-size:0.95rem;line-height:1.5;">${menu
         
         <!-- ALLE SPEICHERN -->
         <button class="btn btn-block" onclick="speichereAlleMenus()" style="padding:20px;font-size:1.2rem;background:var(--color-alpine-green);color:white;border:none;">
-             Alle Aenderungen speichern
+             Alle Änderungen speichern
         </button>
         
     </div>`);
@@ -7469,9 +7469,30 @@ if (!document.getElementById('table-styles')) {
 Router.register('admin-artikel-sortierung', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Nur AKTIVE Artikel laden
-    const alleArtikel = await Artikel.getAll();
-    const aktiveArtikel = alleArtikel.filter(a => a.aktiv);
+    // Nur AKTIVE Artikel DIREKT aus Supabase laden (nicht aus Cache)
+    let aktiveArtikel = [];
+    if (supabaseClient && isOnline) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('artikel')
+                .select('*')
+                .eq('aktiv', true)
+                .order('sortierung');
+            if (!error && data) {
+                aktiveArtikel = data;
+                console.log('✅ Sortierung: ' + data.length + ' aktive Artikel aus Supabase geladen');
+            }
+        } catch(e) {
+            console.error('Supabase Fehler:', e);
+        }
+    }
+    
+    // Fallback: lokale Datenbank
+    if (aktiveArtikel.length === 0) {
+        const alleArtikel = await Artikel.getAll();
+        aktiveArtikel = alleArtikel.filter(a => a.aktiv);
+    }
+    
     const kats = await db.kategorien.toArray();
     kats.sort((a, b) => (a.sortierung || 0) - (b.sortierung || 0));
     
@@ -7538,7 +7559,7 @@ Router.register('admin-artikel-sortierung', async () => {
                     <span style="font-size:1.2rem;"></span>
                     <div>
                         <strong>Hinweis:</strong> Ziehen Sie Artikel innerhalb einer Kategorie um die Reihenfolge zu ändern.
-                        Aenderungen werden automatisch in der Cloud gespeichert.
+                        Änderungen werden automatisch in der Cloud gespeichert.
                     </div>
                 </div>
             </div>
