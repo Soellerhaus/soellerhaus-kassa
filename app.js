@@ -4292,7 +4292,10 @@ Router.register('register', () => {
         <div class="card">
             <div class="form-group">
                 <label class="form-label">${t('first_name')} *</label>
-                <input type="text" id="register-vorname" class="form-input" placeholder="${placeholder}" autofocus style="font-size:1.2rem;padding:16px;">
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="register-vorname" class="form-input" placeholder="${placeholder}" autofocus style="font-size:1.2rem;padding:16px;flex:1;text-transform:uppercase;">
+                    <button type="button" class="btn btn-secondary" onclick="showKeyboard('register-vorname')" style="padding:16px 20px;font-size:1.5rem;" title="Virtuelle Tastatur">⌨️</button>
+                </div>
             </div>
             <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-bottom:24px;">Registrieren</button>
             <div class="form-group">
@@ -6848,7 +6851,10 @@ Router.register('admin-guests', async () => {
             <div style="display:grid;gap:16px;">
                 <div>
                     <label style="font-weight:600;">Nachname: *</label>
-                    <input type="text" id="gast-nachname" class="form-input" placeholder="z.B. MUeLLER" style="text-transform:uppercase;font-size:1.1rem;">
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="gast-nachname" class="form-input" placeholder="z.B. MUELLER" style="text-transform:uppercase;font-size:1.1rem;flex:1;">
+                        <button type="button" class="btn btn-secondary" onclick="showKeyboard('gast-nachname')" style="padding:12px 16px;font-size:1.3rem;" title="Virtuelle Tastatur">⌨️</button>
+                    </div>
                 </div>
                 <div>
                     <label style="font-weight:600;">Gruppenname:</label>
@@ -6859,7 +6865,10 @@ Router.register('admin-guests', async () => {
                 </div>
                 <div>
                     <label style="font-weight:600;">Passwort (PIN): *</label>
-                    <input type="text" id="gast-passwort" class="form-input" placeholder="4-stellige PIN eingeben" maxlength="4" style="font-family:monospace;font-size:1.5rem;letter-spacing:8px;text-align:center;font-weight:bold;">
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="gast-passwort" class="form-input" placeholder="4-stellige PIN" maxlength="4" style="font-family:monospace;font-size:1.5rem;letter-spacing:8px;text-align:center;font-weight:bold;flex:1;">
+                        <button type="button" class="btn btn-secondary" onclick="showNumpad('gast-passwort')" style="padding:12px 16px;font-size:1.3rem;" title="Numpad">🔢</button>
+                    </div>
                     <small style="color:#666;">Der Gast meldet sich mit dieser PIN an</small>
                 </div>
             </div>
@@ -9565,4 +9574,277 @@ window.migrateLocalToSupabase = async () => {
         console.error('❌ Migration Fehler:', e);
         Utils.showToast('Migration fehlgeschlagen: ' + e.message, 'error');
     }
+};
+
+// ===========================================
+// VIRTUELLE TASTATUR für Touch-Geräte
+// ===========================================
+const VirtualKeyboard = {
+    activeInput: null,
+    isVisible: false,
+    
+    // Tastatur HTML erstellen
+    createKeyboardHTML(type = 'full') {
+        if (type === 'numpad') {
+            return `
+                <div id="virtual-keyboard" class="virtual-keyboard numpad">
+                    <div class="vk-header">
+                        <span>PIN eingeben</span>
+                        <button class="vk-close" onclick="VirtualKeyboard.hide()">✕</button>
+                    </div>
+                    <div class="vk-display">
+                        <input type="password" id="vk-display" readonly>
+                    </div>
+                    <div class="vk-keys">
+                        <div class="vk-row">
+                            <button class="vk-key" onclick="VirtualKeyboard.press('1')">1</button>
+                            <button class="vk-key" onclick="VirtualKeyboard.press('2')">2</button>
+                            <button class="vk-key" onclick="VirtualKeyboard.press('3')">3</button>
+                        </div>
+                        <div class="vk-row">
+                            <button class="vk-key" onclick="VirtualKeyboard.press('4')">4</button>
+                            <button class="vk-key" onclick="VirtualKeyboard.press('5')">5</button>
+                            <button class="vk-key" onclick="VirtualKeyboard.press('6')">6</button>
+                        </div>
+                        <div class="vk-row">
+                            <button class="vk-key" onclick="VirtualKeyboard.press('7')">7</button>
+                            <button class="vk-key" onclick="VirtualKeyboard.press('8')">8</button>
+                            <button class="vk-key" onclick="VirtualKeyboard.press('9')">9</button>
+                        </div>
+                        <div class="vk-row">
+                            <button class="vk-key vk-clear" onclick="VirtualKeyboard.clear()">C</button>
+                            <button class="vk-key" onclick="VirtualKeyboard.press('0')">0</button>
+                            <button class="vk-key vk-back" onclick="VirtualKeyboard.backspace()">⌫</button>
+                        </div>
+                        <div class="vk-row">
+                            <button class="vk-key vk-enter" onclick="VirtualKeyboard.confirm()">OK ✓</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Vollständige Tastatur für Namen
+            return `
+                <div id="virtual-keyboard" class="virtual-keyboard full">
+                    <div class="vk-header">
+                        <span>Name eingeben</span>
+                        <button class="vk-close" onclick="VirtualKeyboard.hide()">✕</button>
+                    </div>
+                    <div class="vk-display">
+                        <input type="text" id="vk-display" readonly style="text-transform:uppercase;">
+                    </div>
+                    <div class="vk-keys">
+                        <div class="vk-row">
+                            ${['Q','W','E','R','T','Z','U','I','O','P','Ü'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
+                        </div>
+                        <div class="vk-row">
+                            ${['A','S','D','F','G','H','J','K','L','Ö','Ä'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
+                        </div>
+                        <div class="vk-row">
+                            ${['Y','X','C','V','B','N','M'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
+                            <button class="vk-key vk-back" onclick="VirtualKeyboard.backspace()">⌫</button>
+                        </div>
+                        <div class="vk-row">
+                            <button class="vk-key vk-space" onclick="VirtualKeyboard.press(' ')">LEER</button>
+                            <button class="vk-key" onclick="VirtualKeyboard.press('-')">-</button>
+                            <button class="vk-key vk-clear" onclick="VirtualKeyboard.clear()">C</button>
+                        </div>
+                        <div class="vk-row">
+                            <button class="vk-key vk-enter" onclick="VirtualKeyboard.confirm()">OK ✓</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    },
+    
+    // Tastatur anzeigen
+    show(inputElement, type = 'full') {
+        this.hide(); // Alte schließen
+        this.activeInput = inputElement;
+        
+        // Container erstellen
+        const container = document.createElement('div');
+        container.id = 'vk-container';
+        container.innerHTML = this.createKeyboardHTML(type);
+        document.body.appendChild(container);
+        
+        // Display mit aktuellem Wert füllen
+        const display = document.getElementById('vk-display');
+        if (display) {
+            display.value = inputElement.value || '';
+        }
+        
+        this.isVisible = true;
+        
+        // Style hinzufügen falls noch nicht vorhanden
+        if (!document.getElementById('vk-styles')) {
+            const style = document.createElement('style');
+            style.id = 'vk-styles';
+            style.textContent = `
+                #vk-container {
+                    position: fixed;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    z-index: 9999;
+                    background: rgba(0,0,0,0.5);
+                    padding-top: 20px;
+                }
+                .virtual-keyboard {
+                    background: #2c3e50;
+                    border-radius: 20px 20px 0 0;
+                    padding: 15px;
+                    max-width: 500px;
+                    margin: 0 auto;
+                }
+                .vk-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    color: white;
+                    font-weight: 600;
+                    margin-bottom: 10px;
+                    padding: 0 5px;
+                }
+                .vk-close {
+                    background: #e74c3c;
+                    color: white;
+                    border: none;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    font-size: 18px;
+                    cursor: pointer;
+                }
+                .vk-display {
+                    margin-bottom: 15px;
+                }
+                .vk-display input {
+                    width: 100%;
+                    padding: 15px;
+                    font-size: 24px;
+                    text-align: center;
+                    border: none;
+                    border-radius: 10px;
+                    background: white;
+                    font-weight: bold;
+                    letter-spacing: 3px;
+                }
+                .vk-keys {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                }
+                .vk-row {
+                    display: flex;
+                    justify-content: center;
+                    gap: 6px;
+                }
+                .vk-key {
+                    min-width: 45px;
+                    height: 50px;
+                    font-size: 20px;
+                    font-weight: 600;
+                    border: none;
+                    border-radius: 8px;
+                    background: #ecf0f1;
+                    color: #2c3e50;
+                    cursor: pointer;
+                    transition: all 0.1s;
+                }
+                .vk-key:active {
+                    background: #3498db;
+                    color: white;
+                    transform: scale(0.95);
+                }
+                .numpad .vk-key {
+                    width: 70px;
+                    height: 60px;
+                    font-size: 28px;
+                }
+                .vk-enter {
+                    flex: 1;
+                    background: #27ae60;
+                    color: white;
+                    font-size: 18px;
+                }
+                .vk-enter:active {
+                    background: #2ecc71;
+                }
+                .vk-clear {
+                    background: #e74c3c;
+                    color: white;
+                }
+                .vk-back {
+                    background: #f39c12;
+                    color: white;
+                }
+                .vk-space {
+                    flex: 2;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    },
+    
+    // Tastatur verstecken
+    hide() {
+        const container = document.getElementById('vk-container');
+        if (container) {
+            container.remove();
+        }
+        this.isVisible = false;
+        this.activeInput = null;
+    },
+    
+    // Taste drücken
+    press(key) {
+        const display = document.getElementById('vk-display');
+        if (display) {
+            display.value += key;
+        }
+    },
+    
+    // Löschen
+    backspace() {
+        const display = document.getElementById('vk-display');
+        if (display && display.value.length > 0) {
+            display.value = display.value.slice(0, -1);
+        }
+    },
+    
+    // Alles löschen
+    clear() {
+        const display = document.getElementById('vk-display');
+        if (display) {
+            display.value = '';
+        }
+    },
+    
+    // Bestätigen
+    confirm() {
+        const display = document.getElementById('vk-display');
+        if (this.activeInput && display) {
+            this.activeInput.value = display.value;
+            // Event auslösen damit andere Handler es mitbekommen
+            this.activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            this.activeInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        this.hide();
+    }
+};
+
+// Global verfügbar machen
+window.VirtualKeyboard = VirtualKeyboard;
+
+// Hilfsfunktionen für einfache Nutzung
+window.showNumpad = (inputId) => {
+    const input = document.getElementById(inputId);
+    if (input) VirtualKeyboard.show(input, 'numpad');
+};
+
+window.showKeyboard = (inputId) => {
+    const input = document.getElementById(inputId);
+    if (input) VirtualKeyboard.show(input, 'full');
 };
