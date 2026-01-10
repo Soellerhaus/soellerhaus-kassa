@@ -3592,30 +3592,26 @@ const Umlage = {
             const b = {
                 buchung_id: Utils.uuid(),
                 user_id: gastId,
-                gast_id: gastId,
                 gast_vorname: gastName,
-                artikel_id: 324,  // IMMER 324 für Umlage!
-                artikel_name: 'Umlage',  // Nur "Umlage"
+                artikel_id: 324,
+                artikel_name: 'Umlage',
                 preis: preisProGast,
                 menge: 1,
                 datum: heute,
                 uhrzeit: uhrzeit,
                 erstellt_am: new Date().toISOString(),
-                exportiert: false,
                 storniert: false,
-                fix: true,
-                ist_umlage: true,
-                group_name: gast.group_name || 'keiner Gruppe zugehoerig',
-                session_id: null
+                exportiert: false,
+                group_name: gast.group_name || 'keiner Gruppe zugehoerig'
             };
             
             // Direkt nach Supabase
-            const { error: insertError } = await supabaseClient.from('buchungen').insert(b);
+            const { data, error: insertError } = await supabaseClient.from('buchungen').insert(b).select();
             if (insertError) {
-                console.error('❌ Umlage Buchung Fehler:', gastName, insertError.message);
+                console.error('❌ Umlage Buchung Fehler:', gastName, insertError.message, insertError.details);
                 fehler++;
             } else {
-                console.log('✅ Umlage gebucht für:', gastName);
+                console.log('✅ Umlage gebucht für:', gastName, data);
                 erfolg++;
             }
         }
@@ -5576,30 +5572,26 @@ window.bucheUmlageFürAlle = async () => {
         const b = {
             buchung_id: Utils.uuid(),
             user_id: gastId,
-            gast_id: gastId,
             gast_vorname: gastName,
-            artikel_id: 324,  // IMMER 324 für Umlage!
-            artikel_name: 'Umlage',  // Nur "Umlage"
+            artikel_id: 324,
+            artikel_name: 'Umlage',
             preis: preisProGast,
             menge: 1,
             datum: heute,
             uhrzeit: uhrzeit,
             erstellt_am: new Date().toISOString(),
-            exportiert: false,
             storniert: false,
-            fix: true,
-            ist_umlage: true,
-            group_name: gast.group_name || 'keiner Gruppe zugehoerig',
-            session_id: null
+            exportiert: false,
+            group_name: gast.group_name || 'keiner Gruppe zugehoerig'
         };
         
-        // Direkt nach Supabase
-        const { error: insertError } = await supabaseClient.from('buchungen').insert(b);
+        // Direkt nach Supabase mit besserem Error-Logging
+        const { data, error: insertError } = await supabaseClient.from('buchungen').insert(b).select();
         if (insertError) {
-            console.error('❌ Umlage Buchung Fehler:', gastName, insertError.message);
+            console.error('❌ Umlage Buchung Fehler:', gastName, insertError.message, insertError.details, insertError.hint);
             fehler++;
         } else {
-            console.log('✅ Umlage gebucht für:', gastName);
+            console.log('✅ Umlage gebucht für:', gastName, data);
             erfolg++;
         }
     }
