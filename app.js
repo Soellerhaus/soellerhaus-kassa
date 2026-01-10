@@ -5610,8 +5610,7 @@ window.bucheUmlageFürAlle = async () => {
             .from('fehlende_getraenke')
             .update({ 
                 uebernommen: true, 
-                uebernommen_am: new Date().toISOString(),
-                umgelegt: true
+                uebernommen_am: new Date().toISOString()
             })
             .eq('id', f.id);
     }
