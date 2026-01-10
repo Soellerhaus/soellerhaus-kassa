@@ -9638,18 +9638,16 @@ const VirtualKeyboard = {
                             ${['Q','W','E','R','T','Z','U','I','O','P'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
                         </div>
                         <div class="vk-row">
-                            ${['A','S','D','F','G','H','J','K','L'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
+                            ${['A','S','D','F','G','H','J','K','L','Ä'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
                         </div>
                         <div class="vk-row">
-                            ${['Y','X','C','V','B','N','M'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
+                            ${['Y','X','C','V','B','N','M','Ö','Ü'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
                             <button class="vk-key vk-back" onclick="VirtualKeyboard.backspace()">⌫</button>
                         </div>
                         <div class="vk-row">
-                            ${['Ä','Ö','Ü','-'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
-                            <button class="vk-key vk-space" onclick="VirtualKeyboard.press(' ')">___</button>
-                            <button class="vk-key vk-clear" onclick="VirtualKeyboard.clear()">C</button>
-                        </div>
-                        <div class="vk-row">
+                            <button class="vk-key vk-clear" onclick="VirtualKeyboard.clear()">CLR</button>
+                            <button class="vk-key" onclick="VirtualKeyboard.press('-')">-</button>
+                            <button class="vk-key vk-space" onclick="VirtualKeyboard.press(' ')">LEER</button>
                             <button class="vk-key vk-enter" onclick="VirtualKeyboard.confirm()">OK ✓</button>
                         </div>
                     </div>
@@ -9695,8 +9693,8 @@ const VirtualKeyboard = {
                 .virtual-keyboard {
                     background: #2c3e50;
                     border-radius: 16px 16px 0 0;
-                    padding: 10px;
-                    max-width: 100%;
+                    padding: 12px;
+                    max-width: 450px;
                     width: 100%;
                     margin: 0 auto;
                     box-sizing: border-box;
@@ -9727,7 +9725,7 @@ const VirtualKeyboard = {
                 .vk-display input {
                     width: 100%;
                     padding: 12px;
-                    font-size: 20px;
+                    font-size: 22px;
                     text-align: center;
                     border: none;
                     border-radius: 8px;
@@ -9739,7 +9737,7 @@ const VirtualKeyboard = {
                 .vk-keys {
                     display: flex;
                     flex-direction: column;
-                    gap: 5px;
+                    gap: 6px;
                     width: 100%;
                 }
                 .vk-row {
@@ -9749,11 +9747,9 @@ const VirtualKeyboard = {
                     width: 100%;
                 }
                 .vk-key {
-                    min-width: 28px;
-                    max-width: 40px;
-                    flex: 1;
-                    height: 42px;
-                    font-size: 16px;
+                    width: 38px;
+                    height: 44px;
+                    font-size: 18px;
                     font-weight: 600;
                     border: none;
                     border-radius: 6px;
@@ -9762,25 +9758,26 @@ const VirtualKeyboard = {
                     cursor: pointer;
                     transition: all 0.1s;
                     padding: 0;
+                    flex-shrink: 0;
                 }
                 .vk-key:active {
                     background: #3498db;
                     color: white;
                     transform: scale(0.95);
                 }
+                .numpad {
+                    max-width: 280px;
+                }
                 .numpad .vk-row {
-                    max-width: 250px;
-                    margin: 0 auto;
+                    justify-content: center;
                 }
                 .numpad .vk-key {
-                    width: 60px;
-                    max-width: 70px;
-                    height: 55px;
-                    font-size: 24px;
+                    width: 70px;
+                    height: 58px;
+                    font-size: 26px;
                 }
                 .vk-enter {
-                    flex: 2;
-                    max-width: none;
+                    width: 80px !important;
                     background: #27ae60;
                     color: white;
                     font-size: 16px;
@@ -9789,28 +9786,33 @@ const VirtualKeyboard = {
                     background: #2ecc71;
                 }
                 .vk-clear {
+                    width: 60px !important;
                     background: #e74c3c;
                     color: white;
+                    font-size: 14px;
                 }
                 .vk-back {
                     background: #f39c12;
                     color: white;
                 }
                 .vk-space {
-                    flex: 3;
-                    max-width: none;
+                    width: 120px !important;
+                    font-size: 14px;
                 }
                 @media (max-width: 400px) {
                     .vk-key {
-                        min-width: 24px;
-                        height: 38px;
-                        font-size: 14px;
+                        width: 32px;
+                        height: 40px;
+                        font-size: 16px;
                     }
                     .numpad .vk-key {
-                        width: 50px;
-                        height: 48px;
-                        font-size: 20px;
+                        width: 60px;
+                        height: 50px;
+                        font-size: 22px;
                     }
+                    .vk-space { width: 90px !important; }
+                    .vk-enter { width: 70px !important; }
+                    .vk-clear { width: 50px !important; }
                 }
             `;
             document.head.appendChild(style);
