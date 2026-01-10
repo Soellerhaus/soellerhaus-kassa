@@ -3591,11 +3591,11 @@ const Umlage = {
             
             const b = {
                 buchung_id: Utils.uuid(),
-                user_id: gastId,  // WICHTIG für Supabase!
+                user_id: gastId,
                 gast_id: gastId,
                 gast_vorname: gastName,
-                artikel_id: artikel.artikel_id,
-                artikel_name: `${artikel.name} (Umlage)`,
+                artikel_id: 324,  // IMMER 324 für Umlage!
+                artikel_name: 'Umlage',  // Nur "Umlage"
                 preis: preisProGast,
                 menge: 1,
                 datum: heute,
@@ -5575,11 +5575,11 @@ window.bucheUmlageFürAlle = async () => {
         
         const b = {
             buchung_id: Utils.uuid(),
-            user_id: gastId,  // WICHTIG für Supabase!
+            user_id: gastId,
             gast_id: gastId,
             gast_vorname: gastName,
-            artikel_id: 9999,  // Spezielle ID für Umlage
-            artikel_name: `Umlage (${fehlendeOffen.length} Getränke)`,
+            artikel_id: 324,  // IMMER 324 für Umlage!
+            artikel_name: 'Umlage',  // Nur "Umlage"
             preis: preisProGast,
             menge: 1,
             datum: heute,
