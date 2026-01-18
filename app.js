@@ -8170,19 +8170,32 @@ Router.register('buchen', async () => {
     const sessionCount = sessionBuchungen.reduce((s,b) => s + b.menge, 0);
     
     // ALLE Buchungen des Gastes laden (nur nicht-bezahlte anzeigen)
-    // Hinweis: bezahlt kann false, null oder undefined sein - nur bezahlt=true ausschließen
+    // Wir laden ALLE nicht-stornierten Buchungen und filtern dann lokal auf bezahlt !== true
     let meineBuchungen = [];
     if (supabaseClient && isOnline) {
-        const { data } = await supabaseClient
+        const { data, error } = await supabaseClient
             .from('buchungen')
             .select('*')
             .eq('user_id', gastId)
             .eq('storniert', false)
-            .or('bezahlt.is.null,bezahlt.eq.false')
             .order('erstellt_am', { ascending: false });
-        if (data) meineBuchungen = data.map(b => ({ ...b, gast_id: b.user_id }));
+        
+        if (error) {
+            console.error('Fehler beim Laden der Buchungen:', error);
+        }
+        
+        if (data) {
+            // Lokal filtern: Nur Buchungen wo bezahlt NICHT true ist
+            // bezahlt kann sein: false, null, undefined, oder gar nicht vorhanden
+            meineBuchungen = data
+                .filter(b => b.bezahlt !== true)
+                .map(b => ({ ...b, gast_id: b.user_id }));
+            
+            console.log(`📋 Buchungen geladen: ${data.length} total, ${meineBuchungen.length} nicht bezahlt`);
+        }
     }
-    if (meineBuchungen.length === 0) {
+    if (meineBuchungen.length === 0 && (!supabaseClient || !isOnline)) {
+        // Nur lokale Daten wenn Supabase nicht verfügbar
         const alleBuchungen = await db.buchungen.toArray();
         meineBuchungen = alleBuchungen.filter(b => 
             (b.gast_id === gastId || b.user_id === gastId) && !b.storniert && b.bezahlt !== true
