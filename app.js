@@ -584,7 +584,7 @@ const DataProtection = {
             return;
         }
         
-        // Modal schlieÃŸen
+        // Modal schließen
         document.getElementById('restore-modal')?.remove();
         
         // Fortschrittsanzeige
@@ -1017,8 +1017,8 @@ const GastNachricht = {
         `;
     },
     
-    // Nachricht für diesen Gast schlieÃŸen (nur visuell, nicht für alle)
-    schlieÃŸen() {
+    // Nachricht für diesen Gast schließen (nur visuell, nicht für alle)
+    schließen() {
         const box = document.getElementById('gast-nachricht-box');
         if (box) {
             box.style.animation = 'none';
@@ -1049,7 +1049,7 @@ db.open().then(async () => {
 // TAGESMENUe - Menü auf der Startseite anzeigen
 // ===========================================
 const TagesMenu = {
-    // Prüfen ob eine Uhrzeit aktuell ueberschritten ist
+    // Prüfen ob eine Uhrzeit aktuell überschritten ist
     istZeitVorbei(uhrzeitStr) {
         if (!uhrzeitStr) return false;
         const [stunden, minuten] = uhrzeitStr.split(':').map(Number);
@@ -1057,6 +1057,29 @@ const TagesMenu = {
         const jetztMinuten = jetzt.getHours() * 60 + jetzt.getMinutes();
         const zielMinuten = stunden * 60 + minuten;
         return jetztMinuten >= zielMinuten;
+    },
+    
+    // Automatisch deaktivieren wenn Ausblende-Zeit erreicht
+    async autoDeaktivieren(menuTyp, menuData) {
+        try {
+            console.log(`⏰ ${menuTyp}-Menü wird automatisch deaktiviert (Ausblende-Zeit erreicht)`);
+            menuData[menuTyp].aktiv = false;
+            menuData[menuTyp].auto_deaktiviert = new Date().toISOString();
+            
+            // In Supabase speichern
+            if (supabaseClient && isOnline) {
+                await supabaseClient
+                    .from('settings')
+                    .upsert({ key: 'tages_menu_v2', value: menuData });
+            }
+            
+            // Lokal speichern
+            await db.settings.put({ key: 'tages_menu_v2', value: JSON.stringify(menuData) });
+            
+            console.log(`✅ ${menuTyp}-Menü automatisch deaktiviert`);
+        } catch(e) {
+            console.error('Auto-Deaktivierung Fehler:', e);
+        }
     },
     
     // Aktive Menüs holen (Mittag und/oder Abend, je nach Uhrzeit)
@@ -1099,14 +1122,20 @@ const TagesMenu = {
         
         // Mittagsmenü: aktiv und noch nicht ausgeblendet?
         if (menuData.mittag?.aktiv && menuData.mittag?.text) {
-            if (!this.istZeitVorbei(menuData.mittag.ausblenden_um)) {
+            if (this.istZeitVorbei(menuData.mittag.ausblenden_um)) {
+                // Ausblende-Zeit erreicht -> automatisch deaktivieren!
+                await this.autoDeaktivieren('mittag', menuData);
+            } else {
                 result.mittag = menuData.mittag;
             }
         }
         
         // Abendmenü: aktiv und noch nicht ausgeblendet?
         if (menuData.abend?.aktiv && menuData.abend?.text) {
-            if (!this.istZeitVorbei(menuData.abend.ausblenden_um)) {
+            if (this.istZeitVorbei(menuData.abend.ausblenden_um)) {
+                // Ausblende-Zeit erreicht -> automatisch deaktivieren!
+                await this.autoDeaktivieren('abend', menuData);
+            } else {
                 result.abend = menuData.abend;
             }
         }
@@ -1323,7 +1352,7 @@ const TagesMenu = {
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     },
     
-    // Modal schlieÃŸen
+    // Modal schließen
     closeModal() {
         const modal = document.getElementById('menu-modal-overlay');
         if (modal) modal.remove();
@@ -1619,7 +1648,7 @@ const CheeseOrders = {
         this.updatePriceDisplay();
     },
     
-    // Modal schlieÃŸen
+    // Modal schließen
     closeModal() {
         const modal = document.getElementById('cheese-modal-overlay');
         if (modal) modal.remove();
@@ -1868,8 +1897,8 @@ const i18n = {
             'message_from_team': 'Nachricht vom Team',
             'important_message': 'WICHTIGE NACHRICHT!',
             'hours_visible': 'Noch {h}h sichtbar',
-            'click_to_close': 'Klicke x zum SchlieÃŸen',
-            'read_close': 'Gelesen & SchlieÃŸen',
+            'click_to_close': 'Klicke x zum Schließen',
+            'read_close': 'Gelesen & Schließen',
             
             // Name-Auswahl
             'letter': 'Buchstabe',
@@ -1924,7 +1953,7 @@ const i18n = {
             'cat_biere': 'Biere',
             'cat_weine': 'Weine',
             'cat_schnäpse': 'Schnäpse & Spirituosen',
-            'cat_heiÃŸ': 'HeiÃŸe Getränke',
+            'cat_heiß': 'Heiße Getränke',
             'cat_suess': 'Suesses & Salziges',
             'cat_sonstiges': 'Sonstiges',
             
@@ -2007,7 +2036,7 @@ const i18n = {
             'cat_biere': 'Beers',
             'cat_weine': 'Wines',
             'cat_schnäpse': 'Spirits',
-            'cat_heiÃŸ': 'Hot Drinks',
+            'cat_heiß': 'Hot Drinks',
             'cat_suess': 'Sweets & Snacks',
             'cat_sonstiges': 'Other',
             
@@ -2686,6 +2715,7 @@ const Buchungen = {
             datum: Utils.getBuchungsDatum(),
             uhrzeit: Utils.formatTime(new Date()),
             exportiert: false,
+            bezahlt: false,
             aufgefuellt: false,
             gerät_id: Utils.getDeviceId(), 
             session_id: State.sessionId,
@@ -3173,6 +3203,7 @@ const FehlendeGetränke = {
             uhrzeit: Utils.formatTime(new Date()),
             erstellt_am: new Date().toISOString(),
             exportiert: false,
+            bezahlt: false,
             gerät_id: Utils.getDeviceId(),
             sync_status: isOnline ? 'synced' : 'pending',
             session_id: State.sessionId,
@@ -3602,6 +3633,7 @@ const Umlage = {
                 erstellt_am: new Date().toISOString(),
                 storniert: false,
                 exportiert: false,
+                bezahlt: false,
                 group_name: gast.group_name || 'keiner Gruppe zugehoerig'
             };
             
@@ -3838,14 +3870,14 @@ const Artikel = {
         }
         
         // Category mapping based on Warengruppe values (1-7)
-        // 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=HeiÃŸe, 6=Suesses, 7=Sonstiges
+        // 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiße, 6=Suesses, 7=Sonstiges
         const katMap = {
             0: 'Sonstiges',
             1: 'Alkoholfreie Getränke',
             2: 'Biere',
             3: 'Weine',
             4: 'Schnäpse & Spirituosen',
-            5: 'HeiÃŸe Getränke',
+            5: 'Heiße Getränke',
             6: 'Suesses & Salziges',
             7: 'Sonstiges',
             8: 'Sonstiges'
@@ -3895,8 +3927,8 @@ const Artikel = {
             }
             
             // Get category from Warengruppe and map to new category structure
-            // CSV Warengruppe: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=HeiÃŸ, 6+=Sonstiges
-            // App Kategorien: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=HeiÃŸ, 6=Suesses, 7=Sonstiges
+            // CSV Warengruppe: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=Heiß, 6+=Sonstiges
+            // App Kategorien: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiß, 6=Suesses, 7=Sonstiges
             const warengruppeMigration = {1:1, 2:2, 3:3, 4:4, 5:5, 6:6, 7:6, 8:7};
             let csvWG = 7; // Default: Sonstiges
             if (idx.kat >= 0 && v[idx.kat] !== undefined) {
@@ -3989,7 +4021,7 @@ const Artikel = {
                 {artikel_id:201,sku:'ZIP-05',name:'Zipfer Maerzen 0.5l',name_kurz:'Zipfer',preis:4.2,steuer_prozent:10,kategorie_id:2,kategorie_name:'Biere',aktiv:true,sortierung:10,icon:''},
                 {artikel_id:301,sku:'GV-025',name:'Gruener Veltliner 0.25l',name_kurz:'Gruener V.',preis:4.8,steuer_prozent:10,kategorie_id:3,kategorie_name:'Wein',aktiv:true,sortierung:10,icon:''},
                 {artikel_id:501,sku:'OBS-02',name:'Obstler 2cl',name_kurz:'Obstler',preis:3.5,steuer_prozent:10,kategorie_id:4,kategorie_name:'Spirituosen',aktiv:true,sortierung:10,icon:''},
-                {artikel_id:601,sku:'KAF-GR',name:'Kaffee gross',name_kurz:'Kaffee',preis:3.5,steuer_prozent:10,kategorie_id:5,kategorie_name:'HeiÃŸe Getränke',aktiv:true,sortierung:10,icon:'[Kaffee]'}
+                {artikel_id:601,sku:'KAF-GR',name:'Kaffee gross',name_kurz:'Kaffee',preis:3.5,steuer_prozent:10,kategorie_id:5,kategorie_name:'Heiße Getränke',aktiv:true,sortierung:10,icon:'[Kaffee]'}
             ]);
         }
     }
@@ -4279,7 +4311,7 @@ Router.register('login', async () => {
     // Sprachauswahl Button mit WhatsApp (nur auf Startseite)
     const langBtn = i18n.renderLangButtonWithWhatsApp();
     
-    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,UklGRhASAABXRUJQVlA4WAoAAAAwAAAAKwEAMwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZBTFBI0wEAAAEPMP8REUJys22R5HyIA3MjhD8N75XKhOAARgPtNS3K69EhDFYngPf/gPi8UFBdcgAR/Z8AACirwxH17A9Rz3KMbwf5dZDz/0RXf4hr2MupAR7h8hQk2hgAApXMlKkiSCQKXfrH9AjlSkG2aCHTVaKQRikTtldcj7RK2sZlwk287pnGMBAy6ZUn+q2PpK2k4Vz0UEA9ssNt8tlWYeSZEzKRXbLNaeQ6YJFFp2yyzV4nRq5DZaMOGaSAibxxI52y27KHRVr2erQFNIu8oL3d5cmTTv7HHcABTfaQGQ/UsEPZkNtOEqDSjFGy6NZNLwBKN9dmIg0K/RTpI0nEDdAic8ky5Xq+9ppHZLiA9lQAcgc7UwJQmZcpdJJT00kECj8PWWQGRA9FcqUHGiSeZ4RzzQL7ZdL21AJtrpmp4oC6g53K+9ReId3UOuZ6No+9DeCYbpjeUyR3tYvvqEkdRXL30ObKgM8OTxTZVbTnjEzkQoae9DB0xxPXDVYyS142ok8bjTRk6IWxiijJY1EU20hMpTAiUdSqbQxoXBIpI8oTP9ErTyGLkuafShmLVK68+8eQXklUCpR+v0ZXGJDpUegi6cmlMmTBMlJpEhegAomYdBgsAWgOAFZQOCBGDgAA8EUAnQEqLAE0AD5RJI5Fo6IhEooGHDgFBLIBkgEDJAB2139O3fkB+QHyvVX+9fhD+i+0TyJ5E8uXkL++/mX/WPoT6Ifzf/sfcD/wX9a6Q/mA/Tf/o/6r3Of7h/ov7t7qP2J/zv6gfIB/Rf5h6yP/A9k/+u/732L/5V/Z//P64v68/CL+2n7h+0H/89Y78W/1j8XPBr/DflF2FGqXmX9LehH1KRl8muAF698A/aZ5z5gXrv9c76zUg73+wB/L/6L6L/4/wTPrP+59gL+Lf1T/nf4j15f+n/I+cr8u/xv/k9wT+R/0z/pf3n2qvWt+4vsL/qh/3GI6wAjRj9bMz7HBIzvWJRfblmeKxHz0t2F/QbdlgbQjS+e6KaJGvTwNut9lMjrfGREAQ55sZ4GsQ0R5P78FUEoELeXfFK4ICs/57Irep4bLZHxZ2eC55Puspd8wFwf0dzGnxfL2O3YXhSb26aaSoZcrwZ1fnVcoghDJi/BuhkBWHrIhKHlU/dUrZpqo/wDLl1HrQy3ZAGsaOtCuTvdm/dpHtrxFwMO7qjA3Y1E7ExaxGeYUrY+g5PZN3NI8JrmZqGRg2s5RPrtik7+rJ/FD0CO1MXgzGW0OxiuO+DafE52X/ACUhlqx9LbKqNoRE3UmRheu8NpUz5bh/PQwdq+yNEudSjeCjk8P9FIkWwWJU7AKwULj7Qer7iaAGNME88BEjomKT0tHFK12Btr0DcxEem6Rcw7l8PLAiudqrZrw6JaPeTPVGAD++oDstng5indz+W6cz7srqPIq/nHE58jAsViyXg2TOmuYIp5WhRzL8/xOOcDb9j/jhvRWkPdafKk4EW1hFFJ18nJpYr+Pnzw+1SnD2y5vFYWojn5pNjnl6+eBU6GBjK55GdXW8S11wyWCfA8ckes78+7+AubbKrZnLcAvMu6KHyUTSDD/hqqOut2P/1lHzNBWVh600xdznmVUHZ5B//2Gec+qqka3uap7R7LvMTM4TF3Ozbk7Fqbtpa7gh8jhe5MW3kNQMH8TOF07vHC+9t0CSR6wolbbzRGehUhlL1lL+oYmb9f/bc4CH8yJq66BoEsnUl7kPDwbcdBiqjsFLyToQbMQopgju5Gfn81+BwID7eN3nsHX/opP/9GI//+ilIVCm9pY3C5FwqiMESZQrWYkpmGpvr/+tO14evMmfrvb//7BIp76TESDJU7amA7Rfv7lFGsUi+bBguDC6LHXPCSGsbjE9wmikSbVq9SDIk9J8lRsXKQDiyItL48X4/6VUJ8uprEZrs+Cbpb9dQ4dDiWIGcI9hOcCSTXQ3logKfD6QErT3RRWrfOSZhj7CdcubtBtevqqNd7765p8df3KONDf2jtEM/Z+vsZyD88h6w7nxCqEfF+GP/iZzsq5+JDYspyzq2nL/W59iEjZUphyL1WuFG+XBEB0/cX1HMdklyZW2fPQOZ8ml97qkSgL8dBJx9//ukmFXUr+NqG8cbf5D8AUOx5sVYolpEbHzoPMVlu3bisTVfvjiwSzaz/R4H2C8y3BREeL4nrYUYECfMMULNhnhl9pXZcK8uhyFPBZBhfCsFwOSNukbjqBBaQKZYTTM26qFs2uGLNg1umIHHnyF9PvEgSKc0rmoA6iseC2LwSnkZEJkAJmJtc3yl/y+4ClyYwckDFrMwm84p9vXP8MD7xEuzAS10i7CgdKYNWxpVDTl0Xm5iWjAdWmbfm36FygNDe3stWfwHjHEZIIOqyglhR8QsQ+66TTIiXa1O1002ezTjklzQuCvLBgK+mmV3/4eGDARqpgjj9RaamqLH2RuOCyzp4T3fzW+7sL057wTXo3bnWA5LcaMKjSvaOJqtCOpJ9HXDkxjVHekYjYNO6Lb8hkNs9qnHR+tvcq8U+5aopZzrgfj46I7907wgSP1LBr7jytYQMecmXzRnfVR6RgVuxpIt6o1ciPP5ZG7zfjLxq3IotmNJmTkktsJC0+vJRRySHfiB28d1HVi2iWBARGheYu/fPhMPeie0ABWGPWN676JJkbaGZdDj5GD9DykoH2f+IwTZ+6hQAGF1n70s9EzffN32c9p75x746ECTl8P5X+udHzBNRyXCVLhKO0gqI0b6Z1OMRJH5puyeVWpK643OuQ1gnH4DzjhWOstzVjlG/208mC5NDxn46cIWsFhkyRXwle++Qdn7/AbrHRsZxBEiACzzV1WcWscoSz5y3fnXsqwAW9lPJ/w9F9XHIj67bV0+RDBm+t3Oa4BUNt99buEbkgnYeJNNZS7bET8GH3+/47gzmNdQiNZ8JaOOhPFz8OuyhQp0PLHldpM0CuGzNBVl/E4mlGUD04sgKI+LBRr44/1bah/Xcb5VRaBGur7v/ybxPlQ/mj//hOVdjvIEyD48ghebMOgv066iBYFEnatkHHN8n03EeYjrtjnuUfng1RhgTBgbueXq0kgOwN+0w1V7WxOBCBLogyuTK+e/JjMzbeaGFfh6oXlNaHTRpYec5+fSiuAzS8hai9MsjIYsr7bB//9KNH1NmTjJhjWoyAoEPgJ8k9/ovASQniQCpJWoppv4KAsusREuJu2jVEWTk4n2gcR3m0+qG0tlvVVZXZSFpnkGfJwcaKiambNVuvAAVqtMZEYo7HGSmq6tcy/+HOZFa0gxn/4c5mfyHI/IXQ1E+XayEwd7Q+1gj5S1RVlUikOP2ID+lLqVQJceWFyNZ8qDLyDM3ddq2RdlsgOpgfi7fgPjpwZxmB5J9S9yb1HbkwZyYy/HCN4tmzVkzx70Mp/DWOyP6aB61D8cVM8qJLJf5/VjtAavWpY89JHuZYl92bDZRIfoASfoi1ErNlcbxS5SvhxwPZloxv95vmwMo0/WsQ7fIQMMjY89eL8gDc1xsOof4caL/D2vk/w1Lc95z73oRRNSOysBFXN/ZMufPCrcG1C00OnZeXeOYJM/8+H/yjVTVsLdEN/Al4+jgBNbARDOpRcV48ZO9YR24iFWy31Bzv347vddYYS8IG9Jl/p6Y3p/7aFm1uN4rSUEo3I9oKHXBop6RZ3Vv8q/5zPVm+WjfgEgwWm3egMbEjyOYbgllp8K0oz9ok6BuKp3S++PHtQdr05LLafgKwHsfVw0rGsVbd2ehmnPLI5gPjLwCD2vuNNdG521ZWWVhA4zVyUH8F9O7boRH8aNkhg1WWhD0YL2CG1M0HCNzcEyFHWuqN1bs8xEzF1v7dOs1ged4fJK35MeHZtslQ7GkQznqYkfx7x1uizSz1tIj4QafoHODT4yOvR9fdAelJHBCZ/PH0JAq9yJh6vt8uFHaRm+WLqv1ny8N++dwCNAhLOkWd7Ua3yfsXph3G+NGUWKdNH/8RXxEzDEIcvIEZPL445umG7MvGj/Y6g+cItrx2bz5bwT1uqmyliNqqVtid6xKSNWF6YiUDuOce6G4p1GcqfmBoZ1OKHYG/0lJE7CX9xURSZe3ChNel95pe4zspxLomgdKvMBDFwekhhozzDnYnqtsL5uiAmV2/by2ea3DO3vUaTAUo4kKIlf7E7K9IM0yw0n3V/lSL0AJCWurkFN5c/xkzYdq2jtMnsthdm14zIiVEZIweR4kLalqu8822dBPa6ftuTO5HtlIKg85zHfzwLLxFFcuCnKRvfir28pXW7K5K39FoTHrOo+DdNLEKlyFjV1jx9Sq3ebiGlrcV4NfpQo5UiGvNdijO7UJXQqWv3kmGBfsfKjcd0S+7XLIqepJfkSvkaw/0wmcDVv/X4CPnVZsC+HEqh79makb60hRQWJzTz6Tg8DfwZM+PoAsvepYCM07CzSBX5K/XneAm4kwRl/6nK+ArHucWsVYkTU/yJc+mUXi/Qaz2ZtSmccKNOGHGYlys7Bh8bGjB46trITKHa4x1LCOdwJMYZMpiBHKt5uP050s6BfN+0pUTojlcgqsM74NgbDjm1qcA6y5qYBQmatWHOH5KSmFq7QYpBKdVCz5dCkDP/4R7UWqtn0ktW6WMqxcYiE+ygJ1xDuy1Lw1icK5rdfe1gTgcaUhrljbiGQZRHmzXUpXk0NXshia0ol22NO58wwgbhGNlhWjv3iLl65Ukwsja5mAmyMrGuExxGufldj5Ra5OljojsOD1WCoWD50zUpyLc1nMV+R3XarIeE3Nf/alr+Te4yASxOFwEXzJT7FEd/naLlNCNi92gaMzmxUi8OfvJ7awia/oiNiNhoRTvstmiXRd+m++LjlGL+IZT2GvBJK9w65yXRCuYEzg6WbAuYaMtUXFKgcXjwCXHj8pHN/vDo5M8hWGsE2e7dQbm7/vu9gFm7EgBWTrEzZ6dimjpU/ox4655UQfeEoW1lx0VavGidviFQHxlnWWTK0nztPD1SjL6gg7b72IuORuEhAitdEnTqa4A73XofeBaIqcgVBTmFXuSxd8XvazwzJROeLldKzOx9wrej3/PmoXtwGEPzTPhjD1K7Gv1+uTh6jDY1Vp/Wm2C5VNfOVC8HUz/q4oiu/DRmBGrOayOpiR5PoQx3//0xi0Iv/8ufzO3Irr8WfSswJkWO0WEC5NMQXIux/QOsvEfwlP9vnd4TWIaOzznp3MuawHUvH+j3/pbsej+YPH2qrAmKcHrqohB8J7x9YXhgJMDvp36dPaGk8+9h4+W6f0eAwEeDgj22kBDPsROlYt1ldsQfQtLIjwMzV3D03C7DUMJjvcEc01tGsgxm3fI9w8cmoOhkvLpUe9m/i3TjKIKFxr7mjwDNfNzJWgKHJ0ZNI8aDU5VeG7SQuJWRWuwqHBsefmJFhYsi9Mp656ptz/8oXcNl1rfb/ubSrDm82KB9KMOJt3EZkAq0nkhpeAdRhP7sffaLBLirFi4rbc1srB7PClXgSq/tRwRrZu3uQy/f/n4qZAAe6b9Ajiz/G7DwAAA" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">⚙️</a><span style="color:#bbb;font-size:0.65rem;">v3.4 © 2026 • Entwickelt von: Claudio</span></div></div></div></div>`);
+    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">⚙️</a><span style="color:#bbb;font-size:0.65rem;">v3.4 Â© 2026 • Entwickelt von: Claudio</span></div></div></div></div>`);
 });
 
 Router.register('register', () => {
@@ -4545,7 +4577,7 @@ Router.register('admin-dashboard', async () => {
         " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
             <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 2rem;">${isHP ? '' : ' '}</span>
+                    <span style="font-size: 2rem;">${isHP ? '' : 'Â '}</span>
                     <div>
                         <div style="font-weight: 700; font-size: 1.2rem;">
                             Preismodus: ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
@@ -4707,20 +4739,20 @@ window.repairCategories = async () => {
         {kategorie_id:2, name:'Biere', sortierung:20},
         {kategorie_id:3, name:'Weine', sortierung:30},
         {kategorie_id:4, name:'Schnäpse & Spirituosen', sortierung:40},
-        {kategorie_id:5, name:'HeiÃŸe Getränke', sortierung:50},
+        {kategorie_id:5, name:'Heiße Getränke', sortierung:50},
         {kategorie_id:6, name:'Suesses & Salziges', sortierung:60},
         {kategorie_id:7, name:'Sonstiges', sortierung:70}
     ]);
     
     // Alte Kategorie-IDs auf neue mappen:
-    // ALTE Struktur: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=HeiÃŸe, 6=Sonstiges, 7=Snacks, 8=Diverses
-    // NEUE Struktur: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=HeiÃŸe, 6=Suesses, 7=Sonstiges
+    // ALTE Struktur: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=Heiße, 6=Sonstiges, 7=Snacks, 8=Diverses
+    // NEUE Struktur: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnäpse, 5=Heiße, 6=Suesses, 7=Sonstiges
     const migrationMap = {
         1: 1,  // Alkoholfrei bleibt
         2: 2,  // Biere bleibt
         3: 3,  // Wein -> Weine
         4: 4,  // Spirituosen -> Schnäpse & Spirituosen
-        5: 5,  // HeiÃŸe Getränke bleibt
+        5: 5,  // Heiße Getränke bleibt
         6: 6,  // Sonstiges -> Suesses & Salziges
         7: 6,  // Snacks -> Suesses & Salziges
         8: 7   // Diverses -> Sonstiges
@@ -4732,7 +4764,7 @@ window.repairCategories = async () => {
         2:'Biere',
         3:'Weine',
         4:'Schnäpse & Spirituosen',
-        5:'HeiÃŸe Getränke',
+        5:'Heiße Getränke',
         6:'Suesses & Salziges',
         7:'Sonstiges'
     };
@@ -5164,7 +5196,7 @@ Router.register('admin-alle-buchungen', async () => {
     </div>`);
 });
 
-// Gruppe abgereist - Alle Buchungen exportieren und abschlieÃŸen
+// Gruppe abgereist - Alle Buchungen exportieren und abschließen
 // Filter Buchungen nach Gast
 window.filterBuchungenByGast = (gastId) => {
     State.selectedGastFilter = gastId;
@@ -5255,6 +5287,7 @@ window.addBuchungForSelectedGast = async (artikelId) => {
             erstellt_am: new Date().toISOString(),
             storniert: false,
             exportiert: false,
+            bezahlt: false,
             aufgefuellt: false,
             group_name: 'keiner Gruppe zugehoerig'
         };
@@ -5459,7 +5492,7 @@ Router.register('admin-umlage', async () => {
         <div class="card mb-3" style="background:var(--color-danger);color:white;">
             <div style="padding:20px;text-align:center;">
                 <div style="font-size:2rem;font-weight:700;">${totalGuests} Gäste für Umlage</div>
-                <div style="opacity:0.9;">Kosten werden gleichmäÃŸig verteilt</div>
+                <div style="opacity:0.9;">Kosten werden gleichmäßig verteilt</div>
                 ${ausgenommen > 0 ? `<div style="margin-top:8px;background:rgba(255,255,255,0.2);padding:6px 12px;border-radius:20px;display:inline-block;">${ausgenommen} Gäste ausgenommen</div>` : ''}
             </div>
         </div>
@@ -5585,6 +5618,7 @@ window.bucheUmlageFürAlle = async () => {
             erstellt_am: new Date().toISOString(),
             storniert: false,
             exportiert: false,
+            bezahlt: false,
             group_name: gast.group_name || 'keiner Gruppe zugehoerig'
         };
         
@@ -5997,7 +6031,7 @@ window.showAddGruppeModal = () => {
 
 window.addGruppe = async (name) => {
     try {
-        console.log('âž• Füge Gruppe hinzu:', name);
+        console.log('➕ Füge Gruppe hinzu:', name);
         const result = await Gruppen.add(name);
         console.log('✅ Gruppe hinzugefügt:', result);
         Utils.showToast(`Gruppe "${name}" hinzugefuegt`, 'success');
@@ -6051,7 +6085,7 @@ Router.register('admin-preismodus', async () => {
         <!-- AKTUELLER STATUS -->
         <div class="card mb-3" style="background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};color:white;">
             <div style="padding:24px;text-align:center;">
-                <div style="font-size:4rem;margin-bottom:16px;">${isHP ? '' : ' '}</div>
+                <div style="font-size:4rem;margin-bottom:16px;">${isHP ? '' : 'Â '}</div>
                 <div style="font-size:1.8rem;font-weight:700;margin-bottom:8px;">
                     ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
                 </div>
@@ -6079,7 +6113,7 @@ Router.register('admin-preismodus', async () => {
                         cursor:pointer;
                         transition:all 0.2s;
                     ">
-                        <div style="font-size:2.5rem;margin-bottom:8px;"> </div>
+                        <div style="font-size:2.5rem;margin-bottom:8px;">Â </div>
                         <div style="font-weight:700;font-size:1.1rem;">Selbstversorger</div>
                         <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">Standard-Preise</div>
                         ${!isHP ? '<div style="margin-top:8px;font-weight:bold;"> AKTIV</div>' : ''}
@@ -6212,7 +6246,7 @@ Router.register('admin-nachricht', async () => {
         <!-- NEUE NACHRICHT ERSTELLEN -->
         <div class="card">
             <div class="card-header" style="background:var(--color-alpine-green);color:white;">
-                <h2 class="card-title" style="margin:0;color:white;">✏️ Neue Nachricht erstellen</h2>
+                <h2 class="card-title" style="margin:0;color:white;">✏️ Neue Nachricht erstellen</h2>
             </div>
             <div class="card-body">
                 <div class="form-group">
@@ -6824,7 +6858,7 @@ Router.register('admin-guests', async () => {
                                 </td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;white-space:nowrap;">
                                     <button class="btn btn-primary" onclick="adminBuchenFürGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="Für diesen Gast buchen"></button>
-                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
+                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
                                     <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Löschen"></button>
                                 </td>
                             </tr>`;
@@ -7648,7 +7682,7 @@ Router.register('admin-articles', async () => {
                 </div>
             </td>
             <td style="text-align:right;white-space:nowrap;">
-                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✏️</button>
+                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✏️</button>
                 <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">🗑️</button>
             </td>
         </tr>`;
@@ -7704,7 +7738,7 @@ Router.register('admin-articles', async () => {
                                 <th style="padding:12px 8px;text-align:center;">
                                     <div>Preise</div>
                                     <div style="display:flex;gap:8px;justify-content:center;font-size:0.7rem;font-weight:normal;">
-                                        <span style="color:#3498db;">  SV</span>
+                                        <span style="color:#3498db;">Â  SV</span>
                                         <span style="color:#9b59b6;"> HP</span>
                                     </div>
                                 </th>
@@ -8135,7 +8169,8 @@ Router.register('buchen', async () => {
     const sessionTotal = sessionBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
     const sessionCount = sessionBuchungen.reduce((s,b) => s + b.menge, 0);
     
-    // ALLE Buchungen des Gastes laden
+    // ALLE Buchungen des Gastes laden (nur nicht-bezahlte anzeigen)
+    // Hinweis: bezahlt kann false, null oder undefined sein - nur bezahlt=true ausschließen
     let meineBuchungen = [];
     if (supabaseClient && isOnline) {
         const { data } = await supabaseClient
@@ -8143,14 +8178,14 @@ Router.register('buchen', async () => {
             .select('*')
             .eq('user_id', gastId)
             .eq('storniert', false)
-            .eq('exportiert', false)
+            .or('bezahlt.is.null,bezahlt.eq.false')
             .order('erstellt_am', { ascending: false });
         if (data) meineBuchungen = data.map(b => ({ ...b, gast_id: b.user_id }));
     }
     if (meineBuchungen.length === 0) {
         const alleBuchungen = await db.buchungen.toArray();
         meineBuchungen = alleBuchungen.filter(b => 
-            (b.gast_id === gastId || b.user_id === gastId) && !b.storniert && !b.exportiert
+            (b.gast_id === gastId || b.user_id === gastId) && !b.storniert && b.bezahlt !== true
         ).sort((a,b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
     }
     const gesamtSumme = meineBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
@@ -8333,7 +8368,7 @@ window.toggleWarenkorbDropdown = () => {
     }
 };
 
-// Dropdown schlieÃŸen wenn ausserhalb geklickt
+// Dropdown schließen wenn ausserhalb geklickt
 document.addEventListener('click', (e) => {
     const dropdown = document.getElementById('warenkorb-dropdown');
     const btn = document.getElementById('warenkorb-btn');
@@ -8871,7 +8906,7 @@ window.showZeitbegrenzungModal = (artikelId, artikelName) => {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 };
 
-// Zeitbegrenzung Modal schlieÃŸen
+// Zeitbegrenzung Modal schließen
 window.closeZeitModal = () => {
     const modal = document.getElementById('zeit-modal-overlay');
     if (modal) modal.remove();
@@ -8968,7 +9003,7 @@ window.quickUpdateMwst = async (id, mwst) => {
 // Kategorie direkt ändern
 window.changeArtikelKategorie = async (id, neueKategorieId) => {
     try {
-        const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'HeiÃŸe Getränke',6:'Suesses & Salziges',7:'Sonstiges'};
+        const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Suesses & Salziges',7:'Sonstiges'};
         const iconMap = {1:'',2:'',3:'',4:'',5:'[Kaffee]',6:'',7:''};
         
         const updateData = { 
@@ -9146,7 +9181,7 @@ window.showAddArticleModal = () => {
         <div style="font-weight:600;margin-bottom:12px;"> Preise</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#3498db;font-weight:600;">  Selbstversorger (EUR)</label>
+                <label class="form-label" style="color:#3498db;font-weight:600;">Â  Selbstversorger (EUR)</label>
                 <input type="number" id="article-price-sv" class="form-input" placeholder="0.00" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
             </div>
             <div class="form-group" style="margin-bottom:0;">
@@ -9167,7 +9202,7 @@ window.showAddArticleModal = () => {
     
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
         <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" placeholder="1" min="1" value="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
-        <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Weine</option><option value="4">Schnäpse & Spirituosen</option><option value="5">HeiÃŸe Getränke</option><option value="6">Suesses & Salziges</option><option value="7">Sonstiges</option></select></div>
+        <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getränke</option><option value="2">Biere</option><option value="3">Weine</option><option value="4">Schnäpse & Spirituosen</option><option value="5">Heiße Getränke</option><option value="6">Suesses & Salziges</option><option value="7">Sonstiges</option></select></div>
     </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" checked><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveNewArticle()">Speichern</button></div></div></div>`;
@@ -9198,7 +9233,7 @@ window.showEditArticleModal = async id => {
         <div style="font-weight:600;margin-bottom:12px;"> Preise</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#3498db;font-weight:600;">  Selbstversorger (EUR)</label>
+                <label class="form-label" style="color:#3498db;font-weight:600;">Â  Selbstversorger (EUR)</label>
                 <input type="number" id="article-price-sv" class="form-input" value="${preisSV.toFixed(2)}" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
             </div>
             <div class="form-group" style="margin-bottom:0;">
@@ -9219,7 +9254,7 @@ window.showEditArticleModal = async id => {
     
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
         <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" value="${a.sortierung||1}" min="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
-        <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'HeiÃŸe Getränke',6:'Suesses & Salziges',7:'Sonstiges'}[i]}</option>`).join('')}</select></div>
+        <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Suesses & Salziges',7:'Sonstiges'}[i]}</option>`).join('')}</select></div>
     </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
@@ -9254,7 +9289,7 @@ window.saveNewArticle = async () => {
     const name = document.getElementById('article-name')?.value;
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
-    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'HeiÃŸe Getränke',6:'Suesses & Salziges',7:'Sonstiges'};
+    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Suesses & Salziges',7:'Sonstiges'};
     const iconMap = {1:'',2:'',3:'',4:'',5:'[Kaffee]',6:'',7:''};
     
     // Beide Preise lesen
@@ -9285,7 +9320,7 @@ window.saveEditArticle = async () => {
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
     const newPos = parseInt(document.getElementById('article-sort')?.value) || 1;
-    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'HeiÃŸe Getränke',6:'Suesses & Salziges',7:'Sonstiges'};
+    const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Suesses & Salziges',7:'Sonstiges'};
     const iconMap = {1:'',2:'',3:'',4:'',5:'[Kaffee]',6:'',7:''};
     
     // Beide Preise lesen
@@ -9412,7 +9447,7 @@ window.saveEditArticle = async () => {
                 {kategorie_id:2, name:'Biere', sortierung:20},
                 {kategorie_id:3, name:'Weine', sortierung:30},
                 {kategorie_id:4, name:'Schnäpse & Spirituosen', sortierung:40},
-                {kategorie_id:5, name:'HeiÃŸe Getränke', sortierung:50},
+                {kategorie_id:5, name:'Heiße Getränke', sortierung:50},
                 {kategorie_id:6, name:'Suesses & Salziges', sortierung:60},
                 {kategorie_id:7, name:'Sonstiges', sortierung:70}
             ]);
@@ -9565,7 +9600,7 @@ window.migrateLocalToSupabase = async () => {
         }
         
         Utils.showToast(`✅ Migration fertig!\n${hochgeladen} hochgeladen\n${uebersprungen} übersprungen\n${fehler} Fehler`, 'success');
-        console.log(`📊 Migration: ${hochgeladen} hochgeladen, ${uebersprungen} übersprungen, ${fehler} Fehler`);
+        console.log(`📠 Migration: ${hochgeladen} hochgeladen, ${uebersprungen} übersprungen, ${fehler} Fehler`);
         
         // Dashboard neu laden
         Router.navigate('admin-dashboard');
@@ -9590,7 +9625,7 @@ const VirtualKeyboard = {
                 <div id="virtual-keyboard" class="virtual-keyboard numpad">
                     <div class="vk-header">
                         <span>PIN eingeben</span>
-                        <button class="vk-close" onclick="VirtualKeyboard.hide()">✕</button>
+                        <button class="vk-close" onclick="VirtualKeyboard.hide()">✏•</button>
                     </div>
                     <div class="vk-display">
                         <input type="password" id="vk-display" readonly>
@@ -9617,7 +9652,7 @@ const VirtualKeyboard = {
                             <button class="vk-key vk-back" onclick="VirtualKeyboard.backspace()">⌫</button>
                         </div>
                         <div class="vk-row">
-                            <button class="vk-key vk-enter" onclick="VirtualKeyboard.confirm()">OK ✔</button>
+                            <button class="vk-key vk-enter" onclick="VirtualKeyboard.confirm()">OK ✏”</button>
                         </div>
                     </div>
                 </div>
@@ -9628,7 +9663,7 @@ const VirtualKeyboard = {
                 <div id="virtual-keyboard" class="virtual-keyboard full">
                     <div class="vk-header">
                         <span>Name eingeben</span>
-                        <button class="vk-close" onclick="VirtualKeyboard.hide()">✕</button>
+                        <button class="vk-close" onclick="VirtualKeyboard.hide()">✏•</button>
                     </div>
                     <div class="vk-display">
                         <input type="text" id="vk-display" readonly style="text-transform:uppercase;">
@@ -9648,7 +9683,7 @@ const VirtualKeyboard = {
                             <button class="vk-key vk-clear" onclick="VirtualKeyboard.clear()">CLR</button>
                             <button class="vk-key" onclick="VirtualKeyboard.press('-')">-</button>
                             <button class="vk-key vk-space" onclick="VirtualKeyboard.press(' ')">LEER</button>
-                            <button class="vk-key vk-enter" onclick="VirtualKeyboard.confirm()">OK ✔</button>
+                            <button class="vk-key vk-enter" onclick="VirtualKeyboard.confirm()">OK ✏”</button>
                         </div>
                     </div>
                 </div>
@@ -9658,7 +9693,7 @@ const VirtualKeyboard = {
     
     // Tastatur anzeigen
     show(inputElement, type = 'full') {
-        this.hide(); // Alte schlieÃŸen
+        this.hide(); // Alte schließen
         this.activeInput = inputElement;
         
         // Container erstellen
