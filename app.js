@@ -9927,3 +9927,56 @@ window.showKeyboard = (inputId) => {
     const input = document.getElementById(inputId);
     if (input) VirtualKeyboard.show(input, 'full');
 };
+
+// ============================================
+// KIOSK AUTO-REFRESH bei Inaktivität
+// Refresh nach 30 Min ohne Interaktion
+// Nur auf Login-Seite, nicht während Buchung
+// ============================================
+const KioskRefresh = {
+    TIMEOUT: 30 * 60 * 1000,  // 30 Minuten
+    timer: null,
+    
+    init() {
+        // Bei jeder Interaktion Timer zurücksetzen
+        ['click', 'touchstart', 'keydown', 'scroll'].forEach(event => {
+            document.addEventListener(event, () => this.resetTimer(), { passive: true });
+        });
+        
+        this.resetTimer();
+        console.log('⏰ Kiosk-Modus: Auto-Refresh nach 30 Min Inaktivität aktiviert');
+    },
+    
+    resetTimer() {
+        if (this.timer) clearTimeout(this.timer);
+        this.timer = setTimeout(() => this.checkAndRefresh(), this.TIMEOUT);
+    },
+    
+    checkAndRefresh() {
+        const hash = window.location.hash;
+        const aufLoginSeite = !hash || hash === '#' || hash === '#login';
+        const gastAngemeldet = State.currentUser && State.sessionId;
+        
+        if (aufLoginSeite || !gastAngemeldet) {
+            console.log('🔄 Auto-Refresh wegen Inaktivität...');
+            
+            // Cache löschen
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    names.forEach(name => caches.delete(name));
+                });
+            }
+            
+            // Hard Refresh
+            window.location.reload(true);
+        } else {
+            console.log('⏭️ Refresh übersprungen - Gast ist aktiv');
+            // Nochmal in 5 Min prüfen
+            this.timer = setTimeout(() => this.checkAndRefresh(), 5 * 60 * 1000);
+        }
+    }
+};
+
+// Starten wenn App geladen
+document.addEventListener('DOMContentLoaded', () => KioskRefresh.init());
+if (document.readyState !== 'loading') KioskRefresh.init();
