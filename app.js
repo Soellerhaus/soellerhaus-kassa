@@ -2715,7 +2715,6 @@ const Buchungen = {
             datum: Utils.getBuchungsDatum(),
             uhrzeit: Utils.formatTime(new Date()),
             exportiert: false,
-            bezahlt: false,
             aufgefuellt: false,
             gerät_id: Utils.getDeviceId(), 
             session_id: State.sessionId,
@@ -2748,14 +2747,33 @@ const Buchungen = {
                 erstellt_am: new Date().toISOString()
             };
             
-            // NUR Supabase - kein lokaler Fallback!
-            const { error } = await supabaseClient.from('buchungen').insert(b);
-            if (error) {
-                console.error('❌ Supabase insert error:', error.message);
+            // Versuche mit Retry-Logik
+            let erfolg = false;
+            let letzterFehler = null;
+            
+            for (let versuch = 1; versuch <= 3; versuch++) {
+                const { error } = await supabaseClient.from('buchungen').insert(b);
+                
+                if (!error) {
+                    erfolg = true;
+                    console.log('✅ Buchung nach Supabase:', b.buchung_id);
+                    break;
+                }
+                
+                letzterFehler = error;
+                console.warn(`⚠️ Buchungsversuch ${versuch}/3 fehlgeschlagen:`, error.message);
+                
+                // Kurz warten vor Retry
+                if (versuch < 3) {
+                    await new Promise(r => setTimeout(r, 500 * versuch));
+                }
+            }
+            
+            if (!erfolg) {
+                console.error('❌ Supabase insert error nach 3 Versuchen:', letzterFehler?.message, letzterFehler?.details);
                 throw new Error('Buchung fehlgeschlagen. Bitte nochmal versuchen.');
             }
             
-            console.log('✅ Buchung nach Supabase:', b.buchung_id);
             erstellteBuchungen.push(b);
         }
         
@@ -3203,7 +3221,6 @@ const FehlendeGetränke = {
             uhrzeit: Utils.formatTime(new Date()),
             erstellt_am: new Date().toISOString(),
             exportiert: false,
-            bezahlt: false,
             gerät_id: Utils.getDeviceId(),
             sync_status: isOnline ? 'synced' : 'pending',
             session_id: State.sessionId,
@@ -3633,7 +3650,6 @@ const Umlage = {
                 erstellt_am: new Date().toISOString(),
                 storniert: false,
                 exportiert: false,
-                bezahlt: false,
                 group_name: gast.group_name || 'keiner Gruppe zugehoerig'
             };
             
@@ -5287,7 +5303,6 @@ window.addBuchungForSelectedGast = async (artikelId) => {
             erstellt_am: new Date().toISOString(),
             storniert: false,
             exportiert: false,
-            bezahlt: false,
             aufgefuellt: false,
             group_name: 'keiner Gruppe zugehoerig'
         };
@@ -5618,7 +5633,6 @@ window.bucheUmlageFürAlle = async () => {
             erstellt_am: new Date().toISOString(),
             storniert: false,
             exportiert: false,
-            bezahlt: false,
             group_name: gast.group_name || 'keiner Gruppe zugehoerig'
         };
         
