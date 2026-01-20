@@ -25,7 +25,7 @@ const SAUNA_CONFIG = {
     
     // ===== RABATT-SYSTEM =====
     freeSessionAfterNights: 3,  // Ab X Übernachtungen → 1 Session gratis
-    freeSessionHours: 3,        // Gratis-Session = X Stunden (darüber hinaus wird berechnet)              // Währungssymbol
+    freeSessionHours: 3,        // Gratis-Session = X Stunden (darüber hinaus wird berechnet)
     
     // ===== BETRIEBSZEITEN =====
     openingHour: 8,             // Früheste Startzeit (8:00)
@@ -35,7 +35,7 @@ const SAUNA_CONFIG = {
     // ===== INKLUSIVLEISTUNGEN =====
     includedTowels: 6,          // Anzahl bereitgestellter Handtücher
     
-        // ===== E-MAIL KONFIGURATION =====
+    // ===== E-MAIL KONFIGURATION =====
     email: {
         recipient: 'rezeption@soellerhaus.at',
         subject: 'Neue Sauna-Anfrage',
