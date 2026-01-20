@@ -52,7 +52,7 @@ const SAUNA_CONFIG = {
         
         // Formular-Labels
         labelGuestAccount: 'Gäste-Account ID',
-        labelBookingNumber: 'Buchungsnummer',
+        labelGuestName: 'Ihr Name',
         labelEmail: 'E-Mail-Adresse',
         labelDate: 'Gewünschtes Datum',
         labelStartTime: 'Gewünschte Startzeit',
@@ -61,7 +61,7 @@ const SAUNA_CONFIG = {
         
         // Platzhalter
         placeholderGuestAccount: 'z.B. GA-12345',
-        placeholderBookingNumber: 'z.B. RES-2024-001',
+        placeholderGuestName: 'Vor- und Nachname',
         placeholderEmail: 'ihre@email.at',
         placeholderNotes: 'z.B. Allergien, besondere Anforderungen...',
         
@@ -99,16 +99,24 @@ const SAUNA_CONFIG = {
     
     // ===== SAUNA-REGELN =====
     rules: [
-        'Die Sauna wird exklusiv für Sie und Ihre Begleitung reserviert.',
-        'Bitte erscheinen Sie pünktlich - die Sauna ist zur gebuchten Zeit aufgeheizt.',
-        'Duschen Sie vor Benutzung der Sauna.',
-        'Setzen oder legen Sie sich nur auf die bereitgestellten Handtücher.',
-        'Kein Alkoholkonsum in der Sauna empfohlen.',
-        'Bei Unwohlsein verlassen Sie bitte sofort die Sauna.',
-        'Kinder unter 12 Jahren nur in Begleitung Erwachsener.',
-        'Bitte hinterlassen Sie die Sauna sauber und ordentlich.',
-        'Bei Schäden oder Problemen informieren Sie bitte umgehend die Rezeption.'
+        'Nicht mit leerem Magen oder direkt nach dem Essen in die Sauna gehen.',
+        'Die Sauna darf nicht in alkoholisiertem Zustand betreten werden.',
+        'Bei Problemen mit Bluthochdruck bitten wir Sie, die Sauna nicht zu nützen.',
+        'Bitte betreten Sie die Sauna ohne Schuhe.',
+        'Vor dem Betreten der Sauna immer duschen – nicht nur aufgrund der Hygiene, sondern auch um den störenden Fettfilm der Haut zu entfernen.',
+        'Vor der Sauna gut abtrocknen (die trockene Haut schwitzt besser).',
+        'Legen Sie immer ein Handtuch auf die Sitzbank. Für Sauna-Anfänger ist es ratsam, die unteren Bänke zu bevorzugen.',
+        'Um Schwindel zu vermeiden, erheben Sie sich die letzten 2 Minuten aus der Liegeposition und setzen sich senkrecht.',
+        'Verlassen Sie die Sauna frühzeitig, wenn Sie sich nicht wohl fühlen.',
+        'Ein Saunabad dauert zwischen 8 und 12 Minuten, jedoch nicht über 15 Minuten.',
+        'Nach dem Saunabad etwa 2 Minuten an die frische Luft gehen, um Ihre Atemwege zu kühlen.',
+        'Maximale Personenzahl: 6 Personen gleichzeitig.',
+        'Kein Wasser auf den Holzboden – dies beschädigt das Holz!',
+        'Schäden, die durch fahrlässiges Verhalten entstehen, werden in Rechnung gestellt.'
     ],
+    
+    // Haftungshinweis
+    liabilityNote: 'Im Falle eines Unfalls wird keine Haftung übernommen.',
     
     // ===== CHECKBOXEN =====
     checkboxRulesLabel: 'Ich habe die Sauna-Regeln gelesen und akzeptiere diese.',
