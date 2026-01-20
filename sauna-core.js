@@ -67,7 +67,7 @@ class SaunaBooking {
      */
     async fetchSaunaStatus() {
         try {
-            const response = await fetch('/api/sauna/status');
+            const response = await fetch(this.config.email.apiEndpoint.replace('/request', '/status'));
             if (response.ok) {
                 const status = await response.json();
                 this.state.saunaStatus = status;
