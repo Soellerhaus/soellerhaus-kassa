@@ -35,12 +35,12 @@ const SAUNA_CONFIG = {
     // ===== INKLUSIVLEISTUNGEN =====
     includedTowels: 6,          // Anzahl bereitgestellter Handtücher
     
-    // ===== E-MAIL KONFIGURATION =====
+        // ===== E-MAIL KONFIGURATION =====
     email: {
         recipient: 'rezeption@soellerhaus.at',
         subject: 'Neue Sauna-Anfrage',
-        // API Endpoint (falls Backend vorhanden)
-        apiEndpoint: '/api/sauna-request',
+        // API Endpoint (dein Windows Server)
+        apiEndpoint: 'http://185.237.252.90:3000/api/sauna/request',
         // Fallback auf mailto: wenn API nicht erreichbar
         useFallbackMailto: true
     },
