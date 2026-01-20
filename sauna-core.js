@@ -45,6 +45,7 @@ class SaunaBooking {
         this.freeSessionsRemaining = parseInt(this.getUrlParam('free')) || 0;
         this.guestNights = parseInt(this.getUrlParam('nights')) || 0;
         this.guestEmail = this.getUrlParam('email') || '';
+        this.guestName = this.getUrlParam('name') || '';
         
         // Bei 3+ Übernachtungen: 1 Gratis-Session (wenn nicht schon verbraucht)
         if (this.guestNights >= this.config.freeSessionAfterNights && this.freeSessionsRemaining > 0) {
@@ -241,30 +242,31 @@ class SaunaBooking {
                     <fieldset class="form-section">
                         <legend>Gast-Identifikation</legend>
                         
-                        <div class="form-group">
-                            <label for="guest_account">${t.labelGuestAccount}</label>
-                            <input type="text" id="guest_account" name="guest_account" 
-                                   placeholder="${t.placeholderGuestAccount}"
-                                   value="${this.prefillToken || ''}"
-                                   ${this.selfServiceMode ? 'readonly' : ''}>
-                            ${!this.selfServiceMode ? '<small>Oder verwenden Sie Buchungsnummer + E-Mail:</small>' : ''}
-                        </div>
-
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="booking_number">${t.labelBookingNumber}</label>
-                                <input type="text" id="booking_number" name="booking_number" 
-                                       placeholder="${t.placeholderBookingNumber}"
-                                       ${this.selfServiceMode ? 'readonly' : ''}>
+                                <label for="guest_account">${t.labelGuestAccount}</label>
+                                <input type="text" id="guest_account" name="guest_account" 
+                                       placeholder="${t.placeholderGuestAccount}"
+                                       value="${this.prefillToken || ''}"
+                                       ${this.selfServiceMode ? 'readonly style="background-color: #f0f0f0;"' : ''}>
                             </div>
                             <div class="form-group">
-                                <label for="email">${t.labelEmail} *</label>
-                                <input type="email" id="email" name="email" 
-                                       placeholder="${t.placeholderEmail}" 
-                                       value="${this.guestEmail}"
-                                       ${this.selfServiceMode && this.guestEmail ? 'readonly' : ''}
+                                <label for="guest_name">${t.labelGuestName} *</label>
+                                <input type="text" id="guest_name" name="guest_name" 
+                                       placeholder="${t.placeholderGuestName}"
+                                       value="${this.guestName || ''}"
+                                       ${this.selfServiceMode && this.guestName ? 'readonly style="background-color: #f0f0f0;"' : ''}
                                        required>
                             </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email">${t.labelEmail} *</label>
+                            <input type="email" id="email" name="email" 
+                                   placeholder="${t.placeholderEmail}" 
+                                   value="${this.guestEmail}"
+                                   ${this.selfServiceMode && this.guestEmail ? 'readonly style="background-color: #f0f0f0;"' : ''}
+                                   required>
                         </div>
                     </fieldset>
 
@@ -345,6 +347,12 @@ class SaunaBooking {
                         <ul class="rules-list">
                             ${c.rules.map(rule => `<li>${rule}</li>`).join('')}
                         </ul>
+                        
+                        ${c.liabilityNote ? `
+                        <div style="background: #FFF3CD; border: 1px solid #FFC107; padding: 10px 15px; border-radius: 8px; margin: 15px 0; font-weight: 500;">
+                            ⚠️ ${c.liabilityNote}
+                        </div>
+                        ` : ''}
                         
                         <div class="form-group checkbox-group">
                             <label class="checkbox-label">
@@ -450,8 +458,8 @@ class SaunaBooking {
                     
                     <div class="summary-contact">
                         <p><strong>Kontakt:</strong> ${d.email}</p>
+                        ${d.guest_name ? `<p><strong>Name:</strong> ${d.guest_name}</p>` : ''}
                         ${d.guest_account ? `<p><strong>Gäste-Account:</strong> ${d.guest_account}</p>` : ''}
-                        ${d.booking_number ? `<p><strong>Buchungsnummer:</strong> ${d.booking_number}</p>` : ''}
                         ${d.notes ? `<p><strong>Notizen:</strong> ${d.notes}</p>` : ''}
                     </div>
                 </div>
@@ -763,7 +771,7 @@ class SaunaBooking {
         
         const formData = {
             guest_account: formDataObj.get('guest_account'),
-            booking_number: formDataObj.get('booking_number'),
+            guest_name: formDataObj.get('guest_name'),
             email: formDataObj.get('email'),
             date: formDataObj.get('date'),
             start_time: formDataObj.get('start_time'),
@@ -870,9 +878,9 @@ Neue Sauna-Anfrage
 ==================
 
 Gast-Information:
+- Name: ${data.guest_name || '-'}
 - E-Mail: ${data.email}
 - Gäste-Account: ${data.guest_account || '-'}
-- Buchungsnummer: ${data.booking_number || '-'}
 
 Buchungsdetails:
 - Datum: ${this.formatDate(data.date)}
@@ -933,7 +941,7 @@ Gesendet am: ${new Date().toLocaleString('de-AT')}
         const d = this.state.formData;
         
         setTimeout(() => {
-            const fields = ['guest_account', 'booking_number', 'email', 'date', 'start_time', 'duration', 'temperature', 'notes'];
+            const fields = ['guest_account', 'guest_name', 'email', 'date', 'start_time', 'duration', 'temperature', 'notes'];
             fields.forEach(field => {
                 const el = document.getElementById(field);
                 if (el && d[field]) {
