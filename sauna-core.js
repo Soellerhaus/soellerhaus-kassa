@@ -67,7 +67,9 @@ class SaunaBooking {
      */
     async fetchSaunaStatus() {
         try {
-            const response = await fetch(this.config.email.apiEndpoint.replace('/request', '/status'));
+            // Server-URL aus Config holen
+            const apiBase = this.config.email.apiEndpoint.replace('/api/sauna/request', '');
+            const response = await fetch(apiBase + '/api/sauna/status');
             if (response.ok) {
                 const status = await response.json();
                 this.state.saunaStatus = status;
@@ -75,7 +77,22 @@ class SaunaBooking {
             }
         } catch (error) {
             // API nicht verfügbar - kein Problem, läuft auch ohne
-            console.log('Sauna-Status API nicht erreichbar');
+            console.log('Sauna-Status API nicht erreichbar:', error.message);
+            this.updateStatusDisplayOffline();
+        }
+    }
+
+    /**
+     * Status-Anzeige wenn offline
+     */
+    updateStatusDisplayOffline() {
+        const statusEl = document.getElementById('sauna-live-status');
+        if (statusEl) {
+            statusEl.className = 'sauna-live-status status-offline';
+            statusEl.innerHTML = `
+                <span class="status-icon">⚫</span>
+                <span class="status-text">Status nicht verfügbar</span>
+            `;
         }
     }
 
@@ -812,6 +829,7 @@ class SaunaBooking {
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                mode: 'cors',
                 body: JSON.stringify(requestData)
             });
             
