@@ -2,8 +2,8 @@
   "name": "Söllerhaus Kassa",
   "short_name": "Kassa",
   "description": "Self-Service Buchungssystem für das Söllerhaus",
-  "start_url": "/kassa/",
-  "display": "standalone",
+  "start_url": "/soellerhaus-kassa/",
+  "display": "fullscreen",
   "background_color": "#2C5F7C",
   "theme_color": "#2C5F7C",
   "orientation": "portrait-primary",
@@ -64,7 +64,7 @@
       "name": "Buchen",
       "short_name": "Buchen",
       "description": "Direkt zur Artikel-Buchung",
-      "url": "/kassa/#buchen",
+      "url": "/soellerhaus-kassa/#buchen",
       "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192" }]
     }
   ],
