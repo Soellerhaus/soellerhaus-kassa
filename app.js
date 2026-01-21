@@ -2126,7 +2126,23 @@ const i18n = {
                 align-items:center;
                 gap:5px;
             ">
-                 Käsebestellung
+                🧀 Käsebestellung
+            </button>
+            <button onclick="window.location.href='sauna.html'" style="
+                background:linear-gradient(135deg, #e74c3c, #c0392b);
+                color:white;
+                border:none;
+                border-radius:20px;
+                padding:6px 12px;
+                font-size:0.8rem;
+                font-weight:600;
+                cursor:pointer;
+                box-shadow:0 2px 6px rgba(231,76,60,0.3);
+                display:flex;
+                align-items:center;
+                gap:5px;
+            ">
+                🧖 Sauna
             </button>
             <button onclick="toggleLanguage()" style="
                 background:white;
