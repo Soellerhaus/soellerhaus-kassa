@@ -2128,7 +2128,7 @@ const i18n = {
             ">
                 🧀 Käsebestellung
             </button>
-            <button onclick="window.location.href='sauna.html'" style="
+            <button onclick="window.location.href='http://185.237.252.90:3000/sauna.html'" style="
                 background:linear-gradient(135deg, #e74c3c, #c0392b);
                 color:white;
                 border:none;
