@@ -2425,6 +2425,7 @@ const RegisteredGuests = {
                 passwort: password,  // PIN als Klartext!
                 passwordHash: password,
                 gruppenname: 'keiner Gruppe zugehörig',
+                group_name: 'keiner Gruppe zugehörig',
                 ausnahmeumlage: false,
                 aktiv: true,
                 createdAt: new Date().toISOString(), 
@@ -2433,6 +2434,9 @@ const RegisteredGuests = {
             };
             await db.registeredGuests.add(guest);
             Utils.showToast('Registrierung erfolgreich!', 'success');
+            
+            // WICHTIG: Auch im Offline-Modus User setzen!
+            State.setUser(guest);
             return guest;
         }
     },
@@ -3382,6 +3386,25 @@ const FehlendeGetränke = {
 const Gruppen = {
     // Einstellung: Gruppenabfrage aktiv?
     async isAbfrageAktiv() {
+        // Zuerst Supabase prüfen (falls online)
+        if (supabaseClient && isOnline) {
+            try {
+                const { data } = await supabaseClient
+                    .from('settings')
+                    .select('value')
+                    .eq('key', 'gruppenAbfrageAktiv')
+                    .single();
+                if (data) {
+                    // Lokal cachen
+                    try { await db.settings.put({ key: 'gruppenAbfrageAktiv', value: data.value }); } catch(e) {}
+                    return data.value === true;
+                }
+            } catch(e) {
+                console.log('Supabase Settings nicht gefunden, prüfe lokal');
+            }
+        }
+        
+        // Fallback: Lokal prüfen
         const setting = await db.settings.get('gruppenAbfrageAktiv');
         return setting?.value === true;
     },
@@ -4583,7 +4606,19 @@ window.handlePinLogin = async () => {
 
 // Navigation nach Login - prüft ob Gruppenauswahl nötig
 window.navigateAfterLogin = async () => {
+    console.log('navigateAfterLogin aufgerufen');
+    console.log('State.currentUser:', State.currentUser);
+    console.log('State.selectedGroup:', State.selectedGroup);
+    
+    // Sicherheitscheck: Wenn kein User, zum Login
+    if (!State.currentUser) {
+        console.warn('Kein User in State, leite zum Login');
+        Router.navigate('login');
+        return;
+    }
+    
     const gruppenAktiv = await Gruppen.isAbfrageAktiv();
+    console.log('Gruppenabfrage aktiv:', gruppenAktiv);
     
     // Prüfen ob Gruppe gewählt werden muss
     // "keiner Gruppe zugehörig" zählt als KEINE Gruppe
@@ -4591,25 +4626,47 @@ window.navigateAfterLogin = async () => {
                            State.selectedGroup === 'keiner Gruppe zugehörig' ||
                            State.selectedGroup === '';
     
+    console.log('Hat keine Gruppe:', hatKeineGruppe);
+    
     if (gruppenAktiv && hatKeineGruppe) {
-        // Gruppenauswahl erforderlich
-        Router.navigate('gruppe-wählen');
+        // Gruppenauswahl erforderlich - aber nur wenn es Gruppen gibt
+        const gruppen = await Gruppen.getAll();
+        if (gruppen && gruppen.length > 0) {
+            console.log('Leite zur Gruppenauswahl');
+            Router.navigate('gruppe-wählen');
+        } else {
+            console.log('Keine Gruppen vorhanden, direkt zum Buchen');
+            Router.navigate('buchen');
+        }
     } else {
         // Direkt zum Buchen
+        console.log('Direkt zum Buchen');
         Router.navigate('buchen');
     }
 };
 
 // Route: Gruppe wählen
 Router.register('gruppe-wählen', async () => {
-    if (!State.currentUser) { Router.navigate('login'); return; }
+    if (!State.currentUser) { 
+        console.warn('gruppe-wählen: Kein User eingeloggt, leite zum Login');
+        Router.navigate('login'); 
+        return; 
+    }
     const t = (key, params) => i18n.t(key, params);
     const langBtn = i18n.renderLangButton();
     
     const gruppen = await Gruppen.getAll();
     const name = State.currentUser.firstName || State.currentUser.vorname;
     
-    UI.render(`<div class="app-header"><div class="header-left"><div class="header-title"> ${t('select_group')}</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Auth.logout()">${t('cancel')}</button></div></div>
+    // Wenn keine Gruppen vorhanden, direkt zum Buchen
+    if (!gruppen || gruppen.length === 0) {
+        console.log('Keine Gruppen vorhanden, direkt zum Buchen');
+        Utils.showToast('Willkommen ' + name + '!', 'success');
+        Router.navigate('buchen');
+        return;
+    }
+    
+    UI.render(`${langBtn}<div class="app-header"><div class="header-left"><div class="header-title">👥 ${t('select_group')}</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Auth.logout()">${t('cancel')}</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:20px;text-align:center;">
@@ -4621,7 +4678,7 @@ Router.register('gruppe-wählen', async () => {
         <div style="display:flex;flex-direction:column;gap:16px;">
             ${gruppen.map(g => `
                 <button class="btn btn-primary" onclick="selectGruppe(${g.id}, '${g.name}')" style="padding:24px;font-size:1.3rem;">
-                     ${g.name}
+                    👥 ${g.name}
                 </button>
             `).join('')}
         </div>
@@ -7577,27 +7634,79 @@ window.saveGast = async () => {
 window.handleDeleteGast = async (id) => {
     console.log('handleDeleteGast called with id:', id);
     
-    const alleGäste = await db.registeredGuests.toArray();
-    const gast = alleGäste.find(g => String(g.id) === String(id));
+    // Gast-Name für Bestätigung laden
+    let gastName = 'Unbekannt';
     
-    if (!gast) {
-        Utils.showToast('Gast nicht gefunden!', 'error');
-        return;
+    // Versuche von Supabase zu laden
+    if (supabaseClient && isOnline) {
+        try {
+            const { data: profile } = await supabaseClient
+                .from('profiles')
+                .select('vorname, display_name, first_name')
+                .eq('id', id)
+                .single();
+            if (profile) {
+                gastName = profile.vorname || profile.display_name || profile.first_name || gastName;
+            }
+        } catch(e) {
+            console.warn('Profil laden für Löschung:', e);
+        }
     }
     
-    const name = gast.nachname || gast.firstName;
-    if (!confirm(`Gast "${name}" wirklich löschen?`)) return;
+    // Fallback: Lokal laden
+    if (gastName === 'Unbekannt') {
+        try {
+            const alleGäste = await db.registeredGuests.toArray();
+            const gast = alleGäste.find(g => String(g.id) === String(id));
+            if (gast) {
+                gastName = gast.nachname || gast.firstName || gastName;
+            }
+        } catch(e) {}
+    }
     
-    // Soft delete
-    await db.registeredGuests.update(gast.id, {
-        gelöscht: true,
-        gelöschtAm: new Date().toISOString(),
-        aktiv: false
-    });
+    if (!confirm(`Gast "${gastName}" wirklich löschen?\n\nDer Gast wird deaktiviert und erscheint nicht mehr in der Liste.`)) return;
     
-    await DataProtection.createBackup();
-    Utils.showToast('Gast gelöscht', 'success');
-    Router.navigate('admin-guests');
+    try {
+        // WICHTIG: Zuerst Supabase aktualisieren!
+        if (supabaseClient && isOnline) {
+            const { error } = await supabaseClient
+                .from('profiles')
+                .update({ 
+                    geloescht: true, 
+                    geloescht_am: new Date().toISOString(),
+                    aktiv: false 
+                })
+                .eq('id', id);
+            
+            if (error) {
+                console.error('Supabase Löschen Fehler:', error);
+                throw new Error('Konnte nicht in Supabase löschen: ' + error.message);
+            }
+            console.log('✅ Gast in Supabase als gelöscht markiert');
+        }
+        
+        // Dann lokal aktualisieren
+        try {
+            await db.registeredGuests.update(id, {
+                gelöscht: true,
+                geloescht: true,
+                gelöschtAm: new Date().toISOString(),
+                aktiv: false
+            });
+        } catch(e) {
+            console.warn('Lokales Update fehlgeschlagen:', e);
+        }
+        
+        await DataProtection.createBackup();
+        Utils.showToast('✅ Gast gelöscht', 'success');
+        
+        // Kurze Verzögerung, dann Seite neu laden
+        setTimeout(() => Router.navigate('admin-guests'), 300);
+        
+    } catch(e) {
+        console.error('handleDeleteGast Fehler:', e);
+        Utils.showToast('❌ Fehler: ' + e.message, 'error');
+    }
 };
 
 // Admin bucht für Gast
@@ -8928,9 +9037,23 @@ window.handleRegisterSubmit = async () => {
     if (!p || p.length !== 4) { Utils.showToast('4-stelligen PIN eingeben', 'warning'); return; }
     try { 
         console.log('Registrierung startet...', v.trim(), p.length);
-        await RegisteredGuests.register(v.trim(), p); 
+        const newGuest = await RegisteredGuests.register(v.trim(), p); 
+        
+        console.log('Registrierung erfolgreich, User:', newGuest);
+        console.log('State.currentUser nach Register:', State.currentUser);
+        
+        // Sicherstellen dass User gesetzt ist
+        if (!State.currentUser && newGuest) {
+            console.log('User war nicht gesetzt, setze jetzt');
+            State.setUser(newGuest);
+        }
+        
         // Nach Registrierung prüfen ob Gruppe gewählt werden muss
-        setTimeout(async () => await navigateAfterLogin(), 500); 
+        // Kurze Verzögerung damit State sicher aktualisiert ist
+        setTimeout(async () => {
+            console.log('navigateAfterLogin startet, User:', State.currentUser?.firstName);
+            await navigateAfterLogin();
+        }, 500); 
     } catch(e) {
         console.error('Registrierung Fehler:', e);
         Utils.showToast('Fehler: ' + e.message, 'error');
