@@ -1522,7 +1522,7 @@ const CheeseOrders = {
                                 font-weight:bold;
                                 color:#f39c12;
                                 cursor:pointer;
-                            "></button>
+                            ">−</button>
                             <div style="text-align:center;min-width:100px;">
                                 <div id="cheese-grams-display" style="font-size:2rem;font-weight:700;color:#333;">100</div>
                                 <div style="font-size:0.9rem;color:#666;">Gramm</div>
@@ -1540,7 +1540,7 @@ const CheeseOrders = {
                         </div>
                         <div style="text-align:center;margin-top:8px;font-size:0.85rem;color:#888;">
                             Min: 100g * Max: 1kg * Schritte: 50g<br>
-                            <span style="color:#e67e22;">⚠— Grammzahl ist ca.-Angabe (Richtwert)</span>
+                            <span style="background:#fff3cd;color:#856404;padding:4px 10px;border-radius:12px;font-size:0.8rem;display:inline-block;margin-top:4px;">⚠️ Grammzahl ist ca.-Angabe (Richtwert)</span>
                         </div>
                     </div>
                     
@@ -2203,7 +2203,9 @@ const State = {
     setUser(u) { 
         this.currentUser = u; 
         this.sessionId = Utils.uuid(); // Neue Session starten
-        this.selectedGroup = u.group_name || null; // Gruppe aus User uebernehmen
+        // 'keiner Gruppe zugehörig' zählt als KEINE Gruppe
+        const groupName = u.group_name || u.gruppenname || null;
+        this.selectedGroup = (groupName && groupName !== 'keiner Gruppe zugehörig') ? groupName : null;
         localStorage.setItem('current_user_id', u.id || u.gast_id); 
         localStorage.setItem('current_user_type', u.id ? 'registered' : 'legacy'); 
         this.resetInactivityTimer(); 
@@ -2586,11 +2588,42 @@ const RegisteredGuests = {
     },
     
     async deletePermanent(id) { 
-        if (supabaseClient && isOnline) {
-            await supabaseClient.from('profiles').delete().eq('id', id);
+        try {
+            // ZUERST: Alle Buchungen des Gastes löschen (wegen Foreign Key)
+            if (supabaseClient && isOnline) {
+                // Buchungen in Supabase löschen
+                const { error: buchungenError } = await supabaseClient
+                    .from('buchungen')
+                    .delete()
+                    .eq('gast_id', id);
+                if (buchungenError) {
+                    console.warn('Buchungen löschen Fehler:', buchungenError);
+                }
+                
+                // Dann Gast löschen
+                const { error: gastError } = await supabaseClient
+                    .from('profiles')
+                    .delete()
+                    .eq('id', id);
+                if (gastError) {
+                    console.error('Gast löschen Fehler:', gastError);
+                    throw new Error('Konnte Gast nicht löschen: ' + gastError.message);
+                }
+            }
+            
+            // Lokal löschen
+            try { 
+                await db.buchungen.where('gast_id').equals(id).delete();
+                await db.registeredGuests.delete(id); 
+            } catch(e) {
+                console.warn('Lokales Löschen Fehler:', e);
+            }
+            
+            Utils.showToast('Gast endgültig gelöscht', 'success'); 
+        } catch(e) {
+            console.error('deletePermanent Fehler:', e);
+            Utils.showToast('Fehler beim Löschen: ' + e.message, 'error');
         }
-        try { await db.registeredGuests.delete(id); } catch(e) {}
-        Utils.showToast('Gast endgueltig gelöscht', 'success'); 
     }
 };
 
@@ -4552,7 +4585,13 @@ window.handlePinLogin = async () => {
 window.navigateAfterLogin = async () => {
     const gruppenAktiv = await Gruppen.isAbfrageAktiv();
     
-    if (gruppenAktiv && !State.selectedGroup) {
+    // Prüfen ob Gruppe gewählt werden muss
+    // "keiner Gruppe zugehörig" zählt als KEINE Gruppe
+    const hatKeineGruppe = !State.selectedGroup || 
+                           State.selectedGroup === 'keiner Gruppe zugehörig' ||
+                           State.selectedGroup === '';
+    
+    if (gruppenAktiv && hatKeineGruppe) {
         // Gruppenauswahl erforderlich
         Router.navigate('gruppe-wählen');
     } else {
@@ -4656,6 +4695,13 @@ Router.register('admin-dashboard', async () => {
         fehlendeOffen = await FehlendeGetränke.getOffene();
     } catch(e) { console.error('fehlende error:', e); }
     
+    // Offene Käse-Bestellungen laden
+    let openCheeseOrders = [];
+    try {
+        openCheeseOrders = await CheeseOrders.getOpenOrders();
+    } catch(e) { console.error('cheese orders error:', e); }
+    const cheeseCount = openCheeseOrders.length;
+    
     const heute = Utils.getBuchungsDatum();
     const heuteB = bs.filter(b => b.datum === heute);
     const nichtExp = bs.filter(b => !b.exportiert);
@@ -4689,7 +4735,7 @@ Router.register('admin-dashboard', async () => {
         " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
             <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 2rem;">${isHP ? '' : 'Â '}</span>
+                    <span style="font-size: 2rem;">${isHP ? '🍽️' : '🍽️'}</span>
                     <div>
                         <div style="font-weight: 700; font-size: 1.2rem;">
                             Preismodus: ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
@@ -4775,10 +4821,16 @@ Router.register('admin-dashboard', async () => {
         </button>
         
         <!-- KAeSE-BESTELLUNGEN -->
-        <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;background:linear-gradient(135deg, #f4d03f, #f39c12);color:#5d4e37;border:none;">
-             Käse-Bestellungen<br>
+        <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;background:linear-gradient(135deg, #f4d03f, #f39c12);color:#5d4e37;border:none;${cheeseCount > 0 ? 'animation:cheesePulse 1.5s ease-in-out infinite;box-shadow:0 0 20px rgba(243,156,18,0.6);' : ''}">
+            🧀 Käse-Bestellungen ${cheeseCount > 0 ? '<span style="background:#e74c3c;color:white;padding:4px 12px;border-radius:20px;font-size:0.85rem;margin-left:8px;font-weight:700;">' + cheeseCount + ' NEU!</span>' : ''}<br>
             <small style="opacity:0.9;">(Vorbestellungen verwalten)</small>
         </button>
+        <style>
+            @keyframes cheesePulse {
+                0%, 100% { transform: scale(1); box-shadow: 0 4px 15px rgba(243,156,18,0.4); }
+                50% { transform: scale(1.03); box-shadow: 0 8px 30px rgba(243,156,18,0.7); }
+            }
+        </style>
         
         <!-- ALLE BUCHUNGEN ANSEHEN -->
         <button class="btn btn-block" onclick="Router.navigate('admin-alle-buchungen')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;background:#6c5ce7;color:white;border:none;">
@@ -6195,7 +6247,7 @@ Router.register('admin-preismodus', async () => {
         <!-- AKTUELLER STATUS -->
         <div class="card mb-3" style="background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};color:white;">
             <div style="padding:24px;text-align:center;">
-                <div style="font-size:4rem;margin-bottom:16px;">${isHP ? '' : 'Â '}</div>
+                <div style="font-size:4rem;margin-bottom:16px;">${isHP ? '🍽️' : '🍽️'}</div>
                 <div style="font-size:1.8rem;font-weight:700;margin-bottom:8px;">
                     ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
                 </div>
@@ -6223,7 +6275,7 @@ Router.register('admin-preismodus', async () => {
                         cursor:pointer;
                         transition:all 0.2s;
                     ">
-                        <div style="font-size:2.5rem;margin-bottom:8px;">Â </div>
+                        <div style="font-size:2.5rem;margin-bottom:8px;">🍽️</div>
                         <div style="font-weight:700;font-size:1.1rem;">Selbstversorger</div>
                         <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">Standard-Preise</div>
                         ${!isHP ? '<div style="margin-top:8px;font-weight:bold;"> AKTIV</div>' : ''}
@@ -7848,7 +7900,7 @@ Router.register('admin-articles', async () => {
                                 <th style="padding:12px 8px;text-align:center;">
                                     <div>Preise</div>
                                     <div style="display:flex;gap:8px;justify-content:center;font-size:0.7rem;font-weight:normal;">
-                                        <span style="color:#3498db;">Â  SV</span>
+                                        <span style="color:#3498db;">🍽️ SV</span>
                                         <span style="color:#9b59b6;"> HP</span>
                                     </div>
                                 </th>
@@ -8906,9 +8958,16 @@ window.handleRestoreGuest = async id => {
     Router.navigate('admin-guests');
 };
 window.handlePermanentDeleteGuest = async id => { 
-    if(confirm('Gast ENDGUeLTIG löschen?\n\nDiese Aktion kann nicht rueckgängig gemacht werden!')) { 
-        await RegisteredGuests.deletePermanent(id); 
-        Router.navigate('admin-guests'); 
+    if(confirm('Gast ENDGÜLTIG löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden!\nAlle Buchungen dieses Gastes werden ebenfalls gelöscht.')) { 
+        try {
+            await RegisteredGuests.deletePermanent(id); 
+            // Kurze Verzögerung damit Supabase Zeit hat
+            await new Promise(r => setTimeout(r, 500));
+            // Seite neu laden für saubere Ansicht
+            Router.navigate('admin-guests'); 
+        } catch(e) {
+            Utils.showToast('Fehler: ' + e.message, 'error');
+        }
     } 
 };
 window.handleDeleteArticle = async id => { if(confirm('Artikel löschen?')) { await Artikel.delete(id); Router.navigate('admin-articles'); } };
@@ -9304,7 +9363,7 @@ window.showAddArticleModal = () => {
         <div style="font-weight:600;margin-bottom:12px;"> Preise</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#3498db;font-weight:600;">Â  Selbstversorger (EUR)</label>
+                <label class="form-label" style="color:#3498db;font-weight:600;">🍽️ Selbstversorger (EUR)</label>
                 <input type="number" id="article-price-sv" class="form-input" placeholder="0.00" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
             </div>
             <div class="form-group" style="margin-bottom:0;">
@@ -9356,7 +9415,7 @@ window.showEditArticleModal = async id => {
         <div style="font-weight:600;margin-bottom:12px;"> Preise</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="color:#3498db;font-weight:600;">Â  Selbstversorger (EUR)</label>
+                <label class="form-label" style="color:#3498db;font-weight:600;">🍽️ Selbstversorger (EUR)</label>
                 <input type="number" id="article-price-sv" class="form-input" value="${preisSV.toFixed(2)}" step="0.10" min="0" style="border-color:#3498db;font-size:1.2rem;font-weight:bold;">
             </div>
             <div class="form-group" style="margin-bottom:0;">
