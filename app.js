@@ -4413,7 +4413,59 @@ const ExportService = {
 
 const Router = {
     routes: {},
-    init() { window.addEventListener('popstate', () => this.handleRoute()); this.handleRoute(); },
+    async init() { 
+        // Session wiederherstellen beim Seitenladen
+        await this.restoreSession();
+        window.addEventListener('popstate', () => this.handleRoute()); 
+        this.handleRoute(); 
+    },
+    async restoreSession() {
+        const userId = localStorage.getItem('current_user_id');
+        const userType = localStorage.getItem('current_user_type');
+        
+        if (!userId) return; // Kein User gespeichert
+        
+        console.log('🔄 Stelle Session wieder her:', userId, userType);
+        
+        try {
+            if (userType === 'registered' && supabaseClient && isOnline) {
+                // Supabase User wiederherstellen
+                const { data: profile } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
+                
+                if (profile && !profile.geloescht && profile.aktiv) {
+                    const user = {
+                        id: profile.id,
+                        firstName: profile.first_name || profile.vorname,
+                        nachname: profile.first_name || profile.vorname,
+                        email: profile.email,
+                        group_name: profile.group_name,
+                        gruppenname: profile.group_name
+                    };
+                    State.setUser(user);
+                    console.log('✅ Session wiederhergestellt:', user.firstName);
+                    return;
+                }
+            } else {
+                // Lokaler User wiederherstellen
+                const guest = await db.registeredGuests.get(userId);
+                if (guest && !guest.geloescht && guest.aktiv !== false) {
+                    State.setUser(guest);
+                    console.log('✅ Lokale Session wiederhergestellt:', guest.firstName);
+                    return;
+                }
+            }
+        } catch(e) {
+            console.error('Session-Wiederherstellung fehlgeschlagen:', e);
+        }
+        
+        // Session konnte nicht wiederhergestellt werden
+        localStorage.removeItem('current_user_id');
+        localStorage.removeItem('current_user_type');
+    },
     register(p, h) { this.routes[p] = h; },
     navigate(p) { history.pushState({}, '', `#${p}`); this.handleRoute(); },
     handleRoute() { const p = location.hash.slice(1) || 'login'; State.currentPage = p; (this.routes[p] || this.routes['login'])?.(); }
@@ -4660,15 +4712,22 @@ window.handlePinLogin = async () => {
 
 // Navigation nach Login - prüft ob Gruppenauswahl nötig
 window.navigateAfterLogin = async () => {
-    console.log('navigateAfterLogin aufgerufen');
+    console.log('📍 navigateAfterLogin aufgerufen');
     console.log('State.currentUser:', State.currentUser);
     console.log('State.selectedGroup:', State.selectedGroup);
     
-    // Sicherheitscheck: Wenn kein User, zum Login
+    // Wenn kein User, versuche Session wiederherzustellen
     if (!State.currentUser) {
-        console.warn('Kein User in State, leite zum Login');
-        Router.navigate('login');
-        return;
+        console.warn('⚠️ Kein User in State, versuche Session wiederherzustellen');
+        await Router.restoreSession();
+        
+        // Immer noch kein User? Dann zum Login
+        if (!State.currentUser) {
+            console.error('❌ Session-Wiederherstellung fehlgeschlagen, leite zum Login');
+            Router.navigate('login');
+            return;
+        }
+        console.log('✅ Session wiederhergestellt:', State.currentUser.firstName);
     }
     
     const gruppenAktiv = await Gruppen.isAbfrageAktiv();
@@ -4685,16 +4744,18 @@ window.navigateAfterLogin = async () => {
     if (gruppenAktiv && hatKeineGruppe) {
         // Gruppenauswahl erforderlich - aber nur wenn es Gruppen gibt
         const gruppen = await Gruppen.getAll();
+        console.log('Verfügbare Gruppen:', gruppen?.length || 0);
+        
         if (gruppen && gruppen.length > 0) {
-            console.log('Leite zur Gruppenauswahl');
+            console.log('📍 Leite zur Gruppenauswahl');
             Router.navigate('gruppe-wählen');
         } else {
-            console.log('Keine Gruppen vorhanden, direkt zum Buchen');
+            console.log('📍 Keine Gruppen vorhanden, direkt zum Buchen');
             Router.navigate('buchen');
         }
     } else {
         // Direkt zum Buchen
-        console.log('Direkt zum Buchen');
+        console.log('📍 Direkt zum Buchen (Gruppe:', State.selectedGroup, ')');
         Router.navigate('buchen');
     }
 };
@@ -9114,26 +9175,36 @@ window.handleRegisterSubmit = async () => {
     if (!v?.trim()) { Utils.showToast('Vorname eingeben', 'warning'); return; }
     if (!p || p.length !== 4) { Utils.showToast('4-stelligen PIN eingeben', 'warning'); return; }
     try { 
-        console.log('Registrierung startet...', v.trim(), p.length);
+        console.log('📝 Registrierung startet...', v.trim());
         const newGuest = await RegisteredGuests.register(v.trim(), p); 
         
-        console.log('Registrierung erfolgreich, User:', newGuest);
-        console.log('State.currentUser nach Register:', State.currentUser);
+        console.log('✅ Registrierung erfolgreich');
+        console.log('User-Objekt:', newGuest);
+        console.log('State.currentUser:', State.currentUser);
         
-        // Sicherstellen dass User gesetzt ist
-        if (!State.currentUser && newGuest) {
-            console.log('User war nicht gesetzt, setze jetzt');
+        // KRITISCH: Sicherstellen dass User DEFINITIV gesetzt ist
+        if (!State.currentUser) {
+            console.warn('⚠️ User nicht in State, setze jetzt explizit');
             State.setUser(newGuest);
+            // Kurze Pause damit State definitiv gesetzt ist
+            await new Promise(r => setTimeout(r, 100));
         }
         
-        // Nach Registrierung prüfen ob Gruppe gewählt werden muss
-        // Kurze Verzögerung damit State sicher aktualisiert ist
-        setTimeout(async () => {
-            console.log('navigateAfterLogin startet, User:', State.currentUser?.firstName);
-            await navigateAfterLogin();
-        }, 500); 
+        // Final Check
+        if (!State.currentUser) {
+            console.error('❌ User konnte nicht gesetzt werden!');
+            Utils.showToast('Fehler: Session konnte nicht erstellt werden', 'error');
+            return;
+        }
+        
+        console.log('✅ State.currentUser gesetzt:', State.currentUser.firstName);
+        console.log('📍 Navigiere nach Login...');
+        
+        // OHNE setTimeout - direkter Aufruf
+        await navigateAfterLogin();
+        
     } catch(e) {
-        console.error('Registrierung Fehler:', e);
+        console.error('❌ Registrierung Fehler:', e);
         Utils.showToast('Fehler: ' + e.message, 'error');
     }
 };
