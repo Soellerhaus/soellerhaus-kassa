@@ -4414,8 +4414,12 @@ const ExportService = {
 const Router = {
     routes: {},
     async init() { 
-        // Session wiederherstellen beim Seitenladen
-        await this.restoreSession();
+        // Session wiederherstellen NUR wenn kein User bereits eingeloggt ist
+        if (!State.currentUser) {
+            await this.restoreSession();
+        } else {
+            console.log('✅ User bereits eingeloggt, überspringe Session-Wiederherstellung');
+        }
         window.addEventListener('popstate', () => this.handleRoute()); 
         this.handleRoute(); 
     },
@@ -9917,17 +9921,25 @@ window.saveEditArticle = async () => {
             console.error('Preismodus laden Fehler:', e);
         }
         
-        // KEIN Auto-Login - immer zur Startseite
-        // Supabase Session ausloggen damit frisch gestartet wird
-        try {
-            if (supabaseClient) {
-                await supabaseClient.auth.signOut();
+        // NUR ausloggen wenn keine aktive Session existiert
+        // (verhindert dass gerade registrierte User ausgeloggt werden)
+        if (!State.currentUser) {
+            try {
+                if (supabaseClient) {
+                    const { data: { session } } = await supabaseClient.auth.getSession();
+                    if (!session) {
+                        await supabaseClient.auth.signOut();
+                        console.log('✅ Keine aktive Session - signOut durchgeführt');
+                    } else {
+                        console.log('✅ Aktive Session gefunden - behalte Session bei');
+                    }
+                }
+            } catch(e) {
+                console.error('Session-Check Fehler:', e);
             }
-        } catch(e) {
-            console.error('Supabase signOut Fehler:', e);
+        } else {
+            console.log('✅ User bereits eingeloggt - überspringe signOut');
         }
-        
-        State.currentUser = null;
         
         // Loading Screen ausblenden und App zeigen
         setTimeout(() => {
