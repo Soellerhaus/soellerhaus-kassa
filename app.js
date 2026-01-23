@@ -3386,18 +3386,26 @@ const FehlendeGetränke = {
 const Gruppen = {
     // Einstellung: Gruppenabfrage aktiv?
     async isAbfrageAktiv() {
+        console.log('isAbfrageAktiv wird geprüft...');
+        
         // Zuerst Supabase prüfen (falls online)
         if (supabaseClient && isOnline) {
             try {
-                const { data } = await supabaseClient
+                const { data, error } = await supabaseClient
                     .from('settings')
                     .select('value')
                     .eq('key', 'gruppenAbfrageAktiv')
                     .single();
-                if (data) {
+                
+                if (error) {
+                    console.log('Supabase Settings Fehler:', error.message);
+                } else if (data) {
+                    // Wert kann boolean oder string sein
+                    const isActive = data.value === true || data.value === 'true';
+                    console.log('✅ Gruppenabfrage Status von Supabase:', data.value, '→', isActive);
                     // Lokal cachen
-                    try { await db.settings.put({ key: 'gruppenAbfrageAktiv', value: data.value }); } catch(e) {}
-                    return data.value === true;
+                    try { await db.settings.put({ key: 'gruppenAbfrageAktiv', value: isActive }); } catch(e) {}
+                    return isActive;
                 }
             } catch(e) {
                 console.log('Supabase Settings nicht gefunden, prüfe lokal');
@@ -3406,16 +3414,20 @@ const Gruppen = {
         
         // Fallback: Lokal prüfen
         const setting = await db.settings.get('gruppenAbfrageAktiv');
-        return setting?.value === true;
+        const isActive = setting?.value === true || setting?.value === 'true';
+        console.log('Gruppenabfrage Status lokal:', setting?.value, '→', isActive);
+        return isActive;
     },
     
     async setAbfrageAktiv(aktiv) {
-        console.log('setAbfrageAktiv aufgerufen mit:', aktiv);
+        // Sicherstellen dass es ein Boolean ist
+        const boolValue = aktiv === true || aktiv === 'true';
+        console.log('setAbfrageAktiv aufgerufen mit:', aktiv, '→ Boolean:', boolValue);
         
         // Zuerst lokal speichern
         try {
-            await db.settings.put({ key: 'gruppenAbfrageAktiv', value: aktiv });
-            console.log('✅ Lokal gespeichert');
+            await db.settings.put({ key: 'gruppenAbfrageAktiv', value: boolValue });
+            console.log('✅ Lokal gespeichert:', boolValue);
         } catch(e) {
             console.error('Lokales Speichern fehlgeschlagen:', e);
         }
@@ -3434,17 +3446,17 @@ const Gruppen = {
                     // Update
                     const { error } = await supabaseClient
                         .from('settings')
-                        .update({ value: aktiv })
+                        .update({ value: boolValue })
                         .eq('key', 'gruppenAbfrageAktiv');
                     if (error) throw error;
                 } else {
                     // Insert
                     const { error } = await supabaseClient
                         .from('settings')
-                        .insert({ key: 'gruppenAbfrageAktiv', value: aktiv });
+                        .insert({ key: 'gruppenAbfrageAktiv', value: boolValue });
                     if (error) throw error;
                 }
-                console.log('✅ In Supabase gespeichert');
+                console.log('✅ In Supabase gespeichert:', boolValue);
             } catch(e) {
                 console.warn('Supabase Settings speichern fehlgeschlagen:', e);
                 // Kein throw - lokal ist schon gespeichert
@@ -6189,21 +6201,31 @@ Router.register('admin-gruppen', async () => {
     
     const gruppen = await Gruppen.getAll();
     const isAktiv = await Gruppen.isAbfrageAktiv();
+    console.log('admin-gruppen: isAktiv =', isAktiv);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title"> Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">👥 Gruppenverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
+        <style>
+            .gruppen-switch { position:relative; display:inline-block; width:60px; height:34px; }
+            .gruppen-switch input { opacity:0; width:0; height:0; }
+            .gruppen-slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:34px; }
+            .gruppen-slider:before { position:absolute; content:""; height:26px; width:26px; left:4px; bottom:4px; background-color:white; transition:.4s; border-radius:50%; }
+            .gruppen-switch input:checked + .gruppen-slider { background-color:#27ae60; }
+            .gruppen-switch input:checked + .gruppen-slider:before { transform:translateX(26px); }
+        </style>
+        
         <!-- TOGGLE: Gruppenabfrage aktiv -->
         <div class="card mb-3" style="background:${isAktiv ? 'var(--color-alpine-green)' : '#95a5a6'};color:white;">
             <div style="padding:20px;display:flex;justify-content:space-between;align-items:center;">
                 <div>
                     <div style="font-weight:700;font-size:1.2rem;">Gruppe bei Anmeldung abfragen</div>
                     <div style="font-size:0.9rem;opacity:0.9;">
-                        ${isAktiv ? 'Gäste muessen nach Login eine Gruppe wählen' : 'Keine Gruppenabfrage beim Login'}
+                        ${isAktiv ? '✅ Gäste müssen nach Login eine Gruppe wählen' : 'Keine Gruppenabfrage beim Login'}
                     </div>
                 </div>
-                <label class="switch" style="position:relative;display:inline-block;width:60px;height:34px;">
+                <label class="gruppen-switch">
                     <input type="checkbox" id="gruppenToggle" ${isAktiv ? 'checked' : ''} onchange="toggleGruppenAbfrage(this.checked)">
-                    <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:34px;"></span>
+                    <span class="gruppen-slider"></span>
                 </label>
             </div>
         </div>
