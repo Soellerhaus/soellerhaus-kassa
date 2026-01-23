@@ -1265,3 +1265,112 @@ a {
         display: none !important;
     }
 }
+
+/* ================================
+   KIOSK IMPROVEMENTS v2.0
+   Sticky Header & Tablet Portrait
+   ================================ */
+
+/* ===== STICKY QUICK ACTIONS BAR ===== */
+.quick-actions-bar {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    border-bottom: 1px solid rgba(44, 95, 124, 0.1);
+}
+
+/* Quick Action Buttons */
+.quick-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    white-space: nowrap;
+}
+
+.quick-action-btn:active {
+    transform: scale(0.95);
+}
+
+/* Käsebestellung - Gold */
+.quick-action-btn.cheese {
+    background: linear-gradient(135deg, #f4d03f, #f39c12);
+    color: #5d4e37;
+}
+
+/* Sauna - Rot/Orange */
+.quick-action-btn.sauna {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+}
+
+/* Sprache - Weiß */
+.quick-action-btn.language {
+    background: white;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+/* WhatsApp/Fehler - Grün */
+.quick-action-btn.whatsapp {
+    background: linear-gradient(135deg, #25D366, #128C7E);
+    color: white;
+}
+
+/* Tablet Portrait Optimierung */
+@media (min-width: 500px) and (max-width: 900px) and (orientation: portrait) {
+    .quick-actions-bar {
+        padding: 14px 20px;
+        gap: 10px;
+    }
+    
+    .quick-action-btn {
+        padding: 12px 18px;
+        font-size: 0.9rem;
+    }
+    
+    .alphabet-container {
+        max-width: 480px;
+        padding: 20px;
+    }
+    
+    .alphabet-grid {
+        grid-template-columns: repeat(6, 1fr);
+        gap: 10px;
+    }
+    
+    .alphabet-btn {
+        min-height: 58px;
+        max-height: 65px;
+        font-size: 1.3rem;
+        border-radius: 14px;
+    }
+}
+
+/* Alphabet Buttons verbessert */
+.alphabet-btn {
+    background: linear-gradient(145deg, #3a7ca5, #2C5F7C);
+    box-shadow: 0 3px 8px rgba(44, 95, 124, 0.3);
+}
+
+.alphabet-btn:active {
+    transform: scale(0.92);
+    background: linear-gradient(145deg, #2C5F7C, #1E4A5F);
+}
