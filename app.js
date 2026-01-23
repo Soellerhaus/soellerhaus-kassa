@@ -4472,7 +4472,13 @@ const Router = {
     },
     register(p, h) { this.routes[p] = h; },
     navigate(p) { history.pushState({}, '', `#${p}`); this.handleRoute(); },
-    handleRoute() { const p = location.hash.slice(1) || 'login'; State.currentPage = p; (this.routes[p] || this.routes['login'])?.(); }
+    handleRoute() { 
+        // URL-decode den Hash (für Umlaute wie ä, ö, ü)
+        const hash = location.hash.slice(1) || 'login';
+        const p = decodeURIComponent(hash);
+        State.currentPage = p; 
+        (this.routes[p] || this.routes['login'])?.(); 
+    }
 };
 window.Router = Router;
 
