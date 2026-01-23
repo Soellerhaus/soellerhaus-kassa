@@ -3410,25 +3410,64 @@ const Gruppen = {
     },
     
     async setAbfrageAktiv(aktiv) {
-        await db.settings.put({ key: 'gruppenAbfrageAktiv', value: aktiv });
-        if (supabaseClient && isOnline) {
-            await supabaseClient.from('settings').upsert({ 
-                key: 'gruppenAbfrageAktiv', 
-                value: aktiv 
-            });
+        console.log('setAbfrageAktiv aufgerufen mit:', aktiv);
+        
+        // Zuerst lokal speichern
+        try {
+            await db.settings.put({ key: 'gruppenAbfrageAktiv', value: aktiv });
+            console.log('✅ Lokal gespeichert');
+        } catch(e) {
+            console.error('Lokales Speichern fehlgeschlagen:', e);
         }
+        
+        // Dann in Supabase speichern (falls online)
+        if (supabaseClient && isOnline) {
+            try {
+                // Erst prüfen ob Eintrag existiert
+                const { data: existing } = await supabaseClient
+                    .from('settings')
+                    .select('key')
+                    .eq('key', 'gruppenAbfrageAktiv')
+                    .single();
+                
+                if (existing) {
+                    // Update
+                    const { error } = await supabaseClient
+                        .from('settings')
+                        .update({ value: aktiv })
+                        .eq('key', 'gruppenAbfrageAktiv');
+                    if (error) throw error;
+                } else {
+                    // Insert
+                    const { error } = await supabaseClient
+                        .from('settings')
+                        .insert({ key: 'gruppenAbfrageAktiv', value: aktiv });
+                    if (error) throw error;
+                }
+                console.log('✅ In Supabase gespeichert');
+            } catch(e) {
+                console.warn('Supabase Settings speichern fehlgeschlagen:', e);
+                // Kein throw - lokal ist schon gespeichert
+            }
+        }
+        
+        return true;
     },
     
     // Alle Gruppen laden
     async getAll() {
         if (supabaseClient && isOnline) {
             try {
-                const { data } = await supabaseClient
+                const { data, error } = await supabaseClient
                     .from('gruppen')
                     .select('*')
                     .eq('aktiv', true)
                     .order('id');
-                if (data && data.length > 0) {
+                
+                if (error) {
+                    console.warn('Gruppen laden Supabase Fehler:', error);
+                } else if (data && data.length > 0) {
+                    console.log('✅ Gruppen von Supabase geladen:', data.length);
                     // Lokal cachen
                     for (const g of data) {
                         try { await db.gruppen.put(g); } catch(e) {}
@@ -3439,8 +3478,11 @@ const Gruppen = {
                 console.error('Gruppen laden Fehler:', e);
             }
         }
-        // Fallback: Lokal
-        return await db.gruppen.where('aktiv').equals(1).toArray();
+        // Fallback: Lokal - aktiv kann boolean oder number sein
+        const allLocal = await db.gruppen.toArray();
+        const active = allLocal.filter(g => g.aktiv === true || g.aktiv === 1);
+        console.log('Gruppen aus lokalem Cache:', active.length);
+        return active;
     },
     
     // Gruppe hinzufügen (max 3)
@@ -6227,17 +6269,31 @@ Router.register('admin-gruppen', async () => {
 
 // Toggle Gruppenabfrage
 window.toggleGruppenAbfrage = async (aktiv) => {
-    if (aktiv) {
-        const gruppen = await Gruppen.getAll();
-        if (gruppen.length === 0) {
-            Utils.showToast('Bitte erst mindestens eine Gruppe anlegen!', 'warning');
-            document.getElementById('gruppenToggle').checked = false;
-            return;
+    console.log('toggleGruppenAbfrage aufgerufen mit:', aktiv);
+    
+    try {
+        if (aktiv) {
+            const gruppen = await Gruppen.getAll();
+            console.log('Gruppen gefunden:', gruppen?.length || 0);
+            if (!gruppen || gruppen.length === 0) {
+                Utils.showToast('Bitte erst mindestens eine Gruppe anlegen!', 'warning');
+                document.getElementById('gruppenToggle').checked = false;
+                return;
+            }
         }
+        
+        await Gruppen.setAbfrageAktiv(aktiv);
+        Utils.showToast(aktiv ? '✅ Gruppenabfrage aktiviert' : '✅ Gruppenabfrage deaktiviert', 'success');
+        
+        // Kurze Verzögerung vor Reload
+        setTimeout(() => Router.navigate('admin-gruppen'), 300);
+    } catch(e) {
+        console.error('toggleGruppenAbfrage Fehler:', e);
+        Utils.showToast('❌ Fehler: ' + e.message, 'error');
+        // Toggle zurücksetzen
+        const toggle = document.getElementById('gruppenToggle');
+        if (toggle) toggle.checked = !aktiv;
     }
-    await Gruppen.setAbfrageAktiv(aktiv);
-    Utils.showToast(aktiv ? 'Gruppenabfrage aktiviert' : 'Gruppenabfrage deaktiviert', 'success');
-    Router.navigate('admin-gruppen');
 };
 
 // Gruppe hinzufügen Modal
