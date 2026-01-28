@@ -3359,7 +3359,8 @@ const FehlendeGetränke = {
             session_id: State.sessionId,
             storniert: false,
             fix: true,
-            aus_fehlend: true
+            aus_fehlend: true,
+            aufgefuellt: true  // WICHTIG: Fehlende Getränke NICHT auf Auffüllliste!
         };
         
         await db.buchungen.add(b);
