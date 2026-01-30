@@ -9835,6 +9835,29 @@ window.saveEditArticle = async () => {
 (async function initApp() {
     console.log(' Seollerhaus Kassa v3.0 (Supabase) startet...');
     
+    // Geo-Lock: Nur Zugriff aus Österreich erlauben
+    try {
+        const response = await fetch('https://ipapi.co/json/');
+        const data = await response.json();
+        if (data.country_code !== 'AT') {
+            document.body.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#2C5F7C;">
+                    <div style="text-align:center;padding:60px 40px;background:white;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,0.3);max-width:500px;">
+                        <div style="font-size:4rem;margin-bottom:20px;">🔒</div>
+                        <h1 style="color:#2C5F7C;margin-bottom:20px;font-size:1.8rem;">Zugriff verweigert</h1>
+                        <p style="color:#666;font-size:1.1rem;line-height:1.6;">Diese Anwendung ist ausschließlich vor Ort im Söllerhaus verfügbar.</p>
+                        <p style="color:#999;font-size:0.9rem;margin-top:30px;">Bei Fragen wenden Sie sich bitte an die Rezeption.</p>
+                    </div>
+                </div>
+            `;
+            return; // App-Start abbrechen
+        }
+        console.log('✅ Geo-Check OK');
+    } catch(e) {
+        console.warn('⚠️ Geo-Check fehlgeschlagen - erlaube Zugriff:', e);
+        // Bei Fehler (z.B. offline) → Zugriff erlauben
+    }
+    
     // Funktion um Loading Screen zu verstecken und App zu zeigen
     const showApp = () => {
         const loadingScreen = document.getElementById('loading-screen');
