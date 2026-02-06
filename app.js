@@ -2672,7 +2672,27 @@ const Auth = {
         return [...reg, ...legacy].sort((a,b) => (a.firstName||a.vorname).localeCompare(b.firstName||b.vorname));
     },
     async adminLogin(pw) {
-        // Standard Admin-Passwort Hash für 'admin123'
+        // PRIMÄR: Supabase Auth Login versuchen
+        if (supabaseClient && isOnline) {
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email: 'admin@soellerhaus.local',
+                    password: pw
+                });
+                if (!error && data.user && data.user.email === 'admin@soellerhaus.local') {
+                    State.isAdmin = true;
+                    State.adminUser = data.user;
+                    console.log('✅ Admin-Login via Supabase Auth');
+                    Utils.showToast('Admin-Login erfolgreich!', 'success'); 
+                    return true;
+                }
+                console.log('⚠️ Supabase Auth Login fehlgeschlagen:', error?.message || 'Falsches Passwort');
+            } catch (e) { 
+                console.log('⚠️ Supabase Auth Fehler:', e.message); 
+            }
+        }
+        
+        // FALLBACK: Legacy Hash-basierter Login
         const defaultHash = '6c720cb9fbe0bf0b4889db0cbca428857f838046fdb7b56a709397d4b7e2609f';
         let stored = defaultHash;
         
@@ -2698,7 +2718,8 @@ const Auth = {
         
         if (inputHash === stored) { 
             State.isAdmin = true; 
-            Utils.showToast('Admin-Login OK', 'success'); 
+            console.warn('⚠️ Legacy Admin-Login (bitte Supabase-Passwort verwenden)');
+            Utils.showToast('Admin OK (Legacy)', 'warning'); 
             return true; 
         }
         
