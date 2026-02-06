@@ -2672,59 +2672,40 @@ const Auth = {
         return [...reg, ...legacy].sort((a,b) => (a.firstName||a.vorname).localeCompare(b.firstName||b.vorname));
     },
     async adminLogin(pw) {
-        // PRIMÄR: Supabase Auth Login versuchen
-        if (supabaseClient && isOnline) {
-            try {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({
-                    email: 'admin@soellerhaus.local',
-                    password: pw
-                });
-                if (!error && data.user && data.user.email === 'admin@soellerhaus.local') {
-                    State.isAdmin = true;
-                    State.adminUser = data.user;
-                    console.log('✅ Admin-Login via Supabase Auth');
-                    Utils.showToast('Admin-Login erfolgreich!', 'success'); 
-                    return true;
-                }
-                console.log('⚠️ Supabase Auth Login fehlgeschlagen:', error?.message || 'Falsches Passwort');
-            } catch (e) { 
-                console.log('⚠️ Supabase Auth Fehler:', e.message); 
+        // NUR Supabase Auth - KEIN Legacy-Fallback mehr!
+        if (!supabaseClient || !isOnline) {
+            Utils.showToast('Keine Verbindung zu Supabase', 'error');
+            return false;
+        }
+        
+        try {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: 'admin@soellerhaus.local',
+                password: pw
+            });
+            
+            if (error) {
+                console.log('❌ Login fehlgeschlagen:', error.message);
+                Utils.showToast('Falsches Passwort', 'error');
+                return false;
             }
-        }
-        
-        // FALLBACK: Legacy Hash-basierter Login
-        const defaultHash = '6c720cb9fbe0bf0b4889db0cbca428857f838046fdb7b56a709397d4b7e2609f';
-        let stored = defaultHash;
-        
-        if (supabaseClient && isOnline) {
-            try {
-                const { data, error } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
-                if (!error && data?.value) {
-                    stored = data.value;
-                }
-            } catch(e) {
-                console.log('Settings nicht lesbar, nutze Default');
+            
+            if (data.user && data.user.email === 'admin@soellerhaus.local') {
+                State.isAdmin = true;
+                State.adminUser = data.user;
+                console.log('✅ Admin-Login erfolgreich');
+                Utils.showToast('Admin-Login erfolgreich!', 'success'); 
+                return true;
             }
-        } else {
-            try {
-                const s = await db.settings.get('admin_password');
-                if (s?.value) stored = s.value;
-            } catch(e) {}
+            
+            Utils.showToast('Kein Admin-Account', 'error');
+            return false;
+            
+        } catch (e) { 
+            console.error('❌ Login-Fehler:', e.message);
+            Utils.showToast('Login-Fehler', 'error');
+            return false;
         }
-        
-        const inputHash = await Utils.hashPassword(pw);
-        console.log('Admin Login - Input Hash:', inputHash);
-        console.log('Admin Login - Stored Hash:', stored);
-        
-        if (inputHash === stored) { 
-            State.isAdmin = true; 
-            console.warn('⚠️ Legacy Admin-Login (bitte Supabase-Passwort verwenden)');
-            Utils.showToast('Admin OK (Legacy)', 'warning'); 
-            return true; 
-        }
-        
-        Utils.showToast('Falsches Passwort', 'error'); 
-        return false;
     },
     async logout() { 
         // Buchungen der Session als fix markieren
