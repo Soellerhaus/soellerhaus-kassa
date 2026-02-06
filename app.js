@@ -2513,16 +2513,17 @@ const RegisteredGuests = {
                 } else if (data) {
                     console.log('📊 Geladene Profile (gesamt):', data.length);
                     
-                    // Client-seitig filtern: Buchstabe + nicht gelöscht
+                    // Client-seitig filtern: Buchstabe + nicht gelöscht + nicht ausgecheckt
                     const filtered = data.filter(p => {
                         const name = (p.display_name || p.first_name || '').toUpperCase();
                         const startsWithLetter = name.startsWith(letter.toUpperCase());
                         const isNotDeleted = p.geloescht !== true && p.gelöscht !== true;
+                        const isNotCheckedOut = !p.checked_out_at;  // Nur Gäste ohne checkout
                         
-                        console.log('  Prüfe:', name, '→ Buchstabe:', startsWithLetter, 'Nicht gelöscht:', isNotDeleted);
+                        console.log('  Prüfe:', name, '→ Buchstabe:', startsWithLetter, 'Nicht gelöscht:', isNotDeleted, 'Nicht ausgecheckt:', isNotCheckedOut);
                         
-                        // NUR Buchstabe und nicht-gelöscht prüfen - aktiv ignorieren!
-                        return startsWithLetter && isNotDeleted;
+                        // NUR: Richtiger Buchstabe + nicht gelöscht + nicht ausgecheckt
+                        return startsWithLetter && isNotDeleted && isNotCheckedOut;
                     });
                     
                     console.log('📋 Nach Filter:', filtered.length);
