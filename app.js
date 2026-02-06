@@ -2500,7 +2500,7 @@ const RegisteredGuests = {
         // IMMER zuerst von Supabase laden wenn online
         if (supabaseClient && isOnline) {
             try {
-                console.log(' Lade Gäste für Buchstabe', letter, 'von Supabase...');
+                console.log('🔍 Lade Gäste für Buchstabe', letter, 'von Supabase...');
                 
                 // Alle Profile laden (wir filtern client-seitig)
                 const { data, error } = await supabaseClient
@@ -2509,23 +2509,31 @@ const RegisteredGuests = {
                     .order('display_name');
                 
                 if (error) {
-                    console.error(' Supabase Fehler:', error);
+                    console.error('❌ Supabase Fehler:', error);
                 } else if (data) {
-                    // Client-seitig filtern: Buchstabe + nicht gelöscht + aktiv
+                    console.log('📊 Geladene Profile (gesamt):', data.length);
+                    
+                    // Client-seitig filtern: Buchstabe + nicht gelöscht
                     const filtered = data.filter(p => {
                         const name = (p.display_name || p.first_name || '').toUpperCase();
                         const startsWithLetter = name.startsWith(letter.toUpperCase());
-                        const isNotDeleted = p.geloescht !== true && p.gelöscht !== true;  // Beide Schreibweisen prüfen
-                        const isActive = p.aktiv !== false;  // Nur aktive Gäste
-                        return startsWithLetter && isNotDeleted && isActive;
+                        const isNotDeleted = p.geloescht !== true && p.gelöscht !== true;
+                        
+                        console.log('  Prüfe:', name, '→ Buchstabe:', startsWithLetter, 'Nicht gelöscht:', isNotDeleted);
+                        
+                        // NUR Buchstabe und nicht-gelöscht prüfen - aktiv ignorieren!
+                        return startsWithLetter && isNotDeleted;
                     });
+                    
+                    console.log('📋 Nach Filter:', filtered.length);
                     
                     // DEDUPLIZIERUNG: Nur einzigartige Namen behalten (ersten Eintrag pro Name)
                     const seenNames = new Set();
                     const deduplicated = filtered.filter(p => {
                         const name = (p.display_name || p.first_name || '').toUpperCase().trim();
                         if (seenNames.has(name)) {
-                            return false; // Duplikat überspringen
+                            console.log('  ⚠️ Duplikat übersprungen:', name);
+                            return false;
                         }
                         seenNames.add(name);
                         return true;
@@ -2663,41 +2671,36 @@ const Auth = {
         return [...reg, ...legacy].sort((a,b) => (a.firstName||a.vorname).localeCompare(b.firstName||b.vorname));
     },
     async adminLogin(pw) {
-        if (supabaseClient && isOnline) {
-            try {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({
-                    email: 'admin@soellerhaus.local',
-                    password: pw
-                });
-                if (!error && data.user && data.user.email === 'admin@soellerhaus.local') {
-                    State.isAdmin = true;
-                    State.adminUser = data.user;
-                    console.log('✅ Admin-Login via Supabase Auth');
-                    Utils.showToast('Admin-Login erfolgreich!', 'success'); 
-                    return true;
-                }
-            } catch (e) { console.log('⚠️ Supabase Auth fehlgeschlagen'); }
-        }
+        // Standard Admin-Passwort Hash für 'admin123'
         const defaultHash = '6c720cb9fbe0bf0b4889db0cbca428857f838046fdb7b56a709397d4b7e2609f';
         let stored = defaultHash;
+        
         if (supabaseClient && isOnline) {
             try {
                 const { data, error } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
-                if (!error && data?.value) stored = data.value;
-            } catch(e) { console.log('Settings nicht lesbar, nutze Default'); }
+                if (!error && data?.value) {
+                    stored = data.value;
+                }
+            } catch(e) {
+                console.log('Settings nicht lesbar, nutze Default');
+            }
         } else {
             try {
                 const s = await db.settings.get('admin_password');
                 if (s?.value) stored = s.value;
             } catch(e) {}
         }
+        
         const inputHash = await Utils.hashPassword(pw);
+        console.log('Admin Login - Input Hash:', inputHash);
+        console.log('Admin Login - Stored Hash:', stored);
+        
         if (inputHash === stored) { 
             State.isAdmin = true; 
-            console.warn('⚠️ Legacy Admin-Login');
-            Utils.showToast('Admin OK (Legacy)', 'warning'); 
+            Utils.showToast('Admin-Login OK', 'success'); 
             return true; 
         }
+        
         Utils.showToast('Falsches Passwort', 'error'); 
         return false;
     },
