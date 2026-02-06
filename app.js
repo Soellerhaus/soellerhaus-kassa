@@ -17,38 +17,6 @@ let isOnline = navigator.onLine;
 window.addEventListener('online', () => { isOnline = true; syncPendingData(); });
 window.addEventListener('offline', () => { isOnline = false; });
 
-// Auto-Sync Timer: Prüft alle 30 Sekunden auf pending Buchungen
-let autoSyncTimer = null;
-function startAutoSync() {
-    if (autoSyncTimer) clearInterval(autoSyncTimer);
-    
-    autoSyncTimer = setInterval(async () => {
-        if (isOnline && supabaseClient) {
-            const status = await SyncManager.getSyncStatus();
-            if (status.pending > 0) {
-                console.log(`🔄 Auto-Sync: ${status.pending} pending Buchungen`);
-                await syncPendingData();
-            }
-            if (status.failed > 0) {
-                console.warn(`⚠️ ${status.failed} fehlgeschlagene Buchungen - bitte manuell prüfen`);
-            }
-        }
-    }, 30000); // 30 Sekunden
-    
-    console.log('✅ Auto-Sync Timer gestartet (30s Intervall)');
-}
-
-// Auto-Sync beim Laden starten
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        startAutoSync();
-        initRealtime();
-    });
-} else {
-    startAutoSync();
-    initRealtime();
-}
-
 // Supabase initialisieren
 function initSupabase() {
     if (typeof supabase !== 'undefined' && supabase.createClient) {
@@ -67,264 +35,20 @@ function initSupabase() {
 }
 
 // Pending Data sync (falls offline Buchungen gemacht wurden)
-// Sync-Manager mit Retry-Mechanismus und Conflict Resolution
-const SyncManager = {
-    isSyncing: false,
-    syncQueue: [],
-    maxRetries: 3,
-    retryDelay: 2000, // 2 Sekunden
-    
-    async syncPendingData() {
-        if (!supabaseClient || !isOnline || this.isSyncing) return;
-        
-        this.isSyncing = true;
-        console.log('🔄 Sync startet...');
-        
-        try {
-            const pending = await db.buchungen.where('sync_status').equals('pending').toArray();
-            
-            if (pending.length === 0) {
-                console.log('✅ Keine pending Buchungen');
-                this.isSyncing = false;
-                return;
-            }
-            
-            console.log(`📦 ${pending.length} Buchungen zu synchronisieren`);
-            let synced = 0;
-            let failed = 0;
-            
-            for (const buchung of pending) {
-                const success = await this.syncSingleBuchung(buchung);
-                if (success) {
-                    synced++;
-                } else {
-                    failed++;
-                }
-                
-                // Kurze Pause zwischen Buchungen (Rate Limiting vermeiden)
-                await new Promise(r => setTimeout(r, 100));
-            }
-            
-            console.log(`✅ Sync abgeschlossen: ${synced} erfolgreich, ${failed} fehlgeschlagen`);
-            
-            if (failed > 0) {
-                Utils.showToast(`⚠️ ${failed} Buchungen konnten nicht synchronisiert werden`, 'warning');
-            }
-            
-        } catch (e) {
-            console.error('❌ Sync Fehler:', e);
-        } finally {
-            this.isSyncing = false;
-        }
-    },
-    
-    async syncSingleBuchung(buchung, attempt = 1) {
-        try {
-            console.log(`🔄 Sync Buchung ${buchung.buchung_id} (Versuch ${attempt}/${this.maxRetries})`);
-            
-            // Prüfe ob Buchung bereits in Supabase existiert
-            const { data: existing, error: checkError } = await supabaseClient
-                .from('buchungen')
-                .select('updated_at, sync_status')
-                .eq('buchung_id', buchung.buchung_id)
-                .maybeSingle();
-            
-            if (checkError && checkError.code !== 'PGRST116') {
-                throw checkError;
-            }
-            
-            if (existing) {
-                // Conflict Resolution: Neueste Version gewinnt
-                const localTime = new Date(buchung.updated_at || buchung.erstellt_am);
-                const remoteTime = new Date(existing.updated_at || existing.erstellt_am);
-                
-                if (remoteTime > localTime) {
-                    console.log(`⚠️ Remote Version neuer - überspringe ${buchung.buchung_id}`);
-                    // Markiere als synced ohne zu überschreiben
-                    await db.buchungen.update(buchung.buchung_id, { sync_status: 'synced' });
-                    return true;
-                }
-            }
-            
-            // Upsert mit Conflict Handling
-            const { error } = await supabaseClient
-                .from('buchungen')
-                .upsert({
-                    ...buchung,
-                    updated_at: new Date().toISOString(),
-                    sync_status: 'synced'
-                }, { 
-                    onConflict: 'buchung_id',
-                    ignoreDuplicates: false 
-                });
-            
-            if (error) {
-                throw error;
-            }
-            
-            // Erfolgreich - lokal als synced markieren
-            await db.buchungen.update(buchung.buchung_id, { 
-                sync_status: 'synced',
-                updated_at: new Date().toISOString()
-            });
-            
-            console.log(`✅ Buchung ${buchung.buchung_id} synchronisiert`);
-            return true;
-            
-        } catch (error) {
-            console.error(`❌ Sync Fehler Buchung ${buchung.buchung_id}:`, error);
-            
-            // Retry-Logik
-            if (attempt < this.maxRetries) {
-                console.log(`🔄 Retry in ${this.retryDelay}ms...`);
-                await new Promise(r => setTimeout(r, this.retryDelay));
-                return this.syncSingleBuchung(buchung, attempt + 1);
-            }
-            
-            // Max Retries erreicht - markiere als failed
-            await db.buchungen.update(buchung.buchung_id, { 
-                sync_status: 'failed',
-                sync_error: error.message,
-                sync_attempts: attempt
-            });
-            
-            return false;
-        }
-    },
-    
-    // Manuelle Sync-Auslösung für einzelne Buchung
-    async forceSyncBuchung(buchungId) {
-        const buchung = await db.buchungen.get(buchungId);
-        if (!buchung) return false;
-        
-        await db.buchungen.update(buchungId, { sync_status: 'pending' });
-        return this.syncSingleBuchung(buchung);
-    },
-    
-    // Zeige Sync-Status im UI
-    async getSyncStatus() {
-        const pending = await db.buchungen.where('sync_status').equals('pending').count();
-        const failed = await db.buchungen.where('sync_status').equals('failed').count();
-        
-        return { pending, failed };
-    }
-};
-
-// Legacy-Wrapper für Kompatibilität
 async function syncPendingData() {
-    await SyncManager.syncPendingData();
-}
-
-// ================================
-// REALTIME SUBSCRIPTIONS
-// ================================
-
-const RealtimeManager = {
-    channels: {},
-    
-    // Buchungen live abonnieren
-    subscribeBuchungen(onUpdate) {
-        if (!supabaseClient || !isOnline) {
-            console.log('⚠️ Realtime nicht verfügbar (offline)');
-            return null;
+    if (!supabaseClient || !isOnline) return;
+    try {
+        const pending = await db.buchungen.where('sync_status').equals('pending').toArray();
+        for (const b of pending) {
+            try {
+                const { error } = await supabaseClient.from('buchungen').upsert(b, { onConflict: 'buchung_id' });
+                if (!error) {
+                    await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
+                }
+            } catch (e) { console.error('Sync error:', e); }
         }
-        
-        console.log('🔴 Realtime: Abonniere Buchungen...');
-        
-        const channel = supabaseClient
-            .channel('buchungen-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'buchungen'
-                },
-                (payload) => {
-                    console.log('🔴 Realtime Update:', payload.eventType);
-                    
-                    // Bei INSERT/UPDATE/DELETE → Callback ausführen
-                    if (onUpdate) {
-                        onUpdate(payload);
-                    }
-                    
-                    // UI automatisch aktualisieren wenn auf relevanter Seite
-                    const currentPage = State.currentPage;
-                    if (currentPage === 'kasse' || currentPage === 'bestellung') {
-                        // Aktualisiere Warenkorb-Anzeige
-                        setTimeout(() => {
-                            const event = new CustomEvent('buchung-updated');
-                            window.dispatchEvent(event);
-                        }, 100);
-                    }
-                }
-            )
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log('✅ Realtime Buchungen abonniert');
-                } else if (status === 'CHANNEL_ERROR') {
-                    console.error('❌ Realtime Fehler - reconnecting...');
-                    setTimeout(() => this.subscribeBuchungen(onUpdate), 5000);
-                }
-            });
-        
-        this.channels.buchungen = channel;
-        return channel;
-    },
-    
-    // Fehlende Getränke live abonnieren
-    subscribeFehlendeGetraenke(onUpdate) {
-        if (!supabaseClient || !isOnline) return null;
-        
-        console.log('🔴 Realtime: Abonniere fehlende Getränke...');
-        
-        const channel = supabaseClient
-            .channel('fehlende-getraenke-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'fehlende_getraenke'
-                },
-                (payload) => {
-                    console.log('🔴 Realtime: Fehlende Getränke Update');
-                    if (onUpdate) onUpdate(payload);
-                }
-            )
-            .subscribe();
-        
-        this.channels.fehlendeGetraenke = channel;
-        return channel;
-    },
-    
-    // Alle Subscriptions beenden
-    unsubscribeAll() {
-        console.log('🔴 Realtime: Alle Subscriptions beenden');
-        Object.values(this.channels).forEach(channel => {
-            if (channel) channel.unsubscribe();
-        });
-        this.channels = {};
-    }
-};
-
-// Realtime beim App-Start aktivieren
-let realtimeInitialized = false;
-function initRealtime() {
-    if (realtimeInitialized || !supabaseClient) return;
-    realtimeInitialized = true;
-    
-    // Buchungen abonnieren
-    RealtimeManager.subscribeBuchungen((payload) => {
-        console.log('📊 Buchung geändert:', payload.eventType, payload.new?.artikel_name);
-    });
-    
-    // Fehlende Getränke abonnieren
-    RealtimeManager.subscribeFehlendeGetraenke((payload) => {
-        console.log('⚠️ Fehlende Getränke geändert:', payload.eventType);
-    });
-    
-    console.log('✅ Realtime initialisiert');
+        if (pending.length > 0) console.log(`✅ ${pending.length} Buchungen synchronisiert`);
+    } catch (e) { console.error('syncPendingData error:', e); }
 }
 
 // ================================
@@ -2939,47 +2663,7 @@ const Auth = {
         return [...reg, ...legacy].sort((a,b) => (a.firstName||a.vorname).localeCompare(b.firstName||b.vorname));
     },
     async adminLogin(pw) {
-        // Neue Methode: Admin über Supabase Auth
-        if (supabaseClient && isOnline) {
-            try {
-                // Versuche Admin-Login über Supabase Auth
-                // Admin-Email ist immer im Format: admin@soellerhaus.local
-                const adminEmail = 'admin@soellerhaus.local';
-                
-                const { data, error } = await supabaseClient.auth.signInWithPassword({
-                    email: adminEmail,
-                    password: pw
-                });
-                
-                if (!error && data.user) {
-                    // Prüfe ob User tatsächlich Admin ist
-                    const { data: profile } = await supabaseClient
-                        .from('profiles')
-                        .select('is_admin')
-                        .eq('id', data.user.id)
-                        .single();
-                    
-                    if (profile?.is_admin === true) {
-                        State.isAdmin = true;
-                        State.adminUser = data.user;
-                        console.log('✅ Admin-Login via Supabase Auth erfolgreich');
-                        Utils.showToast('Admin-Login erfolgreich', 'success');
-                        return true;
-                    } else {
-                        await supabaseClient.auth.signOut();
-                        Utils.showToast('Keine Admin-Berechtigung', 'error');
-                        return false;
-                    }
-                }
-            } catch(e) {
-                console.log('Supabase Admin-Login fehlgeschlagen, versuche Legacy:', e);
-            }
-        }
-        
-        // Fallback: Legacy Admin-Passwort (für Übergangszeit)
-        // WARNUNG: Diese Methode sollte nach Migration zu Supabase Auth entfernt werden!
-        console.warn('⚠️ Nutze Legacy Admin-Login - bitte auf Supabase Auth migrieren!');
-        
+        // Standard Admin-Passwort Hash für 'admin123'
         const defaultHash = '6c720cb9fbe0bf0b4889db0cbca428857f838046fdb7b56a709397d4b7e2609f';
         let stored = defaultHash;
         
@@ -3000,11 +2684,12 @@ const Auth = {
         }
         
         const inputHash = await Utils.hashPassword(pw);
+        console.log('Admin Login - Input Hash:', inputHash);
+        console.log('Admin Login - Stored Hash:', stored);
         
         if (inputHash === stored) { 
-            State.isAdmin = true;
-            console.log('✅ Admin-Login via Legacy erfolgreich (bitte migrieren!)');
-            Utils.showToast('Admin-Login OK (Legacy)', 'warning'); 
+            State.isAdmin = true; 
+            Utils.showToast('Admin-Login OK', 'success'); 
             return true; 
         }
         
@@ -3333,9 +3018,6 @@ const Buchungen = {
     
     async getAll(filter={}) {
         // NUR Supabase - kein lokaler Fallback!
-        // WICHTIG: Setzt voraus dass Supabase RLS Policies aktiv sind!
-        // - Normale Gäste sehen nur eigene Buchungen (RLS filtert automatisch)
-        // - Admins (is_admin = true) sehen alle Buchungen
         if (!supabaseClient || !isOnline) {
             console.error('❌ Keine Verbindung zu Supabase');
             return [];
