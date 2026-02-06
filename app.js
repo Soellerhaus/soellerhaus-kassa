@@ -27,7 +27,7 @@ function initSupabase() {
                 detectSessionInUrl: false
             }
         });
-        console.log('âœ… Supabase Client initialisiert');
+        console.log('✅ Supabase Client initialisiert');
         return true;
     }
     console.warn('âš Supabase nicht verfuegbar - Offline-Modus');
@@ -47,7 +47,7 @@ async function syncPendingData() {
                 }
             } catch (e) { console.error('Sync error:', e); }
         }
-        if (pending.length > 0) console.log(`âœ… ${pending.length} Buchungen synchronisiert`);
+        if (pending.length > 0) console.log(`✅ ${pending.length} Buchungen synchronisiert`);
     } catch (e) { console.error('syncPendingData error:', e); }
 }
 
@@ -213,7 +213,7 @@ const DataProtection = {
                 if (backup.fehlendeGetraenke) {
                     for (const f of backup.fehlendeGetraenke) { try { await db.fehlendeGetraenke.add(f); } catch(e) {} }
                 }
-                console.log('âœ… Daten wiederhergestellt');
+                console.log('✅ Daten wiederhergestellt');
             }
         } catch (e) { console.error(e); }
     },
@@ -297,7 +297,7 @@ const DataProtection = {
                         fehlende_getraenke: fehlende.data || []
                     };
                     data.quelle = 'lokal+supabase';
-                    console.log('âœ… Supabase-Daten im Backup:', {
+                    console.log('✅ Supabase-Daten im Backup:', {
                         profiles: data.supabase.profiles.length,
                         buchungen: data.supabase.buchungen.length,
                         artikel: data.supabase.artikel.length
@@ -328,7 +328,7 @@ const DataProtection = {
             // Backup-Datum speichern
             this.setLastBackupDate();
             
-            Utils.showToast(`âœ… Vollstaendiges Backup erstellt!\n${data.statistik.anzahlGaeste} Gaeste, ${data.statistik.anzahlArtikel} Artikel, ${data.statistik.anzahlBuchungen} Buchungen`, 'success');
+            Utils.showToast(`✅ Vollstaendiges Backup erstellt!\n${data.statistik.anzahlGaeste} Gaeste, ${data.statistik.anzahlArtikel} Artikel, ${data.statistik.anzahlBuchungen} Buchungen`, 'success');
             return true;
         } catch (e) {
             console.error('Backup Fehler:', e);
@@ -499,14 +499,14 @@ const DataProtection = {
                             </label>
                             <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
                                 <input type="checkbox" id="restore-fehlende" ${stats.fehlendeGetraenke === 0 ? 'disabled' : ''}>
-                                <span>âš ï¸ Fehlende <strong>(${stats.fehlendeGetraenke})</strong></span>
+                                <span>âš  Fehlende <strong>(${stats.fehlendeGetraenke})</strong></span>
                             </label>
                         </div>
                     </div>
                     
                     <!-- Modus -->
                     <div style="padding:0 20px 20px;">
-                        <h3 style="margin:0 0 12px 0;color:#2C5F7C;">âš™ï¸ Wiederherstellungs-Modus</h3>
+                        <h3 style="margin:0 0 12px 0;color:#2C5F7C;">⚙️ Wiederherstellungs-Modus</h3>
                         <div style="display:flex;flex-direction:column;gap:8px;">
                             <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fff3cd;border:2px solid #ffc107;border-radius:8px;cursor:pointer;">
                                 <input type="radio" name="restore-mode" value="merge" checked style="margin-top:3px;">
@@ -727,7 +727,7 @@ const DataProtection = {
             if (restored.gruppen > 0) summary.push(`${restored.gruppen} Gruppen`);
             if (restored.fehlende > 0) summary.push(`${restored.fehlende} Fehlende`);
             
-            Utils.showToast(`âœ… Wiederherstellung erfolgreich!\n${summary.join(', ') || 'Keine neuen Daten'}`, 'success');
+            Utils.showToast(`✅ Wiederherstellung erfolgreich!\n${summary.join(', ') || 'Keine neuen Daten'}`, 'success');
             
             // Seite neu laden um Aenderungen anzuzeigen
             setTimeout(() => {
@@ -1583,7 +1583,7 @@ const CheeseOrders = {
                         margin-bottom:20px;
                         font-size:0.85rem;
                     ">
-                        <div style="font-weight:600;color:#856404;margin-bottom:8px;">âš ï¸ Wichtige Hinweise:</div>
+                        <div style="font-weight:600;color:#856404;margin-bottom:8px;">âš  Wichtige Hinweise:</div>
                         <ul style="margin:0;padding-left:20px;color:#856404;line-height:1.6;">
                             <li>Grammzahl ist <strong>ca.-Angabe</strong> (Kaese wird frisch geschnitten)</li>
                             <li>Abholung <strong>nur am Abreisetag</strong> beim Check-out</li>
@@ -1708,7 +1708,7 @@ const CheeseOrders = {
                         max-width:350px;
                         box-shadow:0 20px 60px rgba(0,0,0,0.3);
                     ">
-                        <div style="font-size:4rem;margin-bottom:16px;">âœ…</div>
+                        <div style="font-size:4rem;margin-bottom:16px;">✅</div>
                         <h2 style="color:#27ae60;margin:0 0 12px;">Bestellung erfolgreich!</h2>
                         <p style="color:#666;margin:0 0 20px;line-height:1.5;">
                             Ihr Kaese wird fuer Sie vorbereitet.<br>
@@ -2247,7 +2247,7 @@ const RegisteredGuests = {
             }
             
             const userId = authData.user.id;
-            console.log('âœ… Auth SignUp OK, User ID:', userId);
+            console.log('✅ Auth SignUp OK, User ID:', userId);
             
             // Warte auf Trigger (Profile wird automatisch erstellt)
             await new Promise(r => setTimeout(r, 1000));
@@ -2277,7 +2277,7 @@ const RegisteredGuests = {
                             .eq('id', userId);
                         
                         if (!updateError) {
-                            console.log('âœ… PIN in Profile gespeichert (Update)');
+                            console.log('✅ PIN in Profile gespeichert (Update)');
                             pinSaved = true;
                             break;
                         }
@@ -2298,7 +2298,7 @@ const RegisteredGuests = {
                             });
                         
                         if (!insertError) {
-                            console.log('âœ… PIN in Profile gespeichert (Insert)');
+                            console.log('✅ PIN in Profile gespeichert (Insert)');
                             pinSaved = true;
                             break;
                         }
@@ -2349,7 +2349,7 @@ const RegisteredGuests = {
                 if (loginError) {
                     console.warn('Login nach Registrierung fehlgeschlagen:', loginError);
                 } else {
-                    console.log('âœ… Session nach Registrierung aktiv');
+                    console.log('✅ Session nach Registrierung aktiv');
                 }
             } catch(e) {
                 console.warn('Login-Versuch fehlgeschlagen:', e);
@@ -2480,7 +2480,7 @@ const RegisteredGuests = {
                         return true;
                     });
                     
-                    console.log('âœ… Gefunden fuer', letter + ':', deduplicated.length, '(nach Deduplizierung)');
+                    console.log('✅ Gefunden fuer', letter + ':', deduplicated.length, '(nach Deduplizierung)');
                     
                     if (deduplicated.length > 0) {
                         return deduplicated.map(g => {
@@ -2746,11 +2746,11 @@ const Buchungen = {
                 throw new Error('Buchung fehlgeschlagen. Bitte nochmal versuchen.');
             }
             
-            console.log('âœ… Buchung nach Supabase:', b.buchung_id);
+            console.log('✅ Buchung nach Supabase:', b.buchung_id);
             erstellteBuchungen.push(b);
         }
         
-        console.log('âœ…', menge, 'Einzelbuchung(en) erstellt fuer:', artikel.name);
+        console.log('✅', menge, 'Einzelbuchung(en) erstellt fuer:', artikel.name);
         return erstellteBuchungen[0];
     },
 
@@ -2884,7 +2884,7 @@ const Buchungen = {
                 return [];
             }
             
-            console.log('âœ… Buchungen von Supabase geladen:', data.length);
+            console.log('✅ Buchungen von Supabase geladen:', data.length);
             return data.map(b => ({ ...b, gast_id: b.user_id }));
         } catch(e) {
             console.error('âŒ Buchungen.getAll error:', e);
@@ -2970,7 +2970,7 @@ const Buchungen = {
             await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
         }
         
-        console.log(`âœ… ${ids.length} Buchungen als aufgefuellt markiert`);
+        console.log(`✅ ${ids.length} Buchungen als aufgefuellt markiert`);
     },
     
     // Legacy - nicht mehr benutzen
@@ -3032,8 +3032,8 @@ const SyncManager = {
         };
         
         const icons = {
-            green: 'ðŸŸ¢',
-            red: 'ðŸ”´'
+            green: '[OK]',
+            red: '[ERROR]'
         };
         
         ampelEl.innerHTML = `${icons[status]} <span style="color:${colors[status]};font-weight:600;">${message}</span>`;
@@ -3046,9 +3046,9 @@ const SyncManager = {
         
         let message = '';
         if (status === 'green') {
-            message = 'âœ… Mit Supabase verbunden - Alle Buchungen werden direkt synchronisiert!';
+            message = '✅ Mit Supabase verbunden - Alle Buchungen werden direkt synchronisiert!';
         } else {
-            message = 'ðŸ”´ Du bist offline.\n\nBitte stelle eine Internetverbindung her um zu buchen.';
+            message = '[ICON] Du bist offline.\n\nBitte stelle eine Internetverbindung her um zu buchen.';
         }
         
         Utils.showToast(message, status === 'green' ? 'success' : 'error');
@@ -3058,7 +3058,7 @@ const SyncManager = {
     startBackgroundSync() {
         if (this.syncInterval) return;
         
-        console.log('ðŸ”„ SyncManager: Status-Check gestartet');
+        console.log('[ICON] SyncManager: Status-Check gestartet');
         this.updateUI();
         
         // Alle 30 Sekunden Status pruefen
@@ -3299,7 +3299,7 @@ const Gruppen = {
                 }
                 
                 if (data) {
-                    console.log('âœ… Gruppe in Supabase gespeichert:', data);
+                    console.log('✅ Gruppe in Supabase gespeichert:', data);
                     // Lokal mit Supabase-ID speichern
                     gruppe.id = data.id;
                     try { await db.gruppen.put(gruppe); } catch(e) {}
@@ -3632,7 +3632,7 @@ const Umlage = {
                 console.error('âŒ Umlage Buchung Fehler:', gastName, insertError.message, insertError.details);
                 fehler++;
             } else {
-                console.log('âœ… Umlage gebucht fuer:', gastName, data);
+                console.log('✅ Umlage gebucht fuer:', gastName, data);
                 erfolg++;
             }
         }
@@ -3667,7 +3667,7 @@ const Artikel = {
                 await db.artikel.bulkAdd(data);
                 artikelCache = data;
                 artikelCacheTime = Date.now();
-                console.log('âœ… Artikel von Supabase geladen:', data.length);
+                console.log('✅ Artikel von Supabase geladen:', data.length);
                 return true;
             } else {
                 console.log('Supabase hat keine Artikel, nutze lokale Daten');
@@ -3754,7 +3754,7 @@ const Artikel = {
                 console.error('Supabase Insert Fehler:', error);
                 throw new Error('Supabase Fehler: ' + error.message);
             }
-            console.log('âœ… Artikel ' + data.artikel_id + ' in Supabase erstellt');
+            console.log('✅ Artikel ' + data.artikel_id + ' in Supabase erstellt');
         }
         
         // Dann lokal erstellen
@@ -3795,7 +3795,7 @@ const Artikel = {
                 console.error('Supabase Update Fehler:', error);
                 throw new Error('Supabase Fehler: ' + error.message);
             }
-            console.log('âœ… Artikel ' + id + ' in Supabase aktualisiert');
+            console.log('✅ Artikel ' + id + ' in Supabase aktualisiert');
         }
         
         // Dann lokal updaten
@@ -3814,7 +3814,7 @@ const Artikel = {
                 console.error('Supabase Delete Fehler:', error);
                 throw new Error('Supabase Fehler: ' + error.message);
             }
-            console.log('âœ… Artikel ' + id + ' in Supabase geloescht');
+            console.log('✅ Artikel ' + id + ' in Supabase geloescht');
         }
         
         // Dann lokal loeschen
@@ -3989,7 +3989,7 @@ const Artikel = {
                 if (error) {
                     console.error('Supabase upsert error:', error);
                 } else {
-                    console.log('âœ… Artikel nach Supabase synchronisiert');
+                    console.log('✅ Artikel nach Supabase synchronisiert');
                 }
             } catch(e) {
                 console.error('Supabase sync error:', e);
@@ -3997,7 +3997,7 @@ const Artikel = {
         }
         
         await DataProtection.createBackup();
-        const msg = `âœ… ${imp} neu, ${upd} aktualisiert, ${skip} uebersprungen`;
+        const msg = `✅ ${imp} neu, ${upd} aktualisiert, ${skip} uebersprungen`;
         console.log(msg);
         Utils.showToast(msg, 'success');
         return {imp, upd, skip};
@@ -4300,7 +4300,7 @@ Router.register('login', async () => {
     // Sprachauswahl Button mit WhatsApp (nur auf Startseite)
     const langBtn = i18n.renderLangButtonWithWhatsApp();
     
-    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,UklGRhASAABXRUJQVlA4WAoAAAAwAAAAKwEAMwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZBTFBI0wEAAAEPMP8REUJys22R5HyIA3MjhD8N75XKhOAARgPtNS3K69EhDFYngPf/gPi8UFBdcgAR/Z8AACirwxH17A9Rz3KMbwf5dZDz/0RXf4hr2MupAR7h8hQk2hgAApXMlKkiSCQKXfrH9AjlSkG2aCHTVaKQRikTtldcj7RK2sZlwk287pnGMBAy6ZUn+q2PpK2k4Vz0UEA9ssNt8tlWYeSZEzKRXbLNaeQ6YJFFp2yyzV4nRq5DZaMOGaSAibxxI52y27KHRVr2erQFNIu8oL3d5cmTTv7HHcABTfaQGQ/UsEPZkNtOEqDSjFGy6NZNLwBKN9dmIg0K/RTpI0nEDdAic8ky5Xq+9ppHZLiA9lQAcgc7UwJQmZcpdJJT00kECj8PWWQGRA9FcqUHGiSeZ4RzzQL7ZdL21AJtrpmp4oC6g53K+9ReId3UOuZ6No+9DeCYbpjeUyR3tYvvqEkdRXL30ObKgM8OTxTZVbTnjEzkQoae9DB0xxPXDVYyS142ok8bjTRk6IWxiijJY1EU20hMpTAiUdSqbQxoXBIpI8oTP9ErTyGLkuafShmLVK68+8eQXklUCpR+v0ZXGJDpUegi6cmlMmTBMlJpEhegAomYdBgsAWgOAFZQOCBGDgAA8EUAnQEqLAE0AD5RJI5Fo6IhEooGHDgFBLIBkgEDJAB2139O3fkB+QHyvVX+9fhD+i+0TyJ5E8uXkL++/mX/WPoT6Ifzf/sfcD/wX9a6Q/mA/Tf/o/6r3Of7h/ov7t7qP2J/zv6gfIB/Rf5h6yP/A9k/+u/732L/5V/Z//P64v68/CL+2n7h+0H/89Y78W/1j8XPBr/DflF2FGqXmX9LehH1KRl8muAF698A/aZ5z5gXrv9c76zUg73+wB/L/6L6L/4/wTPrP+59gL+Lf1T/nf4j15f+n/I+cr8u/xv/k9wT+R/0z/pf3n2qvWt+4vsL/qh/3GI6wAjRj9bMz7HBIzvWJRfblmeKxHz0t2F/QbdlgbQjS+e6KaJGvTwNut9lMjrfGREAQ55sZ4GsQ0R5P78FUEoELeXfFK4ICs/57Irep4bLZHxZ2eC55Puspd8wFwf0dzGnxfL2O3YXhSb26aaSoZcrwZ1fnVcoghDJi/BuhkBWHrIhKHlU/dUrZpqo/wDLl1HrQy3ZAGsaOtCuTvdm/dpHtrxFwMO7qjA3Y1E7ExaxGeYUrY+g5PZN3NI8JrmZqGRg2s5RPrtik7+rJ/FD0CO1MXgzGW0OxiuO+DafE52X/ACUhlqx9LbKqNoRE3UmRheu8NpUz5bh/PQwdq+yNEudSjeCjk8P9FIkWwWJU7AKwULj7Qer7iaAGNME88BEjomKT0tHFK12Btr0DcxEem6Rcw7l8PLAiudqrZrw6JaPeTPVGAD++oDstng5indz+W6cz7srqPIq/nHE58jAsViyXg2TOmuYIp5WhRzL8/xOOcDb9j/jhvRWkPdafKk4EW1hFFJ18nJpYr+Pnzw+1SnD2y5vFYWojn5pNjnl6+eBU6GBjK55GdXW8S11wyWCfA8ckes78+7+AubbKrZnLcAvMu6KHyUTSDD/hqqOut2P/1lHzNBWVh600xdznmVUHZ5B//2Gec+qqka3uap7R7LvMTM4TF3Ozbk7Fqbtpa7gh8jhe5MW3kNQMH8TOF07vHC+9t0CSR6wolbbzRGehUhlL1lL+oYmb9f/bc4CH8yJq66BoEsnUl7kPDwbcdBiqjsFLyToQbMQopgju5Gfn81+BwID7eN3nsHX/opP/9GI//+ilIVCm9pY3C5FwqiMESZQrWYkpmGpvr/+tO14evMmfrvb//7BIp76TESDJU7amA7Rfv7lFGsUi+bBguDC6LHXPCSGsbjE9wmikSbVq9SDIk9J8lRsXKQDiyItL48X4/6VUJ8uprEZrs+Cbpb9dQ4dDiWIGcI9hOcCSTXQ3logKfD6QErT3RRWrfOSZhj7CdcubtBtevqqNd7765p8df3KONDf2jtEM/Z+vsZyD88h6w7nxCqEfF+GP/iZzsq5+JDYspyzq2nL/W59iEjZUphyL1WuFG+XBEB0/cX1HMdklyZW2fPQOZ8ml97qkSgL8dBJx9//ukmFXUr+NqG8cbf5D8AUOx5sVYolpEbHzoPMVlu3bisTVfvjiwSzaz/R4H2C8y3BREeL4nrYUYECfMMULNhnhl9pXZcK8uhyFPBZBhfCsFwOSNukbjqBBaQKZYTTM26qFs2uGLNg1umIHHnyF9PvEgSKc0rmoA6iseC2LwSnkZEJkAJmJtc3yl/y+4ClyYwckDFrMwm84p9vXP8MD7xEuzAS10i7CgdKYNWxpVDTl0Xm5iWjAdWmbfm36FygNDe3stWfwHjHEZIIOqyglhR8QsQ+66TTIiXa1O1002ezTjklzQuCvLBgK+mmV3/4eGDARqpgjj9RaamqLH2RuOCyzp4T3fzW+7sL057wTXo3bnWA5LcaMKjSvaOJqtCOpJ9HXDkxjVHekYjYNO6Lb8hkNs9qnHR+tvcq8U+5aopZzrgfj46I7907wgSP1LBr7jytYQMecmXzRnfVR6RgVuxpIt6o1ciPP5ZG7zfjLxq3IotmNJmTkktsJC0+vJRRySHfiB28d1HVi2iWBARGheYu/fPhMPeie0ABWGPWN676JJkbaGZdDj5GD9DykoH2f+IwTZ+6hQAGF1n70s9EzffN32c9p75x746ECTl8P5X+udHzBNRyXCVLhKO0gqI0b6Z1OMRJH5puyeVWpK643OuQ1gnH4DzjhWOstzVjlG/208mC5NDxn46cIWsFhkyRXwle++Qdn7/AbrHRsZxBEiACzzV1WcWscoSz5y3fnXsqwAW9lPJ/w9F9XHIj67bV0+RDBm+t3Oa4BUNt99buEbkgnYeJNNZS7bET8GH3+/47gzmNdQiNZ8JaOOhPFz8OuyhQp0PLHldpM0CuGzNBVl/E4mlGUD04sgKI+LBRr44/1bah/Xcb5VRaBGur7v/ybxPlQ/mj//hOVdjvIEyD48ghebMOgv066iBYFEnatkHHN8n03EeYjrtjnuUfng1RhgTBgbueXq0kgOwN+0w1V7WxOBCBLogyuTK+e/JjMzbeaGFfh6oXlNaHTRpYec5+fSiuAzS8hai9MsjIYsr7bB//9KNH1NmTjJhjWoyAoEPgJ8k9/ovASQniQCpJWoppv4KAsusREuJu2jVEWTk4n2gcR3m0+qG0tlvVVZXZSFpnkGfJwcaKiambNVuvAAVqtMZEYo7HGSmq6tcy/+HOZFa0gxn/4c5mfyHI/IXQ1E+XayEwd7Q+1gj5S1RVlUikOP2ID+lLqVQJceWFyNZ8qDLyDM3ddq2RdlsgOpgfi7fgPjpwZxmB5J9S9yb1HbkwZyYy/HCN4tmzVkzx70Mp/DWOyP6aB61D8cVM8qJLJf5/VjtAavWpY89JHuZYl92bDZRIfoASfoi1ErNlcbxS5SvhxwPZloxv95vmwMo0/WsQ7fIQMMjY89eL8gDc1xsOof4caL/D2vk/w1Lc95z73oRRNSOysBFXN/ZMufPCrcG1C00OnZeXeOYJM/8+H/yjVTVsLdEN/Al4+jgBNbARDOpRcV48ZO9YR24iFWy31Bzv347vddYYS8IG9Jl/p6Y3p/7aFm1uN4rSUEo3I9oKHXBop6RZ3Vv8q/5zPVm+WjfgEgwWm3egMbEjyOYbgllp8K0oz9ok6BuKp3S++PHtQdr05LLafgKwHsfVw0rGsVbd2ehmnPLI5gPjLwCD2vuNNdG521ZWWVhA4zVyUH8F9O7boRH8aNkhg1WWhD0YL2CG1M0HCNzcEyFHWuqN1bs8xEzF1v7dOs1ged4fJK35MeHZtslQ7GkQznqYkfx7x1uizSz1tIj4QafoHODT4yOvR9fdAelJHBCZ/PH0JAq9yJh6vt8uFHaRm+WLqv1ny8N++dwCNAhLOkWd7Ua3yfsXph3G+NGUWKdNH/8RXxEzDEIcvIEZPL445umG7MvGj/Y6g+cItrx2bz5bwT1uqmyliNqqVtid6xKSNWF6YiUDuOce6G4p1GcqfmBoZ1OKHYG/0lJE7CX9xURSZe3ChNel95pe4zspxLomgdKvMBDFwekhhozzDnYnqtsL5uiAmV2/by2ea3DO3vUaTAUo4kKIlf7E7K9IM0yw0n3V/lSL0AJCWurkFN5c/xkzYdq2jtMnsthdm14zIiVEZIweR4kLalqu8822dBPa6ftuTO5HtlIKg85zHfzwLLxFFcuCnKRvfir28pXW7K5K39FoTHrOo+DdNLEKlyFjV1jx9Sq3ebiGlrcV4NfpQo5UiGvNdijO7UJXQqWv3kmGBfsfKjcd0S+7XLIqepJfkSvkaw/0wmcDVv/X4CPnVZsC+HEqh79makb60hRQWJzTz6Tg8DfwZM+PoAsvepYCM07CzSBX5K/XneAm4kwRl/6nK+ArHucWsVYkTU/yJc+mUXi/Qaz2ZtSmccKNOGHGYlys7Bh8bGjB46trITKHa4x1LCOdwJMYZMpiBHKt5uP050s6BfN+0pUTojlcgqsM74NgbDjm1qcA6y5qYBQmatWHOH5KSmFq7QYpBKdVCz5dCkDP/4R7UWqtn0ktW6WMqxcYiE+ygJ1xDuy1Lw1icK5rdfe1gTgcaUhrljbiGQZRHmzXUpXk0NXshia0ol22NO58wwgbhGNlhWjv3iLl65Ukwsja5mAmyMrGuExxGufldj5Ra5OljojsOD1WCoWD50zUpyLc1nMV+R3XarIeE3Nf/alr+Te4yASxOFwEXzJT7FEd/naLlNCNi92gaMzmxUi8OfvJ7awia/oiNiNhoRTvstmiXRd+m++LjlGL+IZT2GvBJK9w65yXRCuYEzg6WbAuYaMtUXFKgcXjwCXHj8pHN/vDo5M8hWGsE2e7dQbm7/vu9gFm7EgBWTrEzZ6dimjpU/ox4655UQfeEoW1lx0VavGidviFQHxlnWWTK0nztPD1SjL6gg7b72IuORuEhAitdEnTqa4A73XofeBaIqcgVBTmFXuSxd8XvazwzJROeLldKzOx9wrej3/PmoXtwGEPzTPhjD1K7Gv1+uTh6jDY1Vp/Wm2C5VNfOVC8HUz/q4oiu/DRmBGrOayOpiR5PoQx3//0xi0Iv/8ufzO3Irr8WfSswJkWO0WEC5NMQXIux/QOsvEfwlP9vnd4TWIaOzznp3MuawHUvH+j3/pbsej+YPH2qrAmKcHrqohB8J7x9YXhgJMDvp36dPaGk8+9h4+W6f0eAwEeDgj22kBDPsROlYt1ldsQfQtLIjwMzV3D03C7DUMJjvcEc01tGsgxm3fI9w8cmoOhkvLpUe9m/i3TjKIKFxr7mjwDNfNzJWgKHJ0ZNI8aDU5VeG7SQuJWRWuwqHBsefmJFhYsi9Mp656ptz/8oXcNl1rfb/ubSrDm82KB9KMOJt3EZkAq0nkhpeAdRhP7sffaLBLirFi4rbc1srB7PClXgSq/tRwRrZu3uQy/f/n4qZAAe6b9Ajiz/G7DwAAA" alt="Soellerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">âš™ï¸</a><span style="color:#bbb;font-size:0.65rem;">v3.4 Â© 2026 â€¢ Entwickelt von: Claudio</span></div></div></div></div>`);
+    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Soellerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">⚙️</a><span style="color:#bbb;font-size:0.65rem;">v3.4 Â© 2026 â€¢ Entwickelt von: Claudio</span></div></div></div></div>`);
 });
 
 Router.register('register', () => {
@@ -4315,7 +4315,7 @@ Router.register('register', () => {
                 <label class="form-label">${t('first_name')} *</label>
                 <div style="display:flex;gap:8px;">
                     <input type="text" id="register-vorname" class="form-input" placeholder="${placeholder}" autofocus style="font-size:1.2rem;padding:16px;flex:1;text-transform:uppercase;">
-                    <button type="button" class="btn btn-secondary" onclick="showKeyboard('register-vorname')" style="padding:16px 20px;font-size:1.5rem;" title="Virtuelle Tastatur">âŒ¨ï¸</button>
+                    <button type="button" class="btn btn-secondary" onclick="showKeyboard('register-vorname')" style="padding:16px 20px;font-size:1.5rem;" title="Virtuelle Tastatur">❌¨</button>
                 </div>
             </div>
             <button class="btn btn-primary btn-block" onclick="handleRegisterSubmit()" style="margin-bottom:24px;">Registrieren</button>
@@ -4576,7 +4576,7 @@ Router.register('admin-dashboard', async () => {
                         </div>
                     </div>
                 </div>
-                <span style="font-size: 1.5rem;">âš™ï¸</span>
+                <span style="font-size: 1.5rem;">⚙️</span>
             </div>
         </div>
         
@@ -4600,7 +4600,7 @@ Router.register('admin-dashboard', async () => {
         " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
             <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 2rem;">${aktiveNachricht ? 'ðŸ“¢' : 'ðŸ“¢'}</span>
+                    <span style="font-size: 2rem;">${aktiveNachricht ? '[ICON]' : '[ICON]'}</span>
                     <div>
                         <div style="font-weight: 700; font-size: 1.2rem;">
                             ${aktiveNachricht ? ' Nachricht aktiv!' : 'Gaeste-Nachricht'}
@@ -4694,9 +4694,9 @@ Router.register('admin-dashboard', async () => {
                         <button class="btn" onclick="DataProtection.selectRestoreFile()" style="background:white;color:#e74c3c;border:none;padding:8px 16px;"> Datei waehlen</button>
                     </div>
                     <div style="padding:16px;background:linear-gradient(135deg, #9b59b6, #8e44ad);border-radius:var(--radius-md);color:white;">
-                        <h3 style="font-weight:600;margin-bottom:8px;">ðŸ”„ Lokale â†’ Supabase</h3>
+                        <h3 style="font-weight:600;margin-bottom:8px;">[ICON] Lokale â†’ Supabase</h3>
                         <div style="font-size:0.8rem;opacity:0.9;margin-bottom:8px;">Lokale Buchungen hochladen</div>
-                        <button class="btn" onclick="migrateLocalToSupabase()" style="background:white;color:#9b59b6;border:none;padding:8px 16px;">ðŸ”„ Migrieren</button>
+                        <button class="btn" onclick="migrateLocalToSupabase()" style="background:white;color:#9b59b6;border:none;padding:8px 16px;">[ICON] Migrieren</button>
                     </div>
                     
                 </div>
@@ -4780,9 +4780,9 @@ window.repairCategories = async () => {
 
 // Auffuellliste Route
 Router.register('admin-auffuellliste', async () => {
-    console.log('ðŸ“‹ Auffuellliste Route - isAdmin:', State.isAdmin);
+    console.log('[ICON] Auffuellliste Route - isAdmin:', State.isAdmin);
     if (!State.isAdmin) { 
-        console.log('âš ï¸ Nicht als Admin eingeloggt, leite zum Login');
+        console.log('âš  Nicht als Admin eingeloggt, leite zum Login');
         Router.navigate('admin-login'); 
         return; 
     }
@@ -4790,7 +4790,7 @@ Router.register('admin-auffuellliste', async () => {
     let liste = [];
     try {
         liste = await Buchungen.getAuffuellliste();
-        console.log('âœ… Auffuellliste geladen:', liste.length, 'Positionen');
+        console.log('✅ Auffuellliste geladen:', liste.length, 'Positionen');
     } catch(e) {
         console.error('âŒ Auffuellliste Fehler:', e);
         Utils.showToast('Fehler beim Laden: ' + e.message, 'error');
@@ -4819,7 +4819,7 @@ Router.register('admin-auffuellliste', async () => {
                  Fuer Thermodrucker drucken
             </button>
             <button class="btn btn-success" onclick="resetAuffuelllisteOhneExport()" style="padding:16px;font-size:1.1rem;background:#27ae60;">
-                âœ… Auffuellliste zuruecksetzen<br>
+                ✅ Auffuellliste zuruecksetzen<br>
                 <small style="opacity:0.9;">(Getraenke wurden aufgefuellt)</small>
             </button>
         </div>
@@ -4859,7 +4859,7 @@ Router.register('admin-auffuellliste', async () => {
 // Auffuellliste drucken - fuer Thermodrucker optimiert
 window.printAuffuellliste = async () => {
     try {
-        console.log('ðŸ–¨ï¸ printAuffuellliste gestartet...');
+        console.log('[PRINT] printAuffuellliste gestartet...');
         
         if (!supabaseClient || !isOnline) {
             Utils.showToast('Keine Internetverbindung!', 'error');
@@ -4867,7 +4867,7 @@ window.printAuffuellliste = async () => {
         }
         
         const liste = await Buchungen.getAuffuellliste();
-        console.log('âœ… Auffuellliste fuer Druck geladen:', liste.length, 'Positionen');
+        console.log('✅ Auffuellliste fuer Druck geladen:', liste.length, 'Positionen');
         
         if (liste.length === 0) {
             Utils.showToast('Keine Getraenke zum Auffuellen', 'info');
@@ -5036,7 +5036,7 @@ window.resetAuffuelllisteOhneExport = async () => {
     
     try {
         await Buchungen.markAsAufgefuellt();
-        Utils.showToast('âœ… Auffuellliste zurueckgesetzt', 'success');
+        Utils.showToast('✅ Auffuellliste zurueckgesetzt', 'success');
         Router.navigate('admin-auffuellliste');
     } catch(e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -5314,7 +5314,7 @@ window.handleAdminDeleteBuchung = async (buchungId) => {
 
 // Alle Buchungen eines Tages ENDGUeLTIG loeschen
 window.handleDeleteBuchungenByDate = async (datum) => {
-    if (!confirm(`âš ï¸ ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGUeLTIG geloescht!\n\nDies kann nicht rueckgaengig gemacht werden.\n\nFortfahren?`)) return;
+    if (!confirm(`âš  ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGUeLTIG geloescht!\n\nDies kann nicht rueckgaengig gemacht werden.\n\nFortfahren?`)) return;
     
     try {
         // Buchungen von diesem Datum laden
@@ -5353,7 +5353,7 @@ window.handleDeleteBuchungenByDate = async (datum) => {
         }
         
         await DataProtection.createBackup();
-        Utils.showToast(`âœ… ${buchungenIds.length} Buchungen vom ${datum} geloescht`, 'success');
+        Utils.showToast(`✅ ${buchungenIds.length} Buchungen vom ${datum} geloescht`, 'success');
         Router.navigate('admin-alle-buchungen');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -5526,7 +5526,7 @@ Router.register('admin-umlage', async () => {
         ` : `
         <div class="card">
             <div class="card-body" style="text-align:center;padding:40px;">
-                <div style="font-size:3rem;margin-bottom:16px;">âœ…</div>
+                <div style="font-size:3rem;margin-bottom:16px;">✅</div>
                 <h3>Keine fehlenden Getraenke</h3>
                 <p style="color:var(--color-stone-dark);">Es gibt nichts umzulegen.</p>
             </div>
@@ -5615,7 +5615,7 @@ window.bucheUmlageFuerAlle = async () => {
             console.error('âŒ Umlage Buchung Fehler:', gastName, insertError.message, insertError.details, insertError.hint);
             fehler++;
         } else {
-            console.log('âœ… Umlage gebucht fuer:', gastName, data);
+            console.log('✅ Umlage gebucht fuer:', gastName, data);
             erfolg++;
         }
     }
@@ -5632,9 +5632,9 @@ window.bucheUmlageFuerAlle = async () => {
     }
     
     if (ausgenommen > 0) {
-        Utils.showToast(`âœ… Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gaeste verteilt (${ausgenommen} ausgenommen)`, 'success');
+        Utils.showToast(`✅ Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gaeste verteilt (${ausgenommen} ausgenommen)`, 'success');
     } else {
-        Utils.showToast(`âœ… Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gaeste verteilt`, 'success');
+        Utils.showToast(`✅ Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gaeste verteilt`, 'success');
     }
     
     Router.navigate('admin-dashboard');
@@ -6020,7 +6020,7 @@ window.addGruppe = async (name) => {
     try {
         console.log('Ã¢Å¾â€¢ Fuege Gruppe hinzu:', name);
         const result = await Gruppen.add(name);
-        console.log('âœ… Gruppe hinzugefuegt:', result);
+        console.log('✅ Gruppe hinzugefuegt:', result);
         Utils.showToast(`Gruppe "${name}" hinzugefuegt`, 'success');
         Router.navigate('admin-gruppen');
     } catch (e) {
@@ -6205,7 +6205,7 @@ Router.register('admin-nachricht', async () => {
                         <div style="font-weight:600;">${new Date(aktiveNachricht.erstellt_am).toLocaleString('de-AT')}</div>
                     </div>
                     <div style="text-align:center;padding:12px;background:#fff3cd;border-radius:8px;">
-                        <div style="font-size:0.85rem;color:#856404;">ðŸ• Verbleibend</div>
+                        <div style="font-size:0.85rem;color:#856404;">[TIME] Verbleibend</div>
                         <div style="font-weight:700;color:#856404;font-size:1.1rem;">${verbleibendeZeit}</div>
                     </div>
                 </div>
@@ -6233,7 +6233,7 @@ Router.register('admin-nachricht', async () => {
         <!-- NEUE NACHRICHT ERSTELLEN -->
         <div class="card">
             <div class="card-header" style="background:var(--color-alpine-green);color:white;">
-                <h2 class="card-title" style="margin:0;color:white;">âœï¸ Neue Nachricht erstellen</h2>
+                <h2 class="card-title" style="margin:0;color:white;">âœ Neue Nachricht erstellen</h2>
             </div>
             <div class="card-body">
                 <div class="form-group">
@@ -6272,7 +6272,7 @@ Router.register('admin-nachricht', async () => {
                 
                 ${aktiveNachricht ? `
                 <p style="text-align:center;margin-top:12px;color:#e74c3c;font-size:0.9rem;">
-                    âš ï¸ Die aktuelle Nachricht wird ersetzt!
+                    âš  Die aktuelle Nachricht wird ersetzt!
                 </p>
                 ` : ''}
             </div>
@@ -6367,7 +6367,7 @@ Dessert" style="font-size:0.95rem;line-height:1.5;">${menuData.mittag?.text || '
                 
                 <div style="display:flex;gap:12px;">
                     <button class="btn ${menuData.mittag?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleMittagMenu()" style="flex:1;padding:14px;">
-                        ${menuData.mittag?.aktiv ? ' Deaktivieren' : 'âœ… Aktivieren'}
+                        ${menuData.mittag?.aktiv ? ' Deaktivieren' : '✅ Aktivieren'}
                     </button>
                     ${menuData.mittag?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('mittag')" style="padding:14px;"> Vorschau</button>` : ''}
                 </div>
@@ -6410,7 +6410,7 @@ Apfelstrudel mit Vanillesauce" style="font-size:0.95rem;line-height:1.5;">${menu
                 
                 <div style="display:flex;gap:12px;">
                     <button class="btn ${menuData.abend?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleAbendMenu()" style="flex:1;padding:14px;">
-                        ${menuData.abend?.aktiv ? ' Deaktivieren' : 'âœ… Aktivieren'}
+                        ${menuData.abend?.aktiv ? ' Deaktivieren' : '✅ Aktivieren'}
                     </button>
                     ${menuData.abend?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('abend')" style="padding:14px;"> Vorschau</button>` : ''}
                 </div>
@@ -6693,7 +6693,7 @@ Router.register('admin-guests', async () => {
                 const uniqueData = data.filter(g => {
                     const name = (g.display_name || g.vorname || g.first_name || '').toUpperCase().trim();
                     if (seenNames.has(name)) {
-                        console.log('âš ï¸ Duplikat uebersprungen:', name);
+                        console.log('âš  Duplikat uebersprungen:', name);
                         return false;
                     }
                     seenNames.add(name);
@@ -6715,7 +6715,7 @@ Router.register('admin-guests', async () => {
                         ausnahmeumlage: g.ausnahmeumlage || false
                     };
                 });
-                console.log('âœ… Gaeste von Supabase geladen:', guests.length, '(nach Deduplizierung)');
+                console.log('✅ Gaeste von Supabase geladen:', guests.length, '(nach Deduplizierung)');
             }
         } catch(e) {
             console.error('Supabase Gaeste laden Exception:', e);
@@ -6735,7 +6735,7 @@ Router.register('admin-guests', async () => {
             seenNames.add(name);
             return true;
         });
-        console.log('âš ï¸ Gaeste von lokalem Cache geladen:', guests.length);
+        console.log('âš  Gaeste von lokalem Cache geladen:', guests.length);
     }
     
     // Inaktive Gaeste zaehlen (fuer Button)
@@ -6845,7 +6845,7 @@ Router.register('admin-guests', async () => {
                                 </td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;white-space:nowrap;">
                                     <button class="btn btn-primary" onclick="adminBuchenFuerGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="Fuer diesen Gast buchen"></button>
-                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">âœï¸</button>
+                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">âœ</button>
                                     <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Loeschen"></button>
                                 </td>
                             </tr>`;
@@ -6874,7 +6874,7 @@ Router.register('admin-guests', async () => {
                     <label style="font-weight:600;">Nachname: *</label>
                     <div style="display:flex;gap:8px;">
                         <input type="text" id="gast-nachname" class="form-input" placeholder="z.B. MUELLER" style="text-transform:uppercase;font-size:1.1rem;flex:1;">
-                        <button type="button" class="btn btn-secondary" onclick="showKeyboard('gast-nachname')" style="padding:12px 16px;font-size:1.3rem;" title="Virtuelle Tastatur">âŒ¨ï¸</button>
+                        <button type="button" class="btn btn-secondary" onclick="showKeyboard('gast-nachname')" style="padding:12px 16px;font-size:1.3rem;" title="Virtuelle Tastatur">❌¨</button>
                     </div>
                 </div>
                 <div>
@@ -6888,7 +6888,7 @@ Router.register('admin-guests', async () => {
                     <label style="font-weight:600;">Passwort (PIN): *</label>
                     <div style="display:flex;gap:8px;">
                         <input type="text" id="gast-passwort" class="form-input" placeholder="4-stellige PIN" maxlength="4" style="font-family:monospace;font-size:1.5rem;letter-spacing:8px;text-align:center;font-weight:bold;flex:1;">
-                        <button type="button" class="btn btn-secondary" onclick="showNumpad('gast-passwort')" style="padding:12px 16px;font-size:1.3rem;" title="Numpad">ðŸ”¢</button>
+                        <button type="button" class="btn btn-secondary" onclick="showNumpad('gast-passwort')" style="padding:12px 16px;font-size:1.3rem;" title="Numpad">[ICON]
                     </div>
                     <small style="color:#666;">Der Gast meldet sich mit dieser PIN an</small>
                 </div>
@@ -7080,7 +7080,7 @@ window.reactivateGast = async (id, name) => {
     } catch(e) {}
     
     await DataProtection.createBackup();
-    Utils.showToast(`âœ… ${name} wieder aktiviert`, 'success');
+    Utils.showToast(`✅ ${name} wieder aktiviert`, 'success');
     Router.navigate('admin-guests-inaktiv');
 };
 
@@ -7270,7 +7270,7 @@ window.saveGast = async () => {
                     console.error('Supabase Update Fehler:', error);
                     Utils.showToast('Supabase Fehler: ' + error.message, 'error');
                 } else {
-                    console.log('âœ… Gast in Supabase aktualisiert (PIN: ' + passwort + ')');
+                    console.log('✅ Gast in Supabase aktualisiert (PIN: ' + passwort + ')');
                 }
             } catch (e) {
                 console.error('Supabase Update Exception:', e);
@@ -7345,7 +7345,7 @@ window.saveGast = async () => {
                 
                 // User ID aus Auth uebernehmen
                 finalId = authData.user?.id || finalId;
-                console.log('âœ… Supabase Auth User erstellt mit ID:', finalId);
+                console.log('✅ Supabase Auth User erstellt mit ID:', finalId);
                 
                 // 2. Profile aktualisieren mit zusaetzlichen Daten
                 const { error: profileError } = await supabaseClient
@@ -7366,7 +7366,7 @@ window.saveGast = async () => {
                 if (profileError) {
                     console.error('Supabase Profile Update Fehler:', profileError);
                 } else {
-                    console.log('âœ… Gast-Profil in Supabase aktualisiert');
+                    console.log('✅ Gast-Profil in Supabase aktualisiert');
                 }
                 
             } catch (e) {
@@ -7479,7 +7479,7 @@ window.adminBuchenFuerGast = async (id) => {
                 console.warn('Auth Session fuer Gast fehlgeschlagen:', error.message);
                 // Trotzdem fortfahren - Buchung wird lokal gespeichert
             } else {
-                console.log('âœ… Auth Session fuer Gast erstellt');
+                console.log('✅ Auth Session fuer Gast erstellt');
             }
         } catch(e) {
             console.warn('Auth Session Exception:', e);
@@ -7538,13 +7538,13 @@ window.exportGaesteExcel = async () => {
 Router.register('admin-articles', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    console.log('ðŸ“‹ admin-articles: Lade Artikel...');
+    console.log('[ICON] admin-articles: Lade Artikel...');
     
     // DIREKT aus Supabase laden (nicht aus Cache!)
     let articles = [];
     if (supabaseClient && isOnline) {
         try {
-            console.log('ðŸ“¡ Lade aus Supabase...');
+            console.log('[ICON] Lade aus Supabase...');
             const { data, error } = await supabaseClient
                 .from('artikel')
                 .select('*')
@@ -7556,18 +7556,18 @@ Router.register('admin-articles', async () => {
                 // Zeige Aktivierungsstatus
                 const aktive = data.filter(a => a.aktiv).length;
                 const inaktive = data.filter(a => !a.aktiv).length;
-                console.log('âœ… Artikelverwaltung: ' + data.length + ' Artikel aus Supabase (' + aktive + ' aktiv, ' + inaktive + ' inaktiv)');
+                console.log('✅ Artikelverwaltung: ' + data.length + ' Artikel aus Supabase (' + aktive + ' aktiv, ' + inaktive + ' inaktiv)');
             }
         } catch(e) {
             console.error('Supabase Fehler:', e);
         }
     } else {
-        console.log('âš ï¸ Keine Supabase-Verbindung, nutze lokale DB');
+        console.log('âš  Keine Supabase-Verbindung, nutze lokale DB');
     }
     
     // Fallback: lokale Datenbank
     if (articles.length === 0) {
-        console.log('ðŸ“‚ Fallback: Lade aus lokaler DB...');
+        console.log('[ICON] Fallback: Lade aus lokaler DB...');
         articles = await Artikel.getAll();
     }
     
@@ -7669,8 +7669,8 @@ Router.register('admin-articles', async () => {
                 </div>
             </td>
             <td style="text-align:right;white-space:nowrap;">
-                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">âœï¸</button>
-                <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">ðŸ—‘ï¸</button>
+                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">âœ</button>
+                <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">[ICON]
             </td>
         </tr>`;
     };
@@ -7788,7 +7788,7 @@ Router.register('admin-artikel-sortierung', async () => {
                 .order('sortierung');
             if (!error && data) {
                 aktiveArtikel = data;
-                console.log('âœ… Sortierung: ' + data.length + ' aktive Artikel aus Supabase geladen');
+                console.log('✅ Sortierung: ' + data.length + ' aktive Artikel aus Supabase geladen');
             }
         } catch(e) {
             console.error('Supabase Fehler:', e);
@@ -8098,9 +8098,9 @@ window.speichereSortierungSupabase = async () => {
                     .update({ sortierung: upd.sortierung })
                     .eq('artikel_id', upd.artikel_id);
             }
-            showSortierungStatus('âœ… Sortierung gespeichert (lokal + Cloud)', 'success');
+            showSortierungStatus('✅ Sortierung gespeichert (lokal + Cloud)', 'success');
         } else {
-            showSortierungStatus('âœ… Lokal gespeichert (Cloud offline)', 'success');
+            showSortierungStatus('✅ Lokal gespeichert (Cloud offline)', 'success');
         }
         
         // Cache invalidieren
@@ -8668,7 +8668,7 @@ window.syncFromCloud = async (silent = false) => {
     try {
         // Lokalen Gaeste-Cache loeschen
         await db.registeredGuests.clear();
-        console.log('âœ… Lokaler Gaeste-Cache geloescht');
+        console.log('✅ Lokaler Gaeste-Cache geloescht');
         
         // Alle Profile von Supabase laden
         const { data: profiles, error } = await supabaseClient
@@ -8682,7 +8682,7 @@ window.syncFromCloud = async (silent = false) => {
             return;
         }
         
-        console.log('âœ… Profile von Supabase:', profiles?.length || 0);
+        console.log('✅ Profile von Supabase:', profiles?.length || 0);
         
         // In lokalen Cache speichern
         if (profiles && profiles.length > 0) {
@@ -8706,7 +8706,7 @@ window.syncFromCloud = async (silent = false) => {
             }
         }
         
-        if (!silent) Utils.showToast(`âœ… Synchronisiert`, 'success');
+        if (!silent) Utils.showToast(`✅ Synchronisiert`, 'success');
         
         // Seite nur neu laden wenn nicht silent
         if (!silent) Router.navigate('login');
@@ -8725,7 +8725,7 @@ window.clearLocalCache = async () => {
         await db.registeredGuests.clear();
         await db.buchungen.clear();
         localStorage.clear();
-        Utils.showToast('âœ… Cache geloescht - Seite wird neu geladen', 'success');
+        Utils.showToast('✅ Cache geloescht - Seite wird neu geladen', 'success');
         setTimeout(() => location.reload(), 1000);
     } catch(e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -8776,7 +8776,7 @@ window.handlePermanentDeleteGuest = async id => {
 };
 window.handleDeleteArticle = async id => { if(confirm('Artikel loeschen?')) { await Artikel.delete(id); Router.navigate('admin-articles'); } };
 window.toggleArtikelAktiv = async (id, aktiv) => {
-    console.log('ðŸ”„ toggleArtikelAktiv aufgerufen:', id, aktiv);
+    console.log('[ICON] toggleArtikelAktiv aufgerufen:', id, aktiv);
     
     try {
         // Bei manueller Deaktivierung auch aktiv_bis loeschen
@@ -8785,7 +8785,7 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
             updateData.aktiv_bis = null; // Zeitbegrenzung entfernen
         }
         
-        console.log('ðŸ“¤ Sende an Supabase:', updateData);
+        console.log('[ICON] Sende an Supabase:', updateData);
         
         // ZUERST Supabase updaten (wichtig!)
         if (supabaseClient && isOnline) {
@@ -8800,8 +8800,8 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
                 throw new Error('Supabase Fehler: ' + error.message);
             }
             
-            console.log('âœ… Supabase Antwort:', data);
-            console.log('âœ… Artikel ' + id + ' in Supabase ' + (aktiv ? 'aktiviert' : 'deaktiviert'));
+            console.log('✅ Supabase Antwort:', data);
+            console.log('✅ Artikel ' + id + ' in Supabase ' + (aktiv ? 'aktiviert' : 'deaktiviert'));
         } else {
             console.error('âŒ Keine Supabase-Verbindung!');
             throw new Error('Keine Verbindung zu Supabase!');
@@ -8809,7 +8809,7 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
         
         // Dann lokal updaten
         await db.artikel.update(id, updateData);
-        console.log('âœ… Lokal aktualisiert');
+        console.log('✅ Lokal aktualisiert');
         
         // Cache invalidieren
         artikelCache = null;
@@ -8857,10 +8857,10 @@ window.showZeitbegrenzungModal = (artikelId, artikelName) => {
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <button onclick="setZeitbegrenzung(${artikelId}, 6)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
-                        ðŸ• 6 Stunden
+                        [TIME] 6 Stunden
                     </button>
                     <button onclick="setZeitbegrenzung(${artikelId}, 12)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
-                        ðŸ• 12 Stunden
+                        [TIME] 12 Stunden
                     </button>
                     <button onclick="setZeitbegrenzung(${artikelId}, 24)" class="btn" style="padding: 14px; background: #f8f9fa; border: 2px solid #ddd;">
                          1 Tag
@@ -8934,9 +8934,9 @@ window.setZeitbegrenzung = async (artikelId, stunden) => {
             let zeitText = '';
             if (tage > 0) zeitText = `${tage} Tag(e)`;
             else zeitText = `${restStunden} Stunden`;
-            Utils.showToast(`âœ… Artikel aktiv fuer ${zeitText}`, 'success');
+            Utils.showToast(`✅ Artikel aktiv fuer ${zeitText}`, 'success');
         } else {
-            Utils.showToast('âœ… Zeitbegrenzung entfernt', 'success');
+            Utils.showToast('✅ Zeitbegrenzung entfernt', 'success');
         }
         
         // Seite neu laden
@@ -9026,7 +9026,7 @@ window.changeArtikelId = async (alteId) => {
         return;
     }
     
-    const neueIdStr = prompt(`âš ï¸ ACHTUNG: Artikel-ID aendern\n\nDiese ID wird fuer die Registrierkasse verwendet!\nNur aendern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
+    const neueIdStr = prompt(`âš  ACHTUNG: Artikel-ID aendern\n\nDiese ID wird fuer die Registrierkasse verwendet!\nNur aendern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
     
     if (neueIdStr === null) return; // Abgebrochen
     
@@ -9049,7 +9049,7 @@ window.changeArtikelId = async (alteId) => {
     }
     
     // Bestaetigung einholen
-    if (!confirm(`âš ï¸ LETZTE WARNUNG!\n\nArtikel-ID wirklich aendern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
+    if (!confirm(`âš  LETZTE WARNUNG!\n\nArtikel-ID wirklich aendern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
         return;
     }
     
@@ -9070,7 +9070,7 @@ window.changeArtikelId = async (alteId) => {
         artikelCache = null;
         await DataProtection.createBackup();
         
-        Utils.showToast(`âœ… Artikel-ID geaendert: ${alteId} â†’ ${neueId}`, 'success');
+        Utils.showToast(`✅ Artikel-ID geaendert: ${alteId} â†’ ${neueId}`, 'success');
         Router.navigate('admin-articles');
     } catch (e) {
         console.error('ID aendern Fehler:', e);
@@ -9368,7 +9368,7 @@ window.saveEditArticle = async () => {
         // Supabase initialisieren
         const supabaseReady = initSupabase();
         if (supabaseReady) {
-            console.log('âœ… Supabase bereit - Multi-Device Modus');
+            console.log('✅ Supabase bereit - Multi-Device Modus');
             // Artikel von Supabase laden
             try {
                 await Artikel.loadFromSupabase();
@@ -9392,7 +9392,7 @@ window.saveEditArticle = async () => {
                 if (!error && profiles) {
                     // Nur nicht-geloeschte Profile cachen
                     const aktive = profiles.filter(p => p.geloescht !== true);
-                    console.log('âœ… Profile geladen:', aktive.length, 'aktiv von', profiles.length, 'gesamt');
+                    console.log('✅ Profile geladen:', aktive.length, 'aktiv von', profiles.length, 'gesamt');
                     
                     for (const p of aktive) {
                         const name = p.display_name || p.first_name;
@@ -9437,7 +9437,7 @@ window.saveEditArticle = async () => {
                 {kategorie_id:6, name:'Suesses & Salziges', sortierung:60},
                 {kategorie_id:7, name:'Sonstiges', sortierung:70}
             ]);
-            console.log('âœ… Kategorien automatisch repariert');
+            console.log('✅ Kategorien automatisch repariert');
         } catch(e) {
             console.error('Kategorien init Fehler:', e);
         }
@@ -9515,12 +9515,12 @@ window.migrateLocalToSupabase = async () => {
         return;
     }
     
-    Utils.showToast('ðŸ”„ Migration gestartet...', 'info');
+    Utils.showToast('[ICON] Migration gestartet...', 'info');
     
     try {
         // Alle lokalen Buchungen laden
         const lokaleBuchungen = await db.buchungen.toArray();
-        console.log('ðŸ“¦ Lokale Buchungen gefunden:', lokaleBuchungen.length);
+        console.log('[ICON] Lokale Buchungen gefunden:', lokaleBuchungen.length);
         
         if (lokaleBuchungen.length === 0) {
             Utils.showToast('Keine lokalen Buchungen gefunden', 'info');
@@ -9577,7 +9577,7 @@ window.migrateLocalToSupabase = async () => {
                     }
                 } else {
                     hochgeladen++;
-                    console.log('âœ… Migriert:', b.buchung_id);
+                    console.log('✅ Migriert:', b.buchung_id);
                 }
             } catch(e) {
                 console.error('âŒ Migration exception:', e);
@@ -9585,8 +9585,8 @@ window.migrateLocalToSupabase = async () => {
             }
         }
         
-        Utils.showToast(`âœ… Migration fertig!\n${hochgeladen} hochgeladen\n${uebersprungen} uebersprungen\n${fehler} Fehler`, 'success');
-        console.log(`ðŸ“Š Migration: ${hochgeladen} hochgeladen, ${uebersprungen} uebersprungen, ${fehler} Fehler`);
+        Utils.showToast(`✅ Migration fertig!\n${hochgeladen} hochgeladen\n${uebersprungen} uebersprungen\n${fehler} Fehler`, 'success');
+        console.log(`[ICON] Migration: ${hochgeladen} hochgeladen, ${uebersprungen} uebersprungen, ${fehler} Fehler`);
         
         // Dashboard neu laden
         Router.navigate('admin-dashboard');
@@ -9635,7 +9635,7 @@ const VirtualKeyboard = {
                         <div class="vk-row">
                             <button class="vk-key vk-clear" onclick="VirtualKeyboard.clear()">C</button>
                             <button class="vk-key" onclick="VirtualKeyboard.press('0')">0</button>
-                            <button class="vk-key vk-back" onclick="VirtualKeyboard.backspace()">âŒ«</button>
+                            <button class="vk-key vk-back" onclick="VirtualKeyboard.backspace()">❌«</button>
                         </div>
                         <div class="vk-row">
                             <button class="vk-key vk-enter" onclick="VirtualKeyboard.confirm()">OK âœ”</button>
@@ -9663,7 +9663,7 @@ const VirtualKeyboard = {
                         </div>
                         <div class="vk-row">
                             ${['Y','X','C','V','B','N','M','Oe','Ue'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
-                            <button class="vk-key vk-back" onclick="VirtualKeyboard.backspace()">âŒ«</button>
+                            <button class="vk-key vk-back" onclick="VirtualKeyboard.backspace()">❌«</button>
                         </div>
                         <div class="vk-row">
                             <button class="vk-key vk-clear" onclick="VirtualKeyboard.clear()">CLR</button>
