@@ -30,7 +30,7 @@ function initSupabase() {
         console.log('âœ… Supabase Client initialisiert');
         return true;
     }
-    console.warn('âš Supabase nicht verfÃ¼gbar - Offline-Modus');
+    console.warn('âš Supabase nicht verfuegbar - Offline-Modus');
     return false;
 }
 
@@ -57,7 +57,7 @@ async function syncPendingData() {
 const db = new Dexie('SeollerhausKassa');
 
 db.version(1).stores({
-    gÃ¤ste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
     buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, [gast_id+datum]',
     artikel: 'artikel_id, kategorie_id, name, aktiv',
     kategorien: 'kategorie_id, name, sortierung',
@@ -66,7 +66,7 @@ db.version(1).stores({
 });
 
 db.version(2).stores({
-    gÃ¤ste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
     buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, [gast_id+datum]',
     artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
     kategorien: 'kategorie_id, name, sortierung',
@@ -76,7 +76,7 @@ db.version(2).stores({
 });
 
 db.version(3).stores({
-    gÃ¤ste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
     buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, [gast_id+datum]',
     artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
     kategorien: 'kategorie_id, name, sortierung',
@@ -86,7 +86,7 @@ db.version(3).stores({
 });
 
 db.version(4).stores({
-    gÃ¤ste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
     buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, [gast_id+datum]',
     artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
     kategorien: 'kategorie_id, name, sortierung',
@@ -96,9 +96,9 @@ db.version(4).stores({
     fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen'
 });
 
-// Version 5: Gruppen hinzufÃ¼gen
+// Version 5: Gruppen hinzufuegen
 db.version(5).stores({
-    gÃ¤ste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
     buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
     artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
     kategorien: 'kategorie_id, name, sortierung',
@@ -109,28 +109,28 @@ db.version(5).stores({
     gruppen: '++id, name, aktiv'
 });
 
-// Version 6: Erweiterte GÃ¤stedaten (wie Access-Tabelle)
+// Version 6: Erweiterte Gaestedaten (wie Access-Tabelle)
 db.version(6).stores({
-    gÃ¤ste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
     buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
     artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
     kategorien: 'kategorie_id, name, sortierung',
     settings: 'key',
     exports: '++id, timestamp, anzahl_buchungen',
-    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, gelÃ¶scht, gelÃ¶schtAm, group_name, firstName, passwordHash',
+    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, geloescht, geloeschtAm, group_name, firstName, passwordHash',
     fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
     gruppen: '++id, name, aktiv'
 });
 
-// Version 7: GÃ¤ste-Nachrichten hinzufÃ¼gen
+// Version 7: Gaeste-Nachrichten hinzufuegen
 db.version(7).stores({
-    gÃ¤ste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
     buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
     artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
     kategorien: 'kategorie_id, name, sortierung',
     settings: 'key',
     exports: '++id, timestamp, anzahl_buchungen',
-    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, gelÃ¶scht, gelÃ¶schtAm, group_name, firstName, passwordHash',
+    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, geloescht, geloeschtAm, group_name, firstName, passwordHash',
     fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
     gruppen: '++id, name, aktiv',
     gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
@@ -138,13 +138,13 @@ db.version(7).stores({
 
 // Version 8: Dual-Pricing (HP / Selbstversorger)
 db.version(8).stores({
-    gÃ¤ste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
     buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
     artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
     kategorien: 'kategorie_id, name, sortierung',
     settings: 'key',
     exports: '++id, timestamp, anzahl_buchungen',
-    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, gelÃ¶scht, gelÃ¶schtAm, group_name, firstName, passwordHash',
+    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, geloescht, geloeschtAm, group_name, firstName, passwordHash',
     fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
     gruppen: '++id, name, aktiv',
     gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
@@ -152,13 +152,13 @@ db.version(8).stores({
 
 // Version 9: Schema-Fix
 db.version(9).stores({
-    gÃ¤ste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
     buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
     artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
     kategorien: 'kategorie_id, name, sortierung',
     settings: 'key',
     exports: '++id, timestamp, anzahl_buchungen',
-    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, gelÃ¶scht, gelÃ¶schtAm, group_name, firstName, passwordHash',
+    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, geloescht, geloeschtAm, group_name, firstName, passwordHash',
     fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
     gruppen: '++id, name, aktiv',
     gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
@@ -166,13 +166,13 @@ db.version(9).stores({
 
 // Version 10 - Force rebuild
 db.version(10).stores({
-    gÃ¤ste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
+    gaeste: 'gast_id, nachname, aktiv, zimmernummer, checked_out',
     buchungen: 'buchung_id, gast_id, datum, exportiert, sync_status, session_id, group_name, [gast_id+datum]',
     artikel: 'artikel_id, sku, kategorie_id, name, aktiv',
     kategorien: 'kategorie_id, name, sortierung',
     settings: 'key',
     exports: '++id, timestamp, anzahl_buchungen',
-    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, gelÃ¶scht, gelÃ¶schtAm, group_name, firstName, passwordHash',
+    registeredGuests: '++id, visibleId, nachname, vorname, gruppennr, gruppenname, passwort, aktiv, ausnahmeumlage, createdAt, lastLoginAt, geloescht, geloeschtAm, group_name, firstName, passwordHash',
     fehlendeGetraenke: '++id, artikel_id, datum, erstellt_am, uebernommen',
     gruppen: '++id, name, aktiv',
     gastNachrichten: '++id, gast_id, nachricht, erstellt_am, gueltig_bis, gelesen, erledigt'
@@ -182,7 +182,7 @@ const DataProtection = {
     async createBackup() {
         try {
             const data = {
-                gÃ¤ste: await db.gÃ¤ste.toArray(),
+                gaeste: await db.gaeste.toArray(),
                 buchungen: await db.buchungen.toArray(),
                 registeredGuests: await db.registeredGuests.toArray(),
                 artikel: await db.artikel.toArray(),
@@ -191,7 +191,7 @@ const DataProtection = {
                 version: '2.0'
             };
             localStorage.setItem('kassa_backup', JSON.stringify(data));
-            console.log(' Backup:', data.registeredGuests.length, 'GÃ¤ste,', data.artikel.length, 'Artikel');
+            console.log(' Backup:', data.registeredGuests.length, 'Gaeste,', data.artikel.length, 'Artikel');
             return true;
         } catch (e) { return false; }
     },
@@ -235,7 +235,7 @@ const DataProtection = {
         localStorage.setItem('last_full_backup', Date.now().toString());
     },
     
-    // PrÃ¼fen ob Backup nÃ¶tig (>24h)
+    // Pruefen ob Backup noetig (>24h)
     isBackupNeeded() {
         const lastBackup = this.getLastBackupDate();
         if (!lastBackup) return true;
@@ -262,12 +262,12 @@ const DataProtection = {
         }
     },
     
-    // VollstÃ¤ndiges Backup mit Supabase-Daten
+    // Vollstaendiges Backup mit Supabase-Daten
     async createFullBackup() {
         try {
             // Lokale Daten
             let data = {
-                gÃ¤ste: await db.gÃ¤ste.toArray(),
+                gaeste: await db.gaeste.toArray(),
                 buchungen: await db.buchungen.toArray(),
                 registeredGuests: await db.registeredGuests.toArray(),
                 artikel: await db.artikel.toArray(),
@@ -280,7 +280,7 @@ const DataProtection = {
                 quelle: 'lokal'
             };
             
-            // Wenn online, Supabase-Daten hinzufÃ¼gen
+            // Wenn online, Supabase-Daten hinzufuegen
             if (supabaseClient && isOnline) {
                 try {
                     const [profiles, buchungen, artikel, fehlende] = await Promise.all([
@@ -307,9 +307,9 @@ const DataProtection = {
                 }
             }
             
-            // Statistiken hinzufÃ¼gen
+            // Statistiken hinzufuegen
             data.statistik = {
-                anzahlGÃ¤ste: data.registeredGuests.filter(g => !g.gelÃ¶scht).length,
+                anzahlGaeste: data.registeredGuests.filter(g => !g.geloescht).length,
                 anzahlArtikel: data.artikel.filter(a => a.aktiv).length,
                 anzahlBuchungen: data.buchungen.filter(b => !b.storniert).length,
                 gesamtUmsatz: data.buchungen.filter(b => !b.storniert).reduce((s,b) => s + (b.preis * b.menge), 0)
@@ -322,13 +322,13 @@ const DataProtection = {
             
             const heute = new Date();
             const datumStr = `${heute.getFullYear()}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getDate().toString().padStart(2,'0')}`;
-            a.download = `SÃ¶llerhaus_Backup_${datumStr}.json`;
+            a.download = `Soellerhaus_Backup_${datumStr}.json`;
             a.click();
             
             // Backup-Datum speichern
             this.setLastBackupDate();
             
-            Utils.showToast(`âœ… VollstÃ¤ndiges Backup erstellt!\n${data.statistik.anzahlGÃ¤ste} GÃ¤ste, ${data.statistik.anzahlArtikel} Artikel, ${data.statistik.anzahlBuchungen} Buchungen`, 'success');
+            Utils.showToast(`âœ… Vollstaendiges Backup erstellt!\n${data.statistik.anzahlGaeste} Gaeste, ${data.statistik.anzahlArtikel} Artikel, ${data.statistik.anzahlBuchungen} Buchungen`, 'success');
             return true;
         } catch (e) {
             console.error('Backup Fehler:', e);
@@ -358,7 +358,7 @@ const DataProtection = {
                             <span style="font-weight:600;">${lastBackupText}</span>
                         </div>
                         <div style="font-size:0.85rem;color:#888;margin-top:12px;">
-                             Das Backup enthaelt alle GÃ¤ste, Artikel, Buchungen und Einstellungen 
+                             Das Backup enthaelt alle Gaeste, Artikel, Buchungen und Einstellungen 
                             ${isOnline ? '(inkl. Cloud-Daten von Supabase)' : '(nur lokale Daten - offline)'}.
                         </div>
                     </div>
@@ -370,9 +370,9 @@ const DataProtection = {
                         </button>
                         <button onclick="document.getElementById('backup-reminder-modal').remove();" 
                                 style="width:100%;padding:12px;background:#f0f0f0;color:#666;border:none;border-radius:10px;font-size:1rem;cursor:pointer;">
-                            SpÃ¤ter erinnern
+                            Spaeter erinnern
                         </button>
-                        <button onclick="DataProtection.setLastBackupDate();document.getElementById('backup-reminder-modal').remove();Utils.showToast('Erinnerung fÃ¼r 24h deaktiviert', 'info');" 
+                        <button onclick="DataProtection.setLastBackupDate();document.getElementById('backup-reminder-modal').remove();Utils.showToast('Erinnerung fuer 24h deaktiviert', 'info');" 
                                 style="width:100%;padding:10px;background:transparent;color:#999;border:none;font-size:0.9rem;cursor:pointer;">
                             Heute nicht mehr erinnern
                         </button>
@@ -385,7 +385,7 @@ const DataProtection = {
 
     // ============ RESTORE FUNKTIONEN ============
     
-    // Backup-Datei auswÃ¤hlen und Restore-Dialog anzeigen
+    // Backup-Datei auswaehlen und Restore-Dialog anzeigen
     async selectRestoreFile() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -420,7 +420,7 @@ const DataProtection = {
     // Backup-Datei validieren
     validateBackup(data) {
         // Mindestens eine dieser Tabellen muss vorhanden sein
-        const requiredTables = ['registeredGuests', 'artikel', 'buchungen', 'gÃ¤ste'];
+        const requiredTables = ['registeredGuests', 'artikel', 'buchungen', 'gaeste'];
         const hasTable = requiredTables.some(t => data[t] && Array.isArray(data[t]));
         
         if (!hasTable) {
@@ -435,7 +435,7 @@ const DataProtection = {
     showRestoreDialog(data, filename) {
         // Statistiken berechnen
         const stats = {
-            gÃ¤ste: (data.registeredGuests || []).filter(g => !g.gelÃ¶scht).length,
+            gaeste: (data.registeredGuests || []).filter(g => !g.geloescht).length,
             artikel: (data.artikel || []).filter(a => a.aktiv !== false).length,
             buchungen: (data.buchungen || []).filter(b => !b.storniert).length,
             kategorien: (data.kategorien || []).length,
@@ -478,8 +478,8 @@ const DataProtection = {
                         <h3 style="margin:0 0 16px 0;color:#2C5F7C;"> Inhalt des Backups</h3>
                         <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;">
                             <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
-                                <input type="checkbox" id="restore-gÃ¤ste" checked ${stats.gÃ¤ste === 0 ? 'disabled' : ''}>
-                                <span> GÃ¤ste <strong>(${stats.gÃ¤ste})</strong></span>
+                                <input type="checkbox" id="restore-gaeste" checked ${stats.gaeste === 0 ? 'disabled' : ''}>
+                                <span> Gaeste <strong>(${stats.gaeste})</strong></span>
                             </label>
                             <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:8px;cursor:pointer;">
                                 <input type="checkbox" id="restore-artikel" checked ${stats.artikel === 0 ? 'disabled' : ''}>
@@ -519,7 +519,7 @@ const DataProtection = {
                                 <input type="radio" name="restore-mode" value="replace" style="margin-top:3px;">
                                 <div>
                                     <strong> Ersetzen (Vorsicht!)</strong>
-                                    <div style="font-size:0.85rem;color:#666;">ALLE bestehenden Daten werden gelÃ¶scht und durch Backup ersetzt</div>
+                                    <div style="font-size:0.85rem;color:#666;">ALLE bestehenden Daten werden geloescht und durch Backup ersetzt</div>
                                 </div>
                             </label>
                         </div>
@@ -550,13 +550,13 @@ const DataProtection = {
             </div>
         `;
         
-        // Backup-Daten im Window speichern fÃ¼r executeRestore
+        // Backup-Daten im Window speichern fuer executeRestore
         window._pendingRestoreData = data;
         
         document.body.appendChild(modal);
     },
     
-    // Restore ausfÃ¼hren
+    // Restore ausfuehren
     async executeRestore() {
         const data = window._pendingRestoreData;
         if (!data) {
@@ -566,7 +566,7 @@ const DataProtection = {
         
         // Optionen sammeln
         const options = {
-            gÃ¤ste: document.getElementById('restore-gÃ¤ste')?.checked,
+            gaeste: document.getElementById('restore-gaeste')?.checked,
             artikel: document.getElementById('restore-artikel')?.checked,
             buchungen: document.getElementById('restore-buchungen')?.checked,
             kategorien: document.getElementById('restore-kategorien')?.checked,
@@ -575,27 +575,27 @@ const DataProtection = {
             mode: document.querySelector('input[name="restore-mode"]:checked')?.value || 'merge'
         };
         
-        // Letzte BestÃ¤tigung
+        // Letzte Bestaetigung
         const modeText = options.mode === 'replace' 
             ? 'ALLE bestehenden Daten werden GELOeSCHT!' 
             : 'Daten werden zusammengefuehrt.';
         
-        if (!confirm(`Wiederherstellung wirklich durchfÃ¼hren?\n\n${modeText}\n\nDieser Vorgang kann nicht rueckgÃ¤ngig gemacht werden!`)) {
+        if (!confirm(`Wiederherstellung wirklich durchfuehren?\n\n${modeText}\n\nDieser Vorgang kann nicht rueckgaengig gemacht werden!`)) {
             return;
         }
         
-        // Modal schlieÃƒÅ¸en
+        // Modal schliessen
         document.getElementById('restore-modal')?.remove();
         
         // Fortschrittsanzeige
         Utils.showToast('â³ Wiederherstellung laeuft...', 'info');
         
         try {
-            let restored = { gÃ¤ste: 0, artikel: 0, buchungen: 0, kategorien: 0, gruppen: 0, fehlende: 0 };
+            let restored = { gaeste: 0, artikel: 0, buchungen: 0, kategorien: 0, gruppen: 0, fehlende: 0 };
             
-            // Bei "replace" erst alles lÃ¶schen
+            // Bei "replace" erst alles loeschen
             if (options.mode === 'replace') {
-                if (options.gÃ¤ste) await db.registeredGuests.clear();
+                if (options.gaeste) await db.registeredGuests.clear();
                 if (options.artikel) await db.artikel.clear();
                 if (options.buchungen) await db.buchungen.clear();
                 if (options.kategorien) await db.kategorien.clear();
@@ -603,20 +603,20 @@ const DataProtection = {
                 if (options.fehlende) await db.fehlendeGetraenke.clear();
             }
             
-            // GÃ¤ste wiederherstellen
-            if (options.gÃ¤ste && data.registeredGuests) {
+            // Gaeste wiederherstellen
+            if (options.gaeste && data.registeredGuests) {
                 for (const g of data.registeredGuests) {
                     try {
                         if (options.mode === 'merge') {
-                            // PrÃ¼fen ob schon existiert
+                            // Pruefen ob schon existiert
                             const existing = await db.registeredGuests.get(g.id);
                             if (!existing) {
                                 await db.registeredGuests.add(g);
-                                restored.gÃ¤ste++;
+                                restored.gaeste++;
                             }
                         } else {
                             await db.registeredGuests.add(g);
-                            restored.gÃ¤ste++;
+                            restored.gaeste++;
                         }
                     } catch(e) { /* Duplikat ignorieren */ }
                 }
@@ -694,7 +694,7 @@ const DataProtection = {
                 }
             }
             
-            // Fehlende GetrÃ¤nke wiederherstellen
+            // Fehlende Getraenke wiederherstellen
             if (options.fehlende && data.fehlendeGetraenke) {
                 for (const f of data.fehlendeGetraenke) {
                     try {
@@ -720,7 +720,7 @@ const DataProtection = {
             
             // Erfolgsmeldung
             const summary = [];
-            if (restored.gÃ¤ste > 0) summary.push(`${restored.gÃ¤ste} GÃ¤ste`);
+            if (restored.gaeste > 0) summary.push(`${restored.gaeste} Gaeste`);
             if (restored.artikel > 0) summary.push(`${restored.artikel} Artikel`);
             if (restored.buchungen > 0) summary.push(`${restored.buchungen} Buchungen`);
             if (restored.kategorien > 0) summary.push(`${restored.kategorien} Kategorien`);
@@ -729,9 +729,9 @@ const DataProtection = {
             
             Utils.showToast(`âœ… Wiederherstellung erfolgreich!\n${summary.join(', ') || 'Keine neuen Daten'}`, 'success');
             
-            // Seite neu laden um Ã„nderungen anzuzeigen
+            // Seite neu laden um Aenderungen anzuzeigen
             setTimeout(() => {
-                if (confirm('Seite neu laden um alle Ã„nderungen anzuzeigen?')) {
+                if (confirm('Seite neu laden um alle Aenderungen anzuzeigen?')) {
                     location.reload();
                 }
             }, 1000);
@@ -760,14 +760,14 @@ const DataProtection = {
 
     async exportGuestsCSV() {
         const guests = await db.registeredGuests.toArray();
-        if (!guests.length) { Utils.showToast('Keine GÃ¤ste', 'warning'); return; }
+        if (!guests.length) { Utils.showToast('Keine Gaeste', 'warning'); return; }
         let csv = '\uFEFFID;Vorname;Erstellt;Letzter Login\n';
         guests.forEach(g => { csv += `${g.id};"${g.firstName}";"${g.createdAt}";"${g.lastLoginAt||'-'}"\n`; });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8;'}));
-        a.download = `gÃ¤ste_${Date.now()}.csv`;
+        a.download = `gaeste_${Date.now()}.csv`;
         a.click();
-        Utils.showToast(`${guests.length} GÃ¤ste exportiert`, 'success');
+        Utils.showToast(`${guests.length} Gaeste exportiert`, 'success');
     },
 
     async exportArticlesCSV() {
@@ -788,7 +788,7 @@ window.DataProtection = DataProtection;
 const GastNachricht = {
     ABLAUF_STUNDEN: 18, // Nachricht laeuft nach 18 Stunden ab
     
-    // Aktive Nachricht holen (prÃ¼ft auch Ablauf)
+    // Aktive Nachricht holen (prueft auch Ablauf)
     async getAktive() {
         // Erst von Supabase laden wenn online
         if (supabaseClient && isOnline) {
@@ -802,7 +802,7 @@ const GastNachricht = {
                 if (data?.value) {
                     const nachricht = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
                     
-                    // PrÃ¼fen ob abgelaufen
+                    // Pruefen ob abgelaufen
                     if (nachricht.aktiv && nachricht.erstellt_am) {
                         const erstelltAm = new Date(nachricht.erstellt_am);
                         const jetzt = new Date();
@@ -920,7 +920,7 @@ const GastNachricht = {
         return `${minuten} Minuten`;
     },
     
-    // HTML fÃ¼r die Anzeige auf Login-Seite
+    // HTML fuer die Anzeige auf Login-Seite
     renderHtml(nachricht) {
         if (!nachricht || !nachricht.aktiv) return '';
         
@@ -942,7 +942,7 @@ const GastNachricht = {
         const hintergrund = farben[nachricht.typ] || farben.info;
         const icon = icons[nachricht.typ] || icons.info;
         
-        // Extra-intensive Animation fÃ¼r dringend
+        // Extra-intensive Animation fuer dringend
         const isDringend = nachricht.typ === 'dringend';
         const animationClass = isDringend ? 'dringend-animation' : 'normal-animation';
         
@@ -1017,8 +1017,8 @@ const GastNachricht = {
         `;
     },
     
-    // Nachricht fÃ¼r diesen Gast schlieÃƒÅ¸en (nur visuell, nicht fÃ¼r alle)
-    schlieÃƒÅ¸en() {
+    // Nachricht fuer diesen Gast schliessen (nur visuell, nicht fuer alle)
+    schliessen() {
         const box = document.getElementById('gast-nachricht-box');
         if (box) {
             box.style.animation = 'none';
@@ -1027,11 +1027,11 @@ const GastNachricht = {
             box.style.opacity = '0';
             setTimeout(() => box.remove(), 300);
         }
-        // Merken dass dieser Gast die Nachricht geschlossen hat (fÃ¼r diese Session)
+        // Merken dass dieser Gast die Nachricht geschlossen hat (fuer diese Session)
         sessionStorage.setItem('nachricht_geschlossen', 'true');
     },
     
-    // PrÃ¼fen ob Nachricht fÃ¼r diese Session geschlossen wurde
+    // Pruefen ob Nachricht fuer diese Session geschlossen wurde
     istGeschlossen() {
         return sessionStorage.getItem('nachricht_geschlossen') === 'true';
     }
@@ -1046,10 +1046,10 @@ db.open().then(async () => {
 }).catch(e => console.error('DB Fehler:', e));
 
 // ===========================================
-// TAGESMENUe - MenÃ¼ auf der Startseite anzeigen
+// TAGESMENUe - Menue auf der Startseite anzeigen
 // ===========================================
 const TagesMenu = {
-    // PrÃ¼fen ob eine Uhrzeit aktuell ueberschritten ist
+    // Pruefen ob eine Uhrzeit aktuell ueberschritten ist
     istZeitVorbei(uhrzeitStr) {
         if (!uhrzeitStr) return false;
         const [stunden, minuten] = uhrzeitStr.split(':').map(Number);
@@ -1059,7 +1059,7 @@ const TagesMenu = {
         return jetztMinuten >= zielMinuten;
     },
     
-    // Aktive MenÃ¼s holen (Mittag und/oder Abend, je nach Uhrzeit)
+    // Aktive Menues holen (Mittag und/oder Abend, je nach Uhrzeit)
     async getAktiv() {
         let menuData = null;
         
@@ -1078,7 +1078,7 @@ const TagesMenu = {
                     await db.settings.put({ key: 'tages_menu_v2', value: JSON.stringify(menuData) });
                 }
             } catch(e) {
-                console.log('Kein MenÃ¼ v2 in Supabase');
+                console.log('Kein Menue v2 in Supabase');
             }
         }
         
@@ -1094,30 +1094,30 @@ const TagesMenu = {
         
         if (!menuData) return null;
         
-        // PrÃ¼fen welche MenÃ¼s gerade sichtbar sind
+        // Pruefen welche Menues gerade sichtbar sind
         const result = { mittag: null, abend: null };
         
-        // MittagsmenÃ¼: aktiv und noch nicht ausgeblendet?
+        // Mittagsmenue: aktiv und noch nicht ausgeblendet?
         if (menuData.mittag?.aktiv && menuData.mittag?.text) {
             if (!this.istZeitVorbei(menuData.mittag.ausblenden_um)) {
                 result.mittag = menuData.mittag;
             }
         }
         
-        // AbendmenÃ¼: aktiv und noch nicht ausgeblendet?
+        // Abendmenue: aktiv und noch nicht ausgeblendet?
         if (menuData.abend?.aktiv && menuData.abend?.text) {
             if (!this.istZeitVorbei(menuData.abend.ausblenden_um)) {
                 result.abend = menuData.abend;
             }
         }
         
-        // Wenn keins aktiv, null zurÃ¼ckgeben
+        // Wenn keins aktiv, null zurueckgeben
         if (!result.mittag && !result.abend) return null;
         
         return result;
     },
     
-    // Alle MenÃ¼-Daten laden (fÃ¼r Admin)
+    // Alle Menue-Daten laden (fuer Admin)
     async getAlleMenus() {
         let menuData = null;
         
@@ -1150,7 +1150,7 @@ const TagesMenu = {
         };
     },
     
-    // MenÃ¼s speichern
+    // Menues speichern
     async speichern(menuData) {
         // Lokal speichern
         await db.settings.put({ key: 'tages_menu_v2', value: JSON.stringify(menuData) });
@@ -1163,11 +1163,11 @@ const TagesMenu = {
                     value: menuData 
                 });
             } catch(e) {
-                console.error('MenÃ¼ Supabase sync error:', e);
+                console.error('Menue Supabase sync error:', e);
             }
         }
         
-        Utils.showToast(' MenÃ¼ gespeichert!', 'success');
+        Utils.showToast(' Menue gespeichert!', 'success');
         return menuData;
     },
     
@@ -1175,7 +1175,7 @@ const TagesMenu = {
     formatText(text) {
         if (!text) return '';
         
-        // Sterne als schÃ¶ne Trenner
+        // Sterne als schoene Trenner
         let formatted = text
             .replace(/\*{4,}/g, '<div style="text-align:center;margin:16px 0;letter-spacing:8px;opacity:0.5;">* * * *</div>')
             .replace(/\*{3}/g, '<div style="text-align:center;margin:16px 0;letter-spacing:8px;opacity:0.5;">* * *</div>')
@@ -1186,7 +1186,7 @@ const TagesMenu = {
         return formatted;
     },
     
-    // Buttons fÃ¼r Startseite (Mittag und/oder Abend)
+    // Buttons fuer Startseite (Mittag und/oder Abend)
     renderButtons(menus) {
         let html = '';
         
@@ -1210,7 +1210,7 @@ const TagesMenu = {
                 margin: 0 auto 12px;
             ">
                 <span style="font-size:1.4rem;"></span>
-                MittagsmenÃ¼ (${menus.mittag.uhrzeit} Uhr)
+                Mittagsmenue (${menus.mittag.uhrzeit} Uhr)
             </button>`;
         }
         
@@ -1234,7 +1234,7 @@ const TagesMenu = {
                 margin: 0 auto;
             ">
                 <span style="font-size:1.4rem;"></span>
-                AbendmenÃ¼ (${menus.abend.uhrzeit} Uhr)
+                Abendmenue (${menus.abend.uhrzeit} Uhr)
             </button>`;
         }
         
@@ -1250,7 +1250,7 @@ const TagesMenu = {
         if (!menu) return;
         
         const formattedText = this.formatText(menu.text);
-        const titel = typ === 'mittag' ? 'MittagsmenÃ¼' : 'AbendmenÃ¼';
+        const titel = typ === 'mittag' ? 'Mittagsmenue' : 'Abendmenue';
         const icon = typ === 'mittag' ? '' : '';
         const farbe = typ === 'mittag' ? '#e67e22' : '#8B4513';
         
@@ -1323,14 +1323,14 @@ const TagesMenu = {
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     },
     
-    // Modal schlieÃƒÅ¸en
+    // Modal schliessen
     closeModal() {
         const modal = document.getElementById('menu-modal-overlay');
         if (modal) modal.remove();
     }
 };
 
-// Global verfÃ¼gbar machen
+// Global verfuegbar machen
 window.TagesMenu = TagesMenu;
 
 // ================================
@@ -1362,7 +1362,7 @@ const CheeseOrders = {
         return (cents / 100).toFixed(2).replace('.', ',') + ' EUR';
     },
     
-    // Bestellung erstellen (fÃ¼r GÃ¤ste)
+    // Bestellung erstellen (fuer Gaeste)
     async createOrder(guestName, grams, packagingType) {
         if (!supabaseClient) throw new Error('Keine Verbindung zur Datenbank');
         
@@ -1386,7 +1386,7 @@ const CheeseOrders = {
         return data;
     },
     
-    // Offene Bestellungen laden (fÃ¼r Admin)
+    // Offene Bestellungen laden (fuer Admin)
     async getOpenOrders() {
         if (!supabaseClient) return [];
         
@@ -1397,13 +1397,13 @@ const CheeseOrders = {
             .order('created_at', { ascending: false });
         
         if (error) {
-            console.error('Fehler beim Laden der KÃ¤se-Bestellungen:', error);
+            console.error('Fehler beim Laden der Kaese-Bestellungen:', error);
             return [];
         }
         return data || [];
     },
     
-    // Bestellung als erledigt markieren (fÃ¼r Admin)
+    // Bestellung als erledigt markieren (fuer Admin)
     async markAsDone(orderId) {
         if (!supabaseClient) throw new Error('Keine Verbindung zur Datenbank');
         
@@ -1445,8 +1445,8 @@ const CheeseOrders = {
                         <div style="display:flex;align-items:center;gap:12px;">
                             <span style="font-size:2.5rem;"></span>
                             <div>
-                                <h2 style="margin:0;font-size:1.4rem;font-weight:700;">KÃ¤se zur Abreise</h2>
-                                <p style="margin:4px 0 0;font-size:0.9rem;opacity:0.8;">BergkÃ¤se vom SÃ¶llerhaus</p>
+                                <h2 style="margin:0;font-size:1.4rem;font-weight:700;">Kaese zur Abreise</h2>
+                                <p style="margin:4px 0 0;font-size:0.9rem;opacity:0.8;">Bergkaese vom Soellerhaus</p>
                             </div>
                         </div>
                         <button onclick="CheeseOrders.closeModal()" style="
@@ -1481,7 +1481,7 @@ const CheeseOrders = {
                     <!-- Menge -->
                     <div style="margin-bottom:20px;">
                         <label style="display:block;font-weight:600;margin-bottom:8px;color:#333;">
-                            Menge wÃ¤hlen
+                            Menge waehlen
                         </label>
                         <div style="display:flex;align-items:center;justify-content:center;gap:16px;background:#f8f9fa;padding:16px;border-radius:12px;">
                             <button onclick="CheeseOrders.adjustGrams(-50)" style="
@@ -1518,7 +1518,7 @@ const CheeseOrders = {
                     <!-- Verpackung -->
                     <div style="margin-bottom:20px;">
                         <label style="display:block;font-weight:600;margin-bottom:8px;color:#333;">
-                            Verpackung wÃ¤hlen
+                            Verpackung waehlen
                         </label>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                             <label id="cheese-pkg-film" onclick="CheeseOrders.selectPackaging('FILM')" style="
@@ -1559,7 +1559,7 @@ const CheeseOrders = {
                         margin-bottom:20px;
                     ">
                         <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-                            <span>KÃ¤se (ca. <span id="cheese-price-grams">100</span>g x 2,50 EUR/100g)</span>
+                            <span>Kaese (ca. <span id="cheese-price-grams">100</span>g x 2,50 EUR/100g)</span>
                             <span id="cheese-price-base">2,50 EUR</span>
                         </div>
                         <div id="cheese-price-vacuum-row" style="display:none;justify-content:space-between;margin-bottom:8px;">
@@ -1585,7 +1585,7 @@ const CheeseOrders = {
                     ">
                         <div style="font-weight:600;color:#856404;margin-bottom:8px;">âš ï¸ Wichtige Hinweise:</div>
                         <ul style="margin:0;padding-left:20px;color:#856404;line-height:1.6;">
-                            <li>Grammzahl ist <strong>ca.-Angabe</strong> (KÃ¤se wird frisch geschnitten)</li>
+                            <li>Grammzahl ist <strong>ca.-Angabe</strong> (Kaese wird frisch geschnitten)</li>
                             <li>Abholung <strong>nur am Abreisetag</strong> beim Check-out</li>
                             <li>Bezahlung <strong>nur bar (Cash)</strong></li>
                             <li>Dies ist nur eine <strong>Vorbestellung</strong></li>
@@ -1605,7 +1605,7 @@ const CheeseOrders = {
                         cursor:pointer;
                         transition:transform 0.2s, box-shadow 0.2s;
                     " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 20px rgba(39,174,96,0.4)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-                         KÃ¤se vorbestellen
+                         Kaese vorbestellen
                     </button>
                 </div>
             </div>
@@ -1619,7 +1619,7 @@ const CheeseOrders = {
         this.updatePriceDisplay();
     },
     
-    // Modal schlieÃƒÅ¸en
+    // Modal schliessen
     closeModal() {
         const modal = document.getElementById('cheese-modal-overlay');
         if (modal) modal.remove();
@@ -1635,7 +1635,7 @@ const CheeseOrders = {
         }
     },
     
-    // Verpackung wÃ¤hlen
+    // Verpackung waehlen
     selectPackaging(type) {
         this.currentPackaging = type;
         
@@ -1688,10 +1688,10 @@ const CheeseOrders = {
             await this.createOrder(name, this.currentGrams, this.currentPackaging);
             this.closeModal();
             
-            // ErfolgsbestÃ¤tigung
-            Utils.showToast(' KÃ¤se-Bestellung erfolgreich!', 'success');
+            // Erfolgsbestaetigung
+            Utils.showToast(' Kaese-Bestellung erfolgreich!', 'success');
             
-            // BestÃ¤tigungs-Popup
+            // Bestaetigungs-Popup
             setTimeout(() => {
                 const confirmHtml = `
                 <div id="cheese-confirm-overlay" onclick="this.remove()" style="
@@ -1711,7 +1711,7 @@ const CheeseOrders = {
                         <div style="font-size:4rem;margin-bottom:16px;">âœ…</div>
                         <h2 style="color:#27ae60;margin:0 0 12px;">Bestellung erfolgreich!</h2>
                         <p style="color:#666;margin:0 0 20px;line-height:1.5;">
-                            Ihr KÃ¤se wird fÃ¼r Sie vorbereitet.<br>
+                            Ihr Kaese wird fuer Sie vorbereitet.<br>
                             <strong>Abholung beim Check-out.</strong>
                         </p>
                         <button onclick="this.parentElement.parentElement.remove()" style="
@@ -1730,7 +1730,7 @@ const CheeseOrders = {
             }, 300);
             
         } catch (error) {
-            console.error('KÃ¤se-Bestellung Fehler:', error);
+            console.error('Kaese-Bestellung Fehler:', error);
             Utils.showToast('Fehler bei der Bestellung: ' + error.message, 'error');
         }
     },
@@ -1740,7 +1740,7 @@ const CheeseOrders = {
     currentPackaging: 'FILM'
 };
 
-// Global verfÃ¼gbar machen
+// Global verfuegbar machen
 window.CheeseOrders = CheeseOrders;
 
 const Utils = {
@@ -1751,7 +1751,7 @@ const Utils = {
     formatCurrency: a => new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(a),
     
     // Buchungsdatum basierend auf 7:00-7:00 Periode
-    // Buchungen zwischen 00:00 und 06:59 gehÃ¶ren noch zum Vortag
+    // Buchungen zwischen 00:00 und 06:59 gehoeren noch zum Vortag
     getBuchungsDatum() {
         const jetzt = new Date();
         const stunde = jetzt.getHours();
@@ -1767,12 +1767,12 @@ const Utils = {
         return this.formatDate(jetzt);
     },
     
-    // Aktuelles "Buchungs-Heute" (fÃ¼r Dashboard etc.)
+    // Aktuelles "Buchungs-Heute" (fuer Dashboard etc.)
     getBuchungsHeute() {
         return this.getBuchungsDatum();
     },
     
-    // Vortag relativ zum aktuellen Buchungsdatum (fÃ¼r fehlende GetrÃ¤nke)
+    // Vortag relativ zum aktuellen Buchungsdatum (fuer fehlende Getraenke)
     getVortagBuchungsDatum() {
         const jetzt = new Date();
         const stunde = jetzt.getHours();
@@ -1784,7 +1784,7 @@ const Utils = {
             basisDatum.setDate(basisDatum.getDate() - 1);
         }
         
-        // Davon nochmal einen Tag abziehen fÃ¼r "Vortag"
+        // Davon nochmal einen Tag abziehen fuer "Vortag"
         basisDatum.setDate(basisDatum.getDate() - 1);
         return this.formatDate(basisDatum);
     },
@@ -1800,7 +1800,7 @@ const Utils = {
         setTimeout(() => { t.style.animation = 'toastOut 0.3s ease forwards'; setTimeout(() => t.remove(), 300); }, 3000);
     },
     debounce(fn, w) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), w); }; },
-    // Bild verkleinern und als Base64 zurÃ¼ckgeben
+    // Bild verkleinern und als Base64 zurueckgeben
     async resizeImage(file, maxSize = 150) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -1856,26 +1856,26 @@ const i18n = {
     translations: {
         de: {
             // Login-Seite
-            'app_title': 'SÃ¶llerhaus Kassa',
+            'app_title': 'Soellerhaus Kassa',
             'app_subtitle': 'Self-Service Buchung',
-            'select_first_letter': 'WÃ¤hlen Sie den ersten Buchstaben:',
+            'select_first_letter': 'Waehlen Sie den ersten Buchstaben:',
             'no_account': 'Noch kein Account?',
             'register_new': 'Neu registrieren',
             'admin_login': 'Admin-Login',
-            'missing_drinks': 'Fehlende GetrÃ¤nke',
+            'missing_drinks': 'Fehlende Getraenke',
             'total': 'Gesamt',
             'please_take_after_login': 'Bitte nach Login uebernehmen',
             'message_from_team': 'Nachricht vom Team',
             'important_message': 'WICHTIGE NACHRICHT!',
             'hours_visible': 'Noch {h}h sichtbar',
-            'click_to_close': 'Klicke x zum SchlieÃƒÅ¸en',
-            'read_close': 'Gelesen & SchlieÃƒÅ¸en',
+            'click_to_close': 'Klicke x zum Schliessen',
+            'read_close': 'Gelesen & Schliessen',
             
             // Name-Auswahl
             'letter': 'Buchstabe',
-            'select_your_name': 'WÃ¤hlen Sie Ihren Namen:',
-            'back': 'ZurÃ¼ck',
-            'no_entries': 'Keine EintrÃ¤ge',
+            'select_your_name': 'Waehlen Sie Ihren Namen:',
+            'back': 'Zurueck',
+            'no_entries': 'Keine Eintraege',
             
             // PIN-Eingabe
             'enter_pin': 'PIN eingeben',
@@ -1903,28 +1903,28 @@ const i18n = {
             'book': 'Buchen',
             'quantity': 'Menge',
             'total': 'Gesamt',
-            'per_piece': 'StÃ¼ck',
+            'per_piece': 'Stueck',
             'article_not_found': 'Artikel nicht gefunden',
             'booking_error': 'Fehler beim Buchen',
             
             // Gruppen
-            'select_group': 'Gruppe wÃ¤hlen',
+            'select_group': 'Gruppe waehlen',
             'hello': 'Hallo',
             'please_select_group': 'Bitte waehle deine Gruppe:',
-            'group_saved': 'Die Gruppe wird fÃ¼r alle deine Buchungen gespeichert.',
+            'group_saved': 'Die Gruppe wird fuer alle deine Buchungen gespeichert.',
             'group': 'Gruppe',
             
-            // Fehlende GetrÃ¤nke
-            'missing_drinks_yesterday': 'Fehlende GetrÃ¤nke vom Vortag',
+            // Fehlende Getraenke
+            'missing_drinks_yesterday': 'Fehlende Getraenke vom Vortag',
             'please_take_if_forgot': 'Bitte uebernehmen, falls Sie diese vergessen haben zu buchen',
             
             // Kategorien
             'cat_all': 'Alle',
-            'cat_alkoholfrei': 'Alkoholfreie GetrÃ¤nke',
+            'cat_alkoholfrei': 'Alkoholfreie Getraenke',
             'cat_biere': 'Biere',
             'cat_weine': 'Weine',
-            'cat_schnÃ¤pse': 'SchnÃ¤pse & Spirituosen',
-            'cat_heiÃƒÅ¸': 'HeiÃƒÅ¸e GetrÃ¤nke',
+            'cat_schnaepse': 'Schnaepse & Spirituosen',
+            'cat_heiÃƒÅ¸': 'Heisse Getraenke',
             'cat_suess': 'Suesses & Salziges',
             'cat_sonstiges': 'Sonstiges',
             
@@ -1939,7 +1939,7 @@ const i18n = {
         },
         en: {
             // Login page
-            'app_title': 'SÃ¶llerhaus Kassa',
+            'app_title': 'Soellerhaus Kassa',
             'app_subtitle': 'Self-Service Booking',
             'select_first_letter': 'Select the first letter:',
             'no_account': 'No account yet?',
@@ -2006,7 +2006,7 @@ const i18n = {
             'cat_alkoholfrei': 'Soft Drinks',
             'cat_biere': 'Beers',
             'cat_weine': 'Wines',
-            'cat_schnÃ¤pse': 'Spirits',
+            'cat_schnaepse': 'Spirits',
             'cat_heiÃƒÅ¸': 'Hot Drinks',
             'cat_suess': 'Sweets & Snacks',
             'cat_sonstiges': 'Other',
@@ -2077,7 +2077,7 @@ const i18n = {
         </div>`;
     },
     
-    // Button HTML fÃ¼r Startseite mit Sprache UND WhatsApp
+    // Button HTML fuer Startseite mit Sprache UND WhatsApp
     renderLangButtonWithWhatsApp() {
         const flag = this.currentLang === 'de' ? '' : '';
         const label = this.currentLang === 'de' ? 'English' : 'Deutsch';
@@ -2097,7 +2097,7 @@ const i18n = {
                 align-items:center;
                 gap:5px;
             ">
-                 KÃ¤sebestellung
+                 Kaesebestellung
             </button>
             <button onclick="toggleLanguage()" style="
                 background:white;
@@ -2149,7 +2149,7 @@ const State = {
     currentUser: null, currentPage: 'login', selectedCategory: null,
     isAdmin: false, currentPin: '', inactivityTimer: null, inactivityTimeout: 20000,
     sessionId: null,
-    selectedGroup: null, // AusgewÃ¤hlte Gruppe fÃ¼r aktuelle Session
+    selectedGroup: null, // Ausgewaehlte Gruppe fuer aktuelle Session
     currentPreisModus: 'sv', // 'sv' = Selbstversorger, 'hp' = Halbpension
     async loadPreisModus() {
         this.currentPreisModus = await PreisModus.getModus();
@@ -2189,13 +2189,13 @@ const RegisteredGuests = {
         const cleanName = firstName.trim().toUpperCase();
         
         // Nur Buchstaben, Leerzeichen und Bindestrich erlaubt
-        if (!/^[A-ZÃ„Ã–Ãœa-zÃ¤Ã¶Ã¼][A-ZÃ„Ã–Ãœa-zÃ¤Ã¶Ã¼\s\-]*$/i.test(cleanName)) {
+        if (!/^[A-ZAeOeUea-zaeoeue][A-ZAeOeUea-zaeoeue\s\-]*$/i.test(cleanName)) {
             throw new Error('Name darf nur Buchstaben und Bindestriche enthalten!');
         }
         
-        // PrÃ¼fen ob Name schon vergeben - NUR bei AKTIVEN GÃ¤sten!
+        // Pruefen ob Name schon vergeben - NUR bei AKTIVEN Gaesten!
         if (supabaseClient && isOnline) {
-            // Alle aktiven Profile laden und client-seitig prÃ¼fen (sicherer als ilike)
+            // Alle aktiven Profile laden und client-seitig pruefen (sicherer als ilike)
             const { data: allProfiles } = await supabaseClient
                 .from('profiles')
                 .select('vorname, first_name, display_name')
@@ -2209,24 +2209,24 @@ const RegisteredGuests = {
                 });
                 
                 if (nameExists) {
-                    throw new Error('Dieser Name ist bereits vergeben! Bitte wÃ¤hle einen anderen.');
+                    throw new Error('Dieser Name ist bereits vergeben! Bitte waehle einen anderen.');
                 }
             }
         } else {
-            const alleGÃ¤ste = await db.registeredGuests.toArray();
-            const nameExists = alleGÃ¤ste.find(g => 
+            const alleGaeste = await db.registeredGuests.toArray();
+            const nameExists = alleGaeste.find(g => 
                 ((g.nachname || g.firstName || '').toUpperCase().trim() === cleanName) && 
-                !g.gelÃ¶scht && 
+                !g.geloescht && 
                 g.aktiv !== false
             );
             if (nameExists) {
-                throw new Error('Dieser Name ist bereits vergeben! Bitte wÃ¤hle einen anderen.');
+                throw new Error('Dieser Name ist bereits vergeben! Bitte waehle einen anderen.');
             }
         }
         
-        // PIN-Duplikate sind erlaubt - keine PrÃ¼fung nÃ¶tig
+        // PIN-Duplikate sind erlaubt - keine Pruefung noetig
         
-        // Generiere pseudo-Email fÃ¼r Supabase Auth
+        // Generiere pseudo-Email fuer Supabase Auth
         const uniqueId = Utils.uuid().substring(0, 8);
         const email = `${cleanName.toLowerCase().replace(/[^a-z]/g, '')}.${uniqueId}@kassa.local`;
         
@@ -2256,7 +2256,7 @@ const RegisteredGuests = {
             let pinSaved = false;
             for (let i = 0; i < 3; i++) {
                 try {
-                    // Erst prÃ¼fen ob Profile existiert
+                    // Erst pruefen ob Profile existiert
                     const { data: existingProfile } = await supabaseClient
                         .from('profiles')
                         .select('id')
@@ -2270,7 +2270,7 @@ const RegisteredGuests = {
                             .update({ 
                                 pin_hash: password,
                                 vorname: cleanName,
-                                group_name: 'keiner Gruppe zugehÃ¶rig',
+                                group_name: 'keiner Gruppe zugehoerig',
                                 aktiv: true,
                                 geloescht: false
                             })
@@ -2291,7 +2291,7 @@ const RegisteredGuests = {
                                 pin_hash: password,
                                 vorname: cleanName,
                                 first_name: cleanName,
-                                group_name: 'keiner Gruppe zugehÃ¶rig',
+                                group_name: 'keiner Gruppe zugehoerig',
                                 aktiv: true,
                                 geloescht: false,
                                 created_at: new Date().toISOString()
@@ -2313,7 +2313,7 @@ const RegisteredGuests = {
                 console.error(' PIN konnte nicht in Supabase gespeichert werden!');
             }
             
-            // Profile laden zur BestÃ¤tigung
+            // Profile laden zur Bestaetigung
             const { data: profile } = await supabaseClient
                 .from('profiles')
                 .select('*')
@@ -2330,7 +2330,7 @@ const RegisteredGuests = {
                 email: email,
                 passwort: password,  // PIN als Klartext!
                 passwordHash: password,
-                gruppenname: 'keiner Gruppe zugehÃ¶rig',
+                gruppenname: 'keiner Gruppe zugehoerig',
                 ausnahmeumlage: false,
                 aktiv: true,
                 createdAt: new Date().toISOString(),
@@ -2338,7 +2338,7 @@ const RegisteredGuests = {
             };
             try { await db.registeredGuests.add(localGuest); } catch(e) {}
             
-            // WICHTIG: Nach Registrierung explizit einloggen fÃ¼r aktive Session!
+            // WICHTIG: Nach Registrierung explizit einloggen fuer aktive Session!
             // (sonst funktionieren Buchungen nicht wegen RLS)
             try {
                 console.log(' Expliziter Login nach Registrierung...');
@@ -2363,8 +2363,8 @@ const RegisteredGuests = {
                 firstName: cleanName,
                 nachname: cleanName,
                 email: email,
-                group_name: 'keiner Gruppe zugehÃ¶rig',
-                gruppenname: 'keiner Gruppe zugehÃ¶rig'
+                group_name: 'keiner Gruppe zugehoerig',
+                gruppenname: 'keiner Gruppe zugehoerig'
             };
             console.log(' setUser mit ID:', userObj.id);
             State.setUser(userObj);
@@ -2377,7 +2377,7 @@ const RegisteredGuests = {
                 nachname: cleanName,
                 passwort: password,  // PIN als Klartext!
                 passwordHash: password,
-                gruppenname: 'keiner Gruppe zugehÃ¶rig',
+                gruppenname: 'keiner Gruppe zugehoerig',
                 ausnahmeumlage: false,
                 aktiv: true,
                 createdAt: new Date().toISOString(), 
@@ -2403,14 +2403,14 @@ const RegisteredGuests = {
                 .single();
             
             if (!profile) throw new Error('Gast nicht gefunden');
-            if (profile.geloescht || profile.gelÃ¶scht) throw new Error('Account deaktiviert');
+            if (profile.geloescht || profile.geloescht) throw new Error('Account deaktiviert');
             if (profile.aktiv === false) throw new Error('Du hast bereits ausgecheckt. Bitte wende dich an die Rezeption.');
             
-            // WICHTIG: PrÃ¼fen ob Email vorhanden ist (fÃ¼r Auth Session)
+            // WICHTIG: Pruefen ob Email vorhanden ist (fuer Auth Session)
             if (!profile.email) {
                 // Gast wurde ohne Auth User angelegt - KEIN Login erlaubt!
                 console.error('âŒ Gast hat keine Email - kein Supabase Auth Account');
-                throw new Error('Login fehlgeschlagen. Bitte spÃ¤ter nochmal versuchen.');
+                throw new Error('Login fehlgeschlagen. Bitte spaeter nochmal versuchen.');
             }
             
             // Login mit Email und erweitertem Passwort
@@ -2440,8 +2440,8 @@ const RegisteredGuests = {
             Utils.showToast(`Willkommen, ${user.firstName}!`, 'success');
             return user;
         } else {
-            // Offline: Kein Login mÃ¶glich - brauchen Supabase fÃ¼r Buchungen
-            throw new Error('Keine Internetverbindung. Bitte spÃ¤ter nochmal versuchen.');
+            // Offline: Kein Login moeglich - brauchen Supabase fuer Buchungen
+            throw new Error('Keine Internetverbindung. Bitte spaeter nochmal versuchen.');
         }
     },
     
@@ -2449,7 +2449,7 @@ const RegisteredGuests = {
         // IMMER zuerst von Supabase laden wenn online
         if (supabaseClient && isOnline) {
             try {
-                console.log(' Lade GÃ¤ste fÃ¼r Buchstabe', letter, 'von Supabase...');
+                console.log(' Lade Gaeste fuer Buchstabe', letter, 'von Supabase...');
                 
                 // Alle Profile laden (wir filtern client-seitig)
                 const { data, error } = await supabaseClient
@@ -2460,12 +2460,12 @@ const RegisteredGuests = {
                 if (error) {
                     console.error(' Supabase Fehler:', error);
                 } else if (data) {
-                    // Client-seitig filtern: Buchstabe + nicht gelÃ¶scht + aktiv
+                    // Client-seitig filtern: Buchstabe + nicht geloescht + aktiv
                     const filtered = data.filter(p => {
                         const name = (p.display_name || p.first_name || '').toUpperCase();
                         const startsWithLetter = name.startsWith(letter.toUpperCase());
-                        const isNotDeleted = p.geloescht !== true && p.gelÃ¶scht !== true;  // Beide Schreibweisen prÃ¼fen
-                        const isActive = p.aktiv !== false;  // Nur aktive GÃ¤ste
+                        const isNotDeleted = p.geloescht !== true && p.geloescht !== true;  // Beide Schreibweisen pruefen
+                        const isActive = p.aktiv !== false;  // Nur aktive Gaeste
                         return startsWithLetter && isNotDeleted && isActive;
                     });
                     
@@ -2474,13 +2474,13 @@ const RegisteredGuests = {
                     const deduplicated = filtered.filter(p => {
                         const name = (p.display_name || p.first_name || '').toUpperCase().trim();
                         if (seenNames.has(name)) {
-                            return false; // Duplikat Ã¼berspringen
+                            return false; // Duplikat ueberspringen
                         }
                         seenNames.add(name);
                         return true;
                     });
                     
-                    console.log('âœ… Gefunden fÃ¼r', letter + ':', deduplicated.length, '(nach Deduplizierung)');
+                    console.log('âœ… Gefunden fuer', letter + ':', deduplicated.length, '(nach Deduplizierung)');
                     
                     if (deduplicated.length > 0) {
                         return deduplicated.map(g => {
@@ -2512,23 +2512,23 @@ const RegisteredGuests = {
             return (data || []).map(g => ({ ...g, firstName: g.first_name }));
         }
         const all = await db.registeredGuests.toArray();
-        return all.filter(g => !g.gelÃ¶scht && g.aktiv !== false);
+        return all.filter(g => !g.geloescht && g.aktiv !== false);
     },
     
-    async getGelÃ¶schte() {
+    async getGeloeschte() {
         if (supabaseClient && isOnline) {
             const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', true);
             return (data || []).map(g => ({ ...g, firstName: g.first_name }));
         }
         const all = await db.registeredGuests.toArray();
-        return all.filter(g => g.gelÃ¶scht);
+        return all.filter(g => g.geloescht);
     },
     
     async softDelete(id) { 
         if (supabaseClient && isOnline) {
             await supabaseClient.from('profiles').update({ geloescht: true, geloescht_am: new Date().toISOString() }).eq('id', id);
         }
-        try { await db.registeredGuests.update(id, { gelÃ¶scht: true, gelÃ¶schtAm: new Date().toISOString() }); } catch(e) {}
+        try { await db.registeredGuests.update(id, { geloescht: true, geloeschtAm: new Date().toISOString() }); } catch(e) {}
         Utils.showToast('Gast in Papierkorb verschoben', 'success'); 
     },
     
@@ -2536,7 +2536,7 @@ const RegisteredGuests = {
         if (supabaseClient && isOnline) {
             await supabaseClient.from('profiles').update({ geloescht: false, geloescht_am: null }).eq('id', id);
         }
-        try { await db.registeredGuests.update(id, { geloescht: false, gelÃ¶schtAm: null }); } catch(e) {}
+        try { await db.registeredGuests.update(id, { geloescht: false, geloeschtAm: null }); } catch(e) {}
         Utils.showToast('Gast wiederhergestellt', 'success');
     },
     
@@ -2545,7 +2545,7 @@ const RegisteredGuests = {
             await supabaseClient.from('profiles').delete().eq('id', id);
         }
         try { await db.registeredGuests.delete(id); } catch(e) {}
-        Utils.showToast('Gast endgueltig gelÃ¶scht', 'success'); 
+        Utils.showToast('Gast endgueltig geloescht', 'success'); 
     }
 };
 
@@ -2567,7 +2567,7 @@ const Auth = {
             return RegisteredGuests.login(id, pin);
         }
         // Legacy Gast
-        const g = await db.gÃ¤ste.get(id);
+        const g = await db.gaeste.get(id);
         if (!g) throw new Error('Nicht gefunden');
         if (g.checked_out) throw new Error('Ausgecheckt');
         if (await Utils.hashPassword(pin, g.vorname) !== g.passwort_hash) throw new Error('Falsche PIN');
@@ -2575,9 +2575,9 @@ const Auth = {
         Utils.showToast(`Willkommen, ${g.vorname}!`, 'success');
         return g;
     },
-    async getGÃ¤steByLetter(letter) {
+    async getGaesteByLetter(letter) {
         const reg = await RegisteredGuests.getByFirstLetter(letter);
-        const legacy = (await db.gÃ¤ste.toArray()).filter(g => g.vorname?.toUpperCase().startsWith(letter.toUpperCase()) && g.aktiv && !g.checked_out).map(g => ({...g, firstName: g.vorname, displayName: g.vorname, isLegacy: true}));
+        const legacy = (await db.gaeste.toArray()).filter(g => g.vorname?.toUpperCase().startsWith(letter.toUpperCase()) && g.aktiv && !g.checked_out).map(g => ({...g, firstName: g.vorname, displayName: g.vorname, isLegacy: true}));
         return [...reg, ...legacy].sort((a,b) => (a.firstName||a.vorname).localeCompare(b.firstName||b.vorname));
     },
     async adminLogin(pw) {
@@ -2636,13 +2636,13 @@ const Auth = {
         Utils.showToast('Abgemeldet', 'info'); 
     },
     async autoLogin() {
-        // Zuerst Supabase Session prÃ¼fen
+        // Zuerst Supabase Session pruefen
         if (supabaseClient && isOnline) {
             try {
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 if (session?.user) {
                     const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', session.user.id).single();
-                    if (profile && !profile.geloescht && !profile.gelÃ¶scht) {
+                    if (profile && !profile.geloescht && !profile.geloescht) {
                         State.setUser({ ...session.user, ...profile, firstName: profile.first_name });
                         return true;
                     }
@@ -2653,7 +2653,7 @@ const Auth = {
         const id = localStorage.getItem('current_user_id');
         const type = localStorage.getItem('current_user_type');
         if (id && localStorage.getItem('remember_me')) {
-            const g = type === 'registered' ? await db.registeredGuests.get(parseInt(id)) : await db.gÃ¤ste.get(id);
+            const g = type === 'registered' ? await db.registeredGuests.get(parseInt(id)) : await db.gaeste.get(id);
             if (g && !g.checked_out) { State.setUser(g); return true; }
         }
         return false;
@@ -2661,7 +2661,7 @@ const Auth = {
 };
 
 const Buchungen = {
-    // EINZELBUCHUNGEN: Bei Menge 5 werden 5 separate Buchungen erstellt (fÃ¼r Access/Registrierkasse)
+    // EINZELBUCHUNGEN: Bei Menge 5 werden 5 separate Buchungen erstellt (fuer Access/Registrierkasse)
     async create(artikel, menge=1) {
         if (!State.currentUser) throw new Error('Nicht angemeldet');
         
@@ -2670,12 +2670,12 @@ const Buchungen = {
         if (!userId) userId = localStorage.getItem('current_user_id');
         if (!userId) throw new Error('Benutzer-ID nicht gefunden - bitte neu anmelden');
         
-        console.log(' Buchung erstellen fÃ¼r User:', userId, 'Menge:', menge);
+        console.log(' Buchung erstellen fuer User:', userId, 'Menge:', menge);
         
         // Preis basierend auf aktivem Preismodus
         const preis = PreisModus.getPreis(artikel, State.currentPreisModus);
         
-        // Basis-Daten fÃ¼r alle Buchungen
+        // Basis-Daten fuer alle Buchungen
         const basisDaten = {
             user_id: String(userId),
             gast_id: String(userId),
@@ -2692,7 +2692,7 @@ const Buchungen = {
             uhrzeit: Utils.formatTime(new Date()),
             exportiert: false,
             aufgefuellt: false,
-            gerÃ¤t_id: Utils.getDeviceId(), 
+            geraet_id: Utils.getDeviceId(), 
             session_id: State.sessionId,
             storniert: false,
             fix: false,
@@ -2702,10 +2702,10 @@ const Buchungen = {
         
         // WICHTIG: Nur Supabase - kein lokaler Fallback!
         if (!supabaseClient || !isOnline) {
-            throw new Error('Keine Internetverbindung. Bitte spÃ¤ter nochmal versuchen.');
+            throw new Error('Keine Internetverbindung. Bitte spaeter nochmal versuchen.');
         }
         
-        // Session prÃ¼fen - ABER Admin darf immer buchen!
+        // Session pruefen - ABER Admin darf immer buchen!
         if (!State.isAdmin) {
             const { data: sessionData } = await supabaseClient.auth.getSession();
             if (!sessionData?.session) {
@@ -2713,7 +2713,7 @@ const Buchungen = {
             }
         }
         
-        // LOOP: FÃ¼r jede Einheit eine separate Buchung erstellen
+        // LOOP: Fuer jede Einheit eine separate Buchung erstellen
         const erstellteBuchungen = [];
         for (let i = 0; i < parseInt(menge); i++) {
             const b = {
@@ -2734,14 +2734,14 @@ const Buchungen = {
             erstellteBuchungen.push(b);
         }
         
-        console.log('âœ…', menge, 'Einzelbuchung(en) erstellt fÃ¼r:', artikel.name);
+        console.log('âœ…', menge, 'Einzelbuchung(en) erstellt fuer:', artikel.name);
         return erstellteBuchungen[0];
     },
 
     async storno(buchung_id) {
-        // NUR Ã¼ber Supabase
+        // NUR ueber Supabase
         if (!supabaseClient || !isOnline) {
-            throw new Error('Keine Internetverbindung. Bitte spÃ¤ter nochmal versuchen.');
+            throw new Error('Keine Internetverbindung. Bitte spaeter nochmal versuchen.');
         }
         
         // Buchung von Supabase laden
@@ -2928,11 +2928,11 @@ const Buchungen = {
         }
     },
     
-    // Nur AuffÃ¼llliste zurÃ¼cksetzen (NICHT Export!)
+    // Nur Auffuellliste zuruecksetzen (NICHT Export!)
     async markAsAufgefuellt() {
         // NUR Supabase!
         if (!supabaseClient || !isOnline) {
-            throw new Error('Keine Internetverbindung. Bitte spÃ¤ter nochmal versuchen.');
+            throw new Error('Keine Internetverbindung. Bitte spaeter nochmal versuchen.');
         }
         
         const { data, error } = await supabaseClient
@@ -2965,7 +2965,7 @@ const Buchungen = {
     async markAsExported(ids) { 
         // NUR Supabase!
         if (!supabaseClient || !isOnline) {
-            throw new Error('Keine Internetverbindung. Bitte spÃ¤ter nochmal versuchen.');
+            throw new Error('Keine Internetverbindung. Bitte spaeter nochmal versuchen.');
         }
         
         const update = { exportiert: true, exportiert_am: new Date().toISOString() };
@@ -2988,12 +2988,12 @@ const SyncManager = {
         return { status: 'green', pending: 0, message: 'Verbunden' };
     },
     
-    // Nicht mehr benÃ¶tigt - aber fÃ¼r KompatibilitÃ¤t behalten
+    // Nicht mehr benoetigt - aber fuer Kompatibilitaet behalten
     async getPendingCount() {
         return 0; // Keine pending Buchungen mehr - alles geht direkt zu Supabase
     },
     
-    // Nicht mehr benÃ¶tigt - aber fÃ¼r KompatibilitÃ¤t behalten
+    // Nicht mehr benoetigt - aber fuer Kompatibilitaet behalten
     async syncPending() {
         return { synced: 0, failed: 0 };
     },
@@ -3021,7 +3021,7 @@ const SyncManager = {
         };
         
         ampelEl.innerHTML = `${icons[status]} <span style="color:${colors[status]};font-weight:600;">${message}</span>`;
-        ampelEl.title = status === 'green' ? 'Mit Supabase verbunden' : 'Offline - Keine Buchungen mÃ¶glich';
+        ampelEl.title = status === 'green' ? 'Mit Supabase verbunden' : 'Offline - Keine Buchungen moeglich';
     },
     
     // Details Modal anzeigen
@@ -3045,7 +3045,7 @@ const SyncManager = {
         console.log('ðŸ”„ SyncManager: Status-Check gestartet');
         this.updateUI();
         
-        // Alle 30 Sekunden Status prÃ¼fen
+        // Alle 30 Sekunden Status pruefen
         this.syncInterval = setInterval(() => {
             this.updateUI();
         }, 30000);
@@ -3060,11 +3060,11 @@ const SyncManager = {
     }
 };
 
-// Global verfÃ¼gbar machen
+// Global verfuegbar machen
 window.SyncManager = SyncManager;
 
-// Fehlende GetrÃ¤nke Management
-const FehlendeGetrÃ¤nke = {
+// Fehlende Getraenke Management
+const FehlendeGetraenke = {
     async add(artikel_id, menge = 1) {
         const artikel = await Artikel.getById(artikel_id);
         if (!artikel) throw new Error('Artikel nicht gefunden');
@@ -3095,9 +3095,9 @@ const FehlendeGetrÃ¤nke = {
         if (supabaseClient && isOnline) {
             try {
                 const { error } = await supabaseClient.from('fehlende_getraenke').insert(items);
-                if (error) console.error('Fehlende GetrÃ¤nke Supabase error:', error);
+                if (error) console.error('Fehlende Getraenke Supabase error:', error);
             } catch(e) {
-                console.error('Fehlende GetrÃ¤nke sync error:', e);
+                console.error('Fehlende Getraenke sync error:', e);
             }
         }
         
@@ -3145,7 +3145,7 @@ const FehlendeGetrÃ¤nke = {
             fehlend = await db.fehlendeGetraenke.get(id);
         }
         
-        if (!fehlend || fehlend.uebernommen) throw new Error('Nicht verfÃ¼gbar');
+        if (!fehlend || fehlend.uebernommen) throw new Error('Nicht verfuegbar');
         
         const updateData = {
             uebernommen: true,
@@ -3178,7 +3178,7 @@ const FehlendeGetrÃ¤nke = {
             uhrzeit: Utils.formatTime(new Date()),
             erstellt_am: new Date().toISOString(),
             exportiert: false,
-            gerÃ¤t_id: Utils.getDeviceId(),
+            geraet_id: Utils.getDeviceId(),
             sync_status: isOnline ? 'synced' : 'pending',
             session_id: State.sessionId,
             storniert: false,
@@ -3196,13 +3196,13 @@ const FehlendeGetrÃ¤nke = {
         return b;
     },
     
-    async lÃ¶schen(id) {
+    async loeschen(id) {
         try { await db.fehlendeGetraenke.delete(id); } catch(e) {}
         if (supabaseClient && isOnline) {
             await supabaseClient.from('fehlende_getraenke').delete().eq('id', id);
         }
         await DataProtection.createBackup();
-        Utils.showToast('GelÃ¶scht', 'success');
+        Utils.showToast('Geloescht', 'success');
     }
 };
 
@@ -3248,7 +3248,7 @@ const Gruppen = {
         return await db.gruppen.where('aktiv').equals(1).toArray();
     },
     
-    // Gruppe hinzufÃ¼gen (max 3)
+    // Gruppe hinzufuegen (max 3)
     async add(name) {
         const alle = await this.getAll();
         if (alle.length >= 3) {
@@ -3314,7 +3314,7 @@ const Gruppen = {
         }
     },
     
-    // Gruppe lÃ¶schen (soft delete)
+    // Gruppe loeschen (soft delete)
     async delete(id) {
         await db.gruppen.update(id, { aktiv: false });
         
@@ -3323,7 +3323,7 @@ const Gruppen = {
         }
     },
     
-    // PrÃ¼fen ob mindestens eine Gruppe existiert (wenn Abfrage aktiv)
+    // Pruefen ob mindestens eine Gruppe existiert (wenn Abfrage aktiv)
     async validateSettings() {
         const aktiv = await this.isAbfrageAktiv();
         if (aktiv) {
@@ -3371,7 +3371,7 @@ const GastNachrichten = {
         return msg;
     },
     
-    // Aktive Nachrichten fÃ¼r einen Gast holen
+    // Aktive Nachrichten fuer einen Gast holen
     async getAktiveForGast(gast_id) {
         const jetzt = new Date().toISOString();
         const alle = await db.gastNachrichten.toArray();
@@ -3383,7 +3383,7 @@ const GastNachrichten = {
         ).sort((a, b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
     },
     
-    // Alle aktiven Nachrichten (fÃ¼r Login-Seite)
+    // Alle aktiven Nachrichten (fuer Login-Seite)
     async getAlleAktiven() {
         const jetzt = new Date().toISOString();
         const alle = await db.gastNachrichten.toArray();
@@ -3394,7 +3394,7 @@ const GastNachrichten = {
         ).sort((a, b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
     },
     
-    // Alle Nachrichten (fÃ¼r Admin)
+    // Alle Nachrichten (fuer Admin)
     async getAll() {
         return await db.gastNachrichten.orderBy('id').reverse().toArray();
     },
@@ -3435,8 +3435,8 @@ const GastNachrichten = {
         Utils.showToast('Nachricht als erledigt markiert', 'success');
     },
     
-    // Nachricht lÃ¶schen
-    async lÃ¶schen(id) {
+    // Nachricht loeschen
+    async loeschen(id) {
         await db.gastNachrichten.delete(id);
         
         if (supabaseClient && isOnline) {
@@ -3445,7 +3445,7 @@ const GastNachrichten = {
             } catch(e) {}
         }
         
-        Utils.showToast('Nachricht gelÃ¶scht', 'success');
+        Utils.showToast('Nachricht geloescht', 'success');
     },
     
     // Abgelaufene Nachrichten aufraeumen
@@ -3459,7 +3459,7 @@ const GastNachrichten = {
         }
         
         if (abgelaufen.length > 0) {
-            console.log(' ' + abgelaufen.length + ' abgelaufene Nachrichten gelÃ¶scht');
+            console.log(' ' + abgelaufen.length + ' abgelaufene Nachrichten geloescht');
         }
     }
 };
@@ -3471,7 +3471,7 @@ const PreisModus = {
     
     // Aktuellen Modus laden - ZUERST von Supabase!
     async getModus() {
-        // Supabase hat PrioritÃ¤t (zentrale Einstellung)
+        // Supabase hat Prioritaet (zentrale Einstellung)
         if (supabaseClient && isOnline) {
             try {
                 const { data, error } = await supabaseClient
@@ -3504,7 +3504,7 @@ const PreisModus = {
         // Dann Supabase (zentral)
         if (supabaseClient && isOnline) {
             try {
-                // Erst prÃ¼fen ob existiert, dann update oder insert
+                // Erst pruefen ob existiert, dann update oder insert
                 const { data: existing } = await supabaseClient
                     .from('settings')
                     .select('key')
@@ -3528,15 +3528,15 @@ const PreisModus = {
                 console.error('Preismodus Supabase Speichern Fehler:', e);
             }
         }
-        console.log(' Preismodus geÃ¤ndert auf:', modus === this.HP ? 'Halbpension' : 'Selbstversorger');
+        console.log(' Preismodus geaendert auf:', modus === this.HP ? 'Halbpension' : 'Selbstversorger');
     },
     
-    // Modus-Namen fÃ¼r Anzeige
+    // Modus-Namen fuer Anzeige
     getModusName(modus) {
         return modus === this.HP ? 'Halbpension (HP)' : 'Selbstversorger';
     },
     
-    // Preis fÃ¼r Artikel basierend auf Modus
+    // Preis fuer Artikel basierend auf Modus
     getPreis(artikel, modus = null) {
         const m = modus || State.currentPreisModus || this.SELBSTVERSORGER;
         if (m === this.HP) {
@@ -3545,7 +3545,7 @@ const PreisModus = {
         return artikel.preis ?? 0;
     },
     
-    // Beide Preise fÃ¼r Anzeige
+    // Beide Preise fuer Anzeige
     getBeidePreise(artikel) {
         return {
             sv: artikel.preis ?? 0,
@@ -3554,34 +3554,34 @@ const PreisModus = {
     }
 };
 
-// Umlage auf alle GÃ¤ste
+// Umlage auf alle Gaeste
 const Umlage = {
     async bucheAufAlle(artikel_id, beschreibung = 'Umlage') {
         // NUR Supabase!
         if (!supabaseClient || !isOnline) {
-            throw new Error('Keine Internetverbindung. Bitte spÃ¤ter nochmal versuchen.');
+            throw new Error('Keine Internetverbindung. Bitte spaeter nochmal versuchen.');
         }
         
         const artikel = await Artikel.getById(artikel_id);
         if (!artikel) throw new Error('Artikel nicht gefunden');
         
-        // Alle aktiven GÃ¤ste von Supabase holen
+        // Alle aktiven Gaeste von Supabase holen
         const { data: profiles, error } = await supabaseClient
             .from('profiles')
             .select('*')
             .eq('aktiv', true)
             .eq('geloescht', false);
         
-        if (error) throw new Error('Fehler beim Laden der GÃ¤ste');
+        if (error) throw new Error('Fehler beim Laden der Gaeste');
         
-        // WICHTIG: GÃ¤ste mit Ausnahme Umlage filtern!
-        const alleGÃ¤ste = (profiles || []).filter(g => g.ausnahmeumlage !== true);
-        const ausgenommen = (profiles || []).length - alleGÃ¤ste.length;
+        // WICHTIG: Gaeste mit Ausnahme Umlage filtern!
+        const alleGaeste = (profiles || []).filter(g => g.ausnahmeumlage !== true);
+        const ausgenommen = (profiles || []).length - alleGaeste.length;
         
-        if (alleGÃ¤ste.length === 0) throw new Error('Keine aktiven GÃ¤ste fÃ¼r Umlage');
+        if (alleGaeste.length === 0) throw new Error('Keine aktiven Gaeste fuer Umlage');
         
         // Preis pro Gast berechnen (aufgerundet auf 2 Dezimalen)
-        const preisProGast = Math.ceil((artikel.preis / alleGÃ¤ste.length) * 100) / 100;
+        const preisProGast = Math.ceil((artikel.preis / alleGaeste.length) * 100) / 100;
         
         const heute = Utils.getBuchungsDatum();
         const uhrzeit = Utils.formatTime(new Date());
@@ -3589,8 +3589,8 @@ const Umlage = {
         let erfolg = 0;
         let fehler = 0;
         
-        // FÃ¼r jeden Gast eine Buchung erstellen - DIREKT nach Supabase
-        for (const gast of alleGÃ¤ste) {
+        // Fuer jeden Gast eine Buchung erstellen - DIREKT nach Supabase
+        for (const gast of alleGaeste) {
             const gastId = gast.id;
             const gastName = gast.vorname || gast.display_name || gast.first_name;
             
@@ -3616,18 +3616,18 @@ const Umlage = {
                 console.error('âŒ Umlage Buchung Fehler:', gastName, insertError.message, insertError.details);
                 fehler++;
             } else {
-                console.log('âœ… Umlage gebucht fÃ¼r:', gastName, data);
+                console.log('âœ… Umlage gebucht fuer:', gastName, data);
                 erfolg++;
             }
         }
         
         if (ausgenommen > 0) {
-            Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} GÃ¤ste verteilt (${ausgenommen} ausgenommen)`, 'success');
+            Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gaeste verteilt (${ausgenommen} ausgenommen)`, 'success');
         } else {
-            Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} GÃ¤ste verteilt`, 'success');
+            Utils.showToast(`Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gaeste verteilt`, 'success');
         }
         
-        return { preisProGast, anzahlGÃ¤ste: erfolg, ausgenommen, fehler };
+        return { preisProGast, anzahlGaeste: erfolg, ausgenommen, fehler };
     }
 };
 
@@ -3660,7 +3660,7 @@ const Artikel = {
         return false;
     },
     
-    // PrÃ¼ft ob ein Artikel zeitlich abgelaufen ist
+    // Prueft ob ein Artikel zeitlich abgelaufen ist
     istAbgelaufen(artikel) {
         if (!artikel.aktiv_bis) return false;
         return new Date(artikel.aktiv_bis) < new Date();
@@ -3751,7 +3751,7 @@ const Artikel = {
     },
     
     async update(id, changes) { 
-        // Platztausch wenn Position geÃ¤ndert wird
+        // Platztausch wenn Position geaendert wird
         if (changes.sortierung !== undefined) {
             const artikel = await this.getById(id);
             if (artikel && changes.sortierung !== artikel.sortierung) {
@@ -3791,22 +3791,22 @@ const Artikel = {
     },
     
     async delete(id) { 
-        // ZUERST Supabase lÃ¶schen (wichtig!)
+        // ZUERST Supabase loeschen (wichtig!)
         if (supabaseClient && isOnline) {
             const { error } = await supabaseClient.from('artikel').delete().eq('artikel_id', id);
             if (error) {
                 console.error('Supabase Delete Fehler:', error);
                 throw new Error('Supabase Fehler: ' + error.message);
             }
-            console.log('âœ… Artikel ' + id + ' in Supabase gelÃ¶scht');
+            console.log('âœ… Artikel ' + id + ' in Supabase geloescht');
         }
         
-        // Dann lokal lÃ¶schen
+        // Dann lokal loeschen
         await db.artikel.delete(id);
         artikelCache = null;
         
         await DataProtection.createBackup(); 
-        Utils.showToast('Artikel gelÃ¶scht', 'success'); 
+        Utils.showToast('Artikel geloescht', 'success'); 
     },
     
     async importFromCSV(text) {
@@ -3843,14 +3843,14 @@ const Artikel = {
         }
         
         // Category mapping based on Warengruppe values (1-7)
-        // 1=Alkoholfrei, 2=Biere, 3=Weine, 4=SchnÃ¤pse, 5=HeiÃƒÅ¸e, 6=Suesses, 7=Sonstiges
+        // 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnaepse, 5=Heisse, 6=Suesses, 7=Sonstiges
         const katMap = {
             0: 'Sonstiges',
-            1: 'Alkoholfreie GetrÃ¤nke',
+            1: 'Alkoholfreie Getraenke',
             2: 'Biere',
             3: 'Weine',
-            4: 'SchnÃ¤pse & Spirituosen',
-            5: 'HeiÃƒÅ¸e GetrÃ¤nke',
+            4: 'Schnaepse & Spirituosen',
+            5: 'Heisse Getraenke',
             6: 'Suesses & Salziges',
             7: 'Sonstiges',
             8: 'Sonstiges'
@@ -3901,7 +3901,7 @@ const Artikel = {
             
             // Get category from Warengruppe and map to new category structure
             // CSV Warengruppe: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=HeiÃƒÅ¸, 6+=Sonstiges
-            // App Kategorien: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=SchnÃ¤pse, 5=HeiÃƒÅ¸, 6=Suesses, 7=Sonstiges
+            // App Kategorien: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnaepse, 5=HeiÃƒÅ¸, 6=Suesses, 7=Sonstiges
             const warengruppeMigration = {1:1, 2:2, 3:3, 4:4, 5:5, 6:6, 7:6, 8:7};
             let csvWG = 7; // Default: Sonstiges
             if (idx.kat >= 0 && v[idx.kat] !== undefined) {
@@ -3989,12 +3989,12 @@ const Artikel = {
     async seed() {
         if (await db.artikel.count() === 0) {
             await db.artikel.bulkAdd([
-                {artikel_id:101,sku:'ALM-05',name:'Almdudler 0.5l',name_kurz:'Almdudler',preis:3.5,steuer_prozent:10,kategorie_id:1,kategorie_name:'Alkoholfreie GetrÃ¤nke',aktiv:true,sortierung:10,icon:''},
-                {artikel_id:102,sku:'COL-033',name:'Coca Cola 0.33l',name_kurz:'Cola',preis:3,steuer_prozent:10,kategorie_id:1,kategorie_name:'Alkoholfreie GetrÃ¤nke',aktiv:true,sortierung:20,icon:''},
+                {artikel_id:101,sku:'ALM-05',name:'Almdudler 0.5l',name_kurz:'Almdudler',preis:3.5,steuer_prozent:10,kategorie_id:1,kategorie_name:'Alkoholfreie Getraenke',aktiv:true,sortierung:10,icon:''},
+                {artikel_id:102,sku:'COL-033',name:'Coca Cola 0.33l',name_kurz:'Cola',preis:3,steuer_prozent:10,kategorie_id:1,kategorie_name:'Alkoholfreie Getraenke',aktiv:true,sortierung:20,icon:''},
                 {artikel_id:201,sku:'ZIP-05',name:'Zipfer Maerzen 0.5l',name_kurz:'Zipfer',preis:4.2,steuer_prozent:10,kategorie_id:2,kategorie_name:'Biere',aktiv:true,sortierung:10,icon:''},
                 {artikel_id:301,sku:'GV-025',name:'Gruener Veltliner 0.25l',name_kurz:'Gruener V.',preis:4.8,steuer_prozent:10,kategorie_id:3,kategorie_name:'Wein',aktiv:true,sortierung:10,icon:''},
                 {artikel_id:501,sku:'OBS-02',name:'Obstler 2cl',name_kurz:'Obstler',preis:3.5,steuer_prozent:10,kategorie_id:4,kategorie_name:'Spirituosen',aktiv:true,sortierung:10,icon:''},
-                {artikel_id:601,sku:'KAF-GR',name:'Kaffee gross',name_kurz:'Kaffee',preis:3.5,steuer_prozent:10,kategorie_id:5,kategorie_name:'HeiÃƒÅ¸e GetrÃ¤nke',aktiv:true,sortierung:10,icon:'[Kaffee]'}
+                {artikel_id:601,sku:'KAF-GR',name:'Kaffee gross',name_kurz:'Kaffee',preis:3.5,steuer_prozent:10,kategorie_id:5,kategorie_name:'Heisse Getraenke',aktiv:true,sortierung:10,icon:'[Kaffee]'}
             ]);
         }
     }
@@ -4042,7 +4042,7 @@ const ExportService = {
         await this._exportToAccessFormat(bs, 'Buchenungsdetail_ALLE');
     },
     
-    // Excel-Export im Buchenungsdetail-Format fÃ¼r Registrierkasse
+    // Excel-Export im Buchenungsdetail-Format fuer Registrierkasse
     async exportBuchungenExcel() {
         const bs = await Buchungen.getAll({ exportiert: false });
         if (!bs.length) { Utils.showToast('Keine neuen Buchungen', 'warning'); return; }
@@ -4053,9 +4053,9 @@ const ExportService = {
         await Buchungen.markAsExported(bs.map(b => b.buchung_id));
     },
     
-    // Gemeinsame Export-Funktion fÃ¼r Access-Format
+    // Gemeinsame Export-Funktion fuer Access-Format
     async _exportToAccessFormat(bs, filenamePrefix) {
-        // Artikel-Cache fÃ¼r Kategorie-IDs aufbauen
+        // Artikel-Cache fuer Kategorie-IDs aufbauen
         const artikelCache = {};
         const allArt = await db.artikel.toArray();
         allArt.forEach(a => { artikelCache[a.artikel_id] = a; });
@@ -4063,7 +4063,7 @@ const ExportService = {
         // Letzte ID aus Access (Standard: 20037 basierend auf deiner Tabelle)
         let lastId = parseInt(localStorage.getItem('lastExportId') || '20037');
         
-        // Datum formatieren: DD.MM.YYYY -> YYYY-MM-DD fÃ¼r Access
+        // Datum formatieren: DD.MM.YYYY -> YYYY-MM-DD fuer Access
         const formatDatumForAccess = (datum) => {
             if (!datum) return '';
             // Wenn schon im ISO-Format (YYYY-MM-DD)
@@ -4101,7 +4101,7 @@ const ExportService = {
                 'Gastid': gastIdNum,
                 'Gastname': b.gast_vorname || '',
                 'Gastvorname': '',
-                'Gastgruppe': b.group_name || b.gastgruppe || 'keiner Gruppe zugehÃ¶rig',
+                'Gastgruppe': b.group_name || b.gastgruppe || 'keiner Gruppe zugehoerig',
                 'Gastgruppennr': 0,
                 'bezahlt': false,
                 'Steuer': parseInt(b.steuer_prozent) || 10,
@@ -4119,7 +4119,7 @@ const ExportService = {
                 'Anfang2': 0,
                 'Bestand2': 0,
                 'Basisbestand2': 0,
-                'AuffÃ¼llmenge2': 0,
+                'Auffuellmenge2': 0,
                 'Fehlbestand2': 0,
                 'Warengruppe1': 0
             };
@@ -4145,7 +4145,7 @@ const ExportService = {
         const datumStr = `${heute.getDate().toString().padStart(2,'0')}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getFullYear()}`;
         XLSX.writeFile(wb, `${filenamePrefix}_${datumStr}.xlsx`);
         
-        // ID speichern fÃ¼r nÃ¤chsten Export
+        // ID speichern fuer naechsten Export
         localStorage.setItem('lastExportId', lastId.toString());
         Utils.showToast(`${bs.length} Buchungen exportiert (letzte ID: ${lastId})`, 'success');
     },
@@ -4175,16 +4175,16 @@ const UI = {
     render(html) { document.getElementById('app').innerHTML = html; },
     append(html) { document.getElementById('app').innerHTML += html; },
     renderAlphabet(onClick) {
-        return `<div class="alphabet-container"><div class="alphabet-title">WÃ¤hlen Sie den ersten Buchstaben:</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="${onClick}('${l}')">${l}</button>`).join('')}</div></div>`;
+        return `<div class="alphabet-container"><div class="alphabet-title">Waehlen Sie den ersten Buchstaben:</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="${onClick}('${l}')">${l}</button>`).join('')}</div></div>`;
     },
-    renderNameList(gÃ¤ste, onSelect) {
-        if (!gÃ¤ste?.length) return `<div class="name-list-empty"><p>Keine EintrÃ¤ge</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">â† ZurÃ¼ck</button></div>`;
-        return `<div class="name-list-container"><div class="name-list-title">WÃ¤hlen Sie Ihren Namen:</div><div class="name-list">${gÃ¤ste.map(g => `<button class="name-list-item" onclick="${onSelect}('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">â†’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">â† ZurÃ¼ck</button></div>`;
+    renderNameList(gaeste, onSelect) {
+        if (!gaeste?.length) return `<div class="name-list-empty"><p>Keine Eintraege</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">â† Zurueck</button></div>`;
+        return `<div class="name-list-container"><div class="name-list-title">Waehlen Sie Ihren Namen:</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="${onSelect}('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">â†’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">â† Zurueck</button></div>`;
     }
 };
 
 // Routes
-// Auto-Refresh Timer fÃ¼r Startseite (neue Nachrichten laden)
+// Auto-Refresh Timer fuer Startseite (neue Nachrichten laden)
 let loginRefreshTimer = null;
 
 Router.register('login', async () => {
@@ -4220,12 +4220,12 @@ Router.register('login', async () => {
         nachrichtHtml = GastNachricht.renderHtml(nachricht);
     }
     
-    // TagesmenÃ¼ laden
+    // Tagesmenue laden
     const tagesMenu = await TagesMenu.getAktiv();
     const tagesMenuHtml = tagesMenu ? `<div style="max-width:600px;margin:0 auto 24px;">${TagesMenu.renderButtons(tagesMenu)}</div>` : '';
     
-    // Gast-spezifische Nachrichten laden (GastNachrichten - mehrere pro Gast mÃ¶glich)
-    // Gast kann Nachricht NICHT lÃ¶schen - nur Admin kann das
+    // Gast-spezifische Nachrichten laden (GastNachrichten - mehrere pro Gast moeglich)
+    // Gast kann Nachricht NICHT loeschen - nur Admin kann das
     const gastNachrichten = await GastNachrichten.getAlleAktiven();
     const gastNachrichtenHtml = gastNachrichten.length ? `
     <div style="max-width:600px;margin:0 auto 24px;">
@@ -4256,8 +4256,8 @@ Router.register('login', async () => {
     </div>
     ` : '';
     
-    // Fehlende GetrÃ¤nke laden und zusammenfassen
-    const fehlendeOffen = await FehlendeGetrÃ¤nke.getOffene();
+    // Fehlende Getraenke laden und zusammenfassen
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
     const zusammenfassung = {};
     fehlendeOffen.forEach(f => {
         if (!zusammenfassung[f.artikel_name]) {
@@ -4284,7 +4284,7 @@ Router.register('login', async () => {
     // Sprachauswahl Button mit WhatsApp (nur auf Startseite)
     const langBtn = i18n.renderLangButtonWithWhatsApp();
     
-    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="SÃ¶llerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">âš™ï¸</a><span style="color:#bbb;font-size:0.65rem;">v3.4 Â© 2026 â€¢ Entwickelt von: Claudio</span></div></div></div></div>`);
+    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Soellerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">âš™ï¸</a><span style="color:#bbb;font-size:0.65rem;">v3.4 Â© 2026 â€¢ Entwickelt von: Claudio</span></div></div></div></div>`);
 });
 
 Router.register('register', () => {
@@ -4342,11 +4342,11 @@ Router.register('name-select', async () => {
     if (!window.currentLetter) { Router.navigate('login'); return; }
     const t = (key, params) => i18n.t(key, params);
     const langBtn = i18n.renderLangButton();
-    const gÃ¤ste = await Auth.getGÃ¤steByLetter(window.currentLetter);
+    const gaeste = await Auth.getGaesteByLetter(window.currentLetter);
     
-    const nameListHtml = !gÃ¤ste?.length 
+    const nameListHtml = !gaeste?.length 
         ? `<div class="name-list-empty"><p>${t('no_entries')}</p><button class="btn btn-secondary btn-block" onclick="handleBackToLogin()">â† ${t('back')}</button></div>`
-        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gÃ¤ste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">â†’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">â† ${t('back')}</button></div>`;
+        : `<div class="name-list-container"><div class="name-list-title">${t('select_your_name')}</div><div class="name-list">${gaeste.map(g => `<button class="name-list-item" onclick="handleNameSelect('${g.id || g.gast_id}')"><span class="name-text">${g.displayName}</span><span class="name-arrow">â†’</span></button>`).join('')}</div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">â† ${t('back')}</button></div>`;
     
     UI.render(`<div class="main-content"><div style="max-width:600px;margin:40px auto;"><h1 class="page-title" style="text-align:center;">${t('letter')}: ${window.currentLetter}</h1>${nameListHtml}</div></div>`);
 });
@@ -4401,7 +4401,7 @@ window.handlePinLogin = async () => {
     }
     try {
         await Auth.login(window.selectedGastId, window.loginPin);
-        await navigateAfterLogin(); // PrÃ¼ft ob Gruppe gewÃ¤hlt werden muss
+        await navigateAfterLogin(); // Prueft ob Gruppe gewaehlt werden muss
     } catch (e) {
         Utils.showToast(e.message, 'error');
         window.loginPin = '';
@@ -4409,21 +4409,21 @@ window.handlePinLogin = async () => {
     }
 };
 
-// Navigation nach Login - prÃ¼ft ob Gruppenauswahl nÃ¶tig
+// Navigation nach Login - prueft ob Gruppenauswahl noetig
 window.navigateAfterLogin = async () => {
     const gruppenAktiv = await Gruppen.isAbfrageAktiv();
     
     if (gruppenAktiv && !State.selectedGroup) {
         // Gruppenauswahl erforderlich
-        Router.navigate('gruppe-wÃ¤hlen');
+        Router.navigate('gruppe-waehlen');
     } else {
         // Direkt zum Buchen
         Router.navigate('buchen');
     }
 };
 
-// Route: Gruppe wÃ¤hlen
-Router.register('gruppe-wÃ¤hlen', async () => {
+// Route: Gruppe waehlen
+Router.register('gruppe-waehlen', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
     const t = (key, params) => i18n.t(key, params);
     const langBtn = i18n.renderLangButton();
@@ -4454,7 +4454,7 @@ Router.register('gruppe-wÃ¤hlen', async () => {
     </div>`);
 });
 
-// Gruppe auswÃ¤hlen
+// Gruppe auswaehlen
 window.selectGruppe = async (gruppeId, gruppeName) => {
     State.selectedGroup = gruppeName;
     
@@ -4480,7 +4480,7 @@ window.selectGruppe = async (gruppeId, gruppeName) => {
 };
 
 Router.register('admin-login', () => {
-    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;"> Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">â† ZurÃ¼ck</button></div></div>`);
+    UI.render(`<div class="main-content"><div style="max-width:500px;margin:60px auto;"><h1 class="page-title" style="text-align:center;"> Admin-Login</h1><div class="card"><div class="form-group"><label class="form-label">Admin-Passwort</label><input type="password" id="admin-password" class="form-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')handleAdminLogin()" style="font-size:1.2rem;padding:16px;"></div><button class="btn btn-primary btn-block" onclick="handleAdminLogin()">Anmelden</button></div><button class="btn btn-secondary btn-block mt-3" onclick="handleBackToLogin()">â† Zurueck</button></div></div>`);
     setTimeout(() => document.getElementById('admin-password')?.focus(), 100);
 });
 
@@ -4491,7 +4491,7 @@ Router.register('admin-dashboard', async () => {
     let guests = [];
     let artCount = 0;
     let bs = [];
-    let auffÃ¼llListe = [];
+    let auffuellListe = [];
     let fehlendeOffen = [];
     
     try {
@@ -4510,23 +4510,23 @@ Router.register('admin-dashboard', async () => {
     } catch(e) { console.error('bs error:', e); }
     
     try {
-        auffÃ¼llListe = await Buchungen.getAuffuellliste();
-    } catch(e) { console.error('auffÃ¼llliste error:', e); }
+        auffuellListe = await Buchungen.getAuffuellliste();
+    } catch(e) { console.error('auffuellliste error:', e); }
     
     try {
-        fehlendeOffen = await FehlendeGetrÃ¤nke.getOffene();
+        fehlendeOffen = await FehlendeGetraenke.getOffene();
     } catch(e) { console.error('fehlende error:', e); }
     
     const heute = Utils.getBuchungsDatum();
     const heuteB = bs.filter(b => b.datum === heute);
     const nichtExp = bs.filter(b => !b.exportiert);
-    const auffÃ¼llAnzahl = auffÃ¼llListe.reduce((s, i) => s + i.menge, 0);
+    const auffuellAnzahl = auffuellListe.reduce((s, i) => s + i.menge, 0);
     
     // Aktive Nachricht laden
     const aktiveNachricht = await GastNachricht.getAktive();
     const verbleibendeZeit = aktiveNachricht ? GastNachricht.getVerbleibendeZeit(aktiveNachricht) : null;
     
-    // TagesmenÃ¼ laden
+    // Tagesmenue laden
     const menuData = await TagesMenu.getAktiv();
     const aktivesMenu = menuData && (menuData.mittag || menuData.abend); // true wenn mindestens eines aktiv
     const menuPreview = menuData?.mittag?.text || menuData?.abend?.text || '';
@@ -4556,7 +4556,7 @@ Router.register('admin-dashboard', async () => {
                             Preismodus: ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
                         </div>
                         <div style="font-size: 0.9rem; opacity: 0.9;">
-                            ${isHP ? 'HP-Preise werden fÃ¼r neue Buchungen verwendet' : 'Standard-Preise werden fÃ¼r neue Buchungen verwendet'}
+                            ${isHP ? 'HP-Preise werden fuer neue Buchungen verwendet' : 'Standard-Preise werden fuer neue Buchungen verwendet'}
                         </div>
                     </div>
                 </div>
@@ -4565,7 +4565,7 @@ Router.register('admin-dashboard', async () => {
         </div>
         
         <div class="stats-grid">
-            <div class="stat-card"><div class="stat-value">${guests.length}</div><div class="stat-label">GÃ¤ste</div></div>
+            <div class="stat-card"><div class="stat-value">${guests.length}</div><div class="stat-label">Gaeste</div></div>
             <div class="stat-card"><div class="stat-value">${artCount}</div><div class="stat-label">Artikel</div></div>
             <div class="stat-card"><div class="stat-value">${heuteB.length}</div><div class="stat-label">Buchungen heute</div></div>
             <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(heuteB.reduce((s,b) => s+b.preis*b.menge, 0))}</div><div class="stat-label">Umsatz heute</div></div>
@@ -4587,12 +4587,12 @@ Router.register('admin-dashboard', async () => {
                     <span style="font-size: 2rem;">${aktiveNachricht ? 'ðŸ“¢' : 'ðŸ“¢'}</span>
                     <div>
                         <div style="font-weight: 700; font-size: 1.2rem;">
-                            ${aktiveNachricht ? ' Nachricht aktiv!' : 'GÃ¤ste-Nachricht'}
+                            ${aktiveNachricht ? ' Nachricht aktiv!' : 'Gaeste-Nachricht'}
                         </div>
                         <div style="font-size: 0.9rem; opacity: 0.9;">
                             ${aktiveNachricht 
                                 ? `"${aktiveNachricht.text.substring(0, 40)}${aktiveNachricht.text.length > 40 ? '...' : ''} * Noch ${verbleibendeZeit}`
-                                : 'Wichtige Info an alle GÃ¤ste senden'}
+                                : 'Wichtige Info an alle Gaeste senden'}
                         </div>
                     </div>
                 </div>
@@ -4616,12 +4616,12 @@ Router.register('admin-dashboard', async () => {
                     <span style="font-size: 2rem;"></span>
                     <div>
                         <div style="font-weight: 700; font-size: 1.2rem;">
-                            ${aktivesMenu ? 'TagesmenÃ¼ aktiv!' : 'TagesmenÃ¼'}
+                            ${aktivesMenu ? 'Tagesmenue aktiv!' : 'Tagesmenue'}
                         </div>
                         <div style="font-size: 0.9rem; opacity: 0.9;">
                             ${aktivesMenu 
                                 ? `"${menuPreview.substring(0, 40)}${menuPreview.length > 40 ? '...' : ''}"`
-                                : 'MenÃ¼ fÃ¼r GÃ¤ste auf Startseite anzeigen'}
+                                : 'Menue fuer Gaeste auf Startseite anzeigen'}
                         </div>
                     </div>
                 </div>
@@ -4631,33 +4631,33 @@ Router.register('admin-dashboard', async () => {
         
         <!-- AUFFUeLLLISTE -->
         <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;">
-             AuffÃ¼llliste drucken<br>
-            <small style="opacity:0.9;">(${auffÃ¼llAnzahl} GetrÃ¤nke zum AuffÃ¼llen)</small>
+             Auffuellliste drucken<br>
+            <small style="opacity:0.9;">(${auffuellAnzahl} Getraenke zum Auffuellen)</small>
         </button>
         
         <!-- KAeSE-BESTELLUNGEN -->
         <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;background:linear-gradient(135deg, #f4d03f, #f39c12);color:#5d4e37;border:none;">
-             KÃ¤se-Bestellungen<br>
+             Kaese-Bestellungen<br>
             <small style="opacity:0.9;">(Vorbestellungen verwalten)</small>
         </button>
         
         <!-- ALLE BUCHUNGEN ANSEHEN -->
         <button class="btn btn-block" onclick="Router.navigate('admin-alle-buchungen')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;background:#6c5ce7;color:white;border:none;">
              Alle Buchungen ansehen<br>
-            <small style="opacity:0.9;">(${bs.length} gesamt * bearbeiten/lÃ¶schen)</small>
+            <small style="opacity:0.9;">(${bs.length} gesamt * bearbeiten/loeschen)</small>
         </button>
         
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
-                âš Fehlende GetrÃ¤nke<br><small>(${fehlendeOffen.length} offen)</small>
+                âš Fehlende Getraenke<br><small>(${fehlendeOffen.length} offen)</small>
             </button>
             <button class="btn btn-danger" onclick="Router.navigate('admin-umlage')" style="padding:16px;">
-                 Umlage buchen<br><small>(auf alle GÃ¤ste)</small>
+                 Umlage buchen<br><small>(auf alle Gaeste)</small>
             </button>
         </div>
         
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
-            <button class="btn btn-primary" onclick="Router.navigate('admin-guests')" style="padding:24px;"> GÃ¤steverwaltung</button>
+            <button class="btn btn-primary" onclick="Router.navigate('admin-guests')" style="padding:24px;"> Gaesteverwaltung</button>
             <button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:24px;"> Artikelverwaltung</button>
             <button class="btn btn-primary" onclick="Router.navigate('admin-artikel-sortierung')" style="padding:24px;"> Artikel sortieren</button>
             <button class="btn btn-primary" onclick="Router.navigate('admin-gruppen')" style="padding:24px;"> Gruppenverwaltung</button>
@@ -4675,7 +4675,7 @@ Router.register('admin-dashboard', async () => {
                     <div style="padding:16px;background:linear-gradient(135deg, #e74c3c, #c0392b);border-radius:var(--radius-md);color:white;">
                         <h3 style="font-weight:600;margin-bottom:8px;"> Backup laden</h3>
                         <div style="font-size:0.8rem;opacity:0.9;margin-bottom:8px;">Daten aus JSON wiederherstellen</div>
-                        <button class="btn" onclick="DataProtection.selectRestoreFile()" style="background:white;color:#e74c3c;border:none;padding:8px 16px;"> Datei wÃ¤hlen</button>
+                        <button class="btn" onclick="DataProtection.selectRestoreFile()" style="background:white;color:#e74c3c;border:none;padding:8px 16px;"> Datei waehlen</button>
                     </div>
                     <div style="padding:16px;background:linear-gradient(135deg, #9b59b6, #8e44ad);border-radius:var(--radius-md);color:white;">
                         <h3 style="font-weight:600;margin-bottom:8px;">ðŸ”„ Lokale â†’ Supabase</h3>
@@ -4687,7 +4687,7 @@ Router.register('admin-dashboard', async () => {
             </div>
         </div>
         
-        <!-- NOTFALL - klein und unauffÃ¤llig -->
+        <!-- NOTFALL - klein und unauffaellig -->
         <div style="text-align:center;margin-top:24px;padding-top:16px;border-top:1px dashed #ccc;">
             <a href="#" onclick="Router.navigate('admin-notfall-export');return false;" style="color:#888;font-size:0.85rem;text-decoration:none;">
                  Notfall: Buchungen nach Datum exportieren
@@ -4695,7 +4695,7 @@ Router.register('admin-dashboard', async () => {
         </div>
     </div>`);
     
-    // Backup-Erinnerung prÃ¼fen (nach 24h)
+    // Backup-Erinnerung pruefen (nach 24h)
     setTimeout(() => {
         if (DataProtection.isBackupNeeded()) {
             DataProtection.showBackupReminder();
@@ -4708,24 +4708,24 @@ window.repairCategories = async () => {
     // Kategorien-Tabelle komplett neu aufbauen - 7 Kategorien
     await db.kategorien.clear();
     await db.kategorien.bulkAdd([
-        {kategorie_id:1, name:'Alkoholfreie GetrÃ¤nke', sortierung:10},
+        {kategorie_id:1, name:'Alkoholfreie Getraenke', sortierung:10},
         {kategorie_id:2, name:'Biere', sortierung:20},
         {kategorie_id:3, name:'Weine', sortierung:30},
-        {kategorie_id:4, name:'SchnÃ¤pse & Spirituosen', sortierung:40},
-        {kategorie_id:5, name:'HeiÃƒÅ¸e GetrÃ¤nke', sortierung:50},
+        {kategorie_id:4, name:'Schnaepse & Spirituosen', sortierung:40},
+        {kategorie_id:5, name:'Heisse Getraenke', sortierung:50},
         {kategorie_id:6, name:'Suesses & Salziges', sortierung:60},
         {kategorie_id:7, name:'Sonstiges', sortierung:70}
     ]);
     
     // Alte Kategorie-IDs auf neue mappen:
-    // ALTE Struktur: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=HeiÃƒÅ¸e, 6=Sonstiges, 7=Snacks, 8=Diverses
-    // NEUE Struktur: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=SchnÃ¤pse, 5=HeiÃƒÅ¸e, 6=Suesses, 7=Sonstiges
+    // ALTE Struktur: 1=Alkoholfrei, 2=Biere, 3=Wein, 4=Spirituosen, 5=Heisse, 6=Sonstiges, 7=Snacks, 8=Diverses
+    // NEUE Struktur: 1=Alkoholfrei, 2=Biere, 3=Weine, 4=Schnaepse, 5=Heisse, 6=Suesses, 7=Sonstiges
     const migrationMap = {
         1: 1,  // Alkoholfrei bleibt
         2: 2,  // Biere bleibt
         3: 3,  // Wein -> Weine
-        4: 4,  // Spirituosen -> SchnÃ¤pse & Spirituosen
-        5: 5,  // HeiÃƒÅ¸e GetrÃ¤nke bleibt
+        4: 4,  // Spirituosen -> Schnaepse & Spirituosen
+        5: 5,  // Heisse Getraenke bleibt
         6: 6,  // Sonstiges -> Suesses & Salziges
         7: 6,  // Snacks -> Suesses & Salziges
         8: 7   // Diverses -> Sonstiges
@@ -4733,11 +4733,11 @@ window.repairCategories = async () => {
     
     const iconMap = {1:'',2:'',3:'',4:'',5:'[Kaffee]',6:'',7:''};
     const katMap = {
-        1:'Alkoholfreie GetrÃ¤nke',
+        1:'Alkoholfreie Getraenke',
         2:'Biere',
         3:'Weine',
-        4:'SchnÃ¤pse & Spirituosen',
-        5:'HeiÃƒÅ¸e GetrÃ¤nke',
+        4:'Schnaepse & Spirituosen',
+        5:'Heisse Getraenke',
         6:'Suesses & Salziges',
         7:'Sonstiges'
     };
@@ -4762,9 +4762,9 @@ window.repairCategories = async () => {
     Router.navigate('admin-articles');
 };
 
-// AuffÃ¼llliste Route
+// Auffuellliste Route
 Router.register('admin-auffuellliste', async () => {
-    console.log('ðŸ“‹ AuffÃ¼llliste Route - isAdmin:', State.isAdmin);
+    console.log('ðŸ“‹ Auffuellliste Route - isAdmin:', State.isAdmin);
     if (!State.isAdmin) { 
         console.log('âš ï¸ Nicht als Admin eingeloggt, leite zum Login');
         Router.navigate('admin-login'); 
@@ -4774,9 +4774,9 @@ Router.register('admin-auffuellliste', async () => {
     let liste = [];
     try {
         liste = await Buchungen.getAuffuellliste();
-        console.log('âœ… AuffÃ¼llliste geladen:', liste.length, 'Positionen');
+        console.log('âœ… Auffuellliste geladen:', liste.length, 'Positionen');
     } catch(e) {
-        console.error('âŒ AuffÃ¼llliste Fehler:', e);
+        console.error('âŒ Auffuellliste Fehler:', e);
         Utils.showToast('Fehler beim Laden: ' + e.message, 'error');
     }
     
@@ -4789,35 +4789,35 @@ Router.register('admin-auffuellliste', async () => {
     
     const total = liste.reduce((s, i) => s + i.menge, 0);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title"> AuffÃ¼llliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title"> Auffuellliste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:20px;text-align:center;">
-                <div style="font-size:2rem;font-weight:700;">${total} GetrÃ¤nke</div>
-                <div>zum AuffÃ¼llen</div>
+                <div style="font-size:2rem;font-weight:700;">${total} Getraenke</div>
+                <div>zum Auffuellen</div>
             </div>
         </div>
         
         <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
             <button class="btn btn-primary" onclick="printAuffuellliste()" style="padding:16px;font-size:1.1rem;">
-                 FÃ¼r Thermodrucker drucken
+                 Fuer Thermodrucker drucken
             </button>
             <button class="btn btn-success" onclick="resetAuffuelllisteOhneExport()" style="padding:16px;font-size:1.1rem;background:#27ae60;">
-                âœ… AuffÃ¼llliste zurÃ¼cksetzen<br>
-                <small style="opacity:0.9;">(GetrÃ¤nke wurden aufgefuellt)</small>
+                âœ… Auffuellliste zuruecksetzen<br>
+                <small style="opacity:0.9;">(Getraenke wurden aufgefuellt)</small>
             </button>
         </div>
         
         <div class="card mb-3" style="background:#fff3cd;border:1px solid #ffc107;">
             <div style="padding:12px;">
                 <p style="margin:0;color:#856404;font-size:0.85rem;">
-                     <strong>Tipp:</strong> Damit der Thermodrucker automatisch gewÃ¤hlt wird:<br>
-                    Im Druckdialog â†’ "EPSON TM-T88V" wÃ¤hlen â†’ Haekchen bei "Als Standard speichern"
+                     <strong>Tipp:</strong> Damit der Thermodrucker automatisch gewaehlt wird:<br>
+                    Im Druckdialog â†’ "EPSON TM-T88V" waehlen â†’ Haekchen bei "Als Standard speichern"
                 </p>
             </div>
         </div>
         
-        <div id="auffÃ¼llliste-print">
+        <div id="auffuellliste-print">
             ${Object.keys(byKat).length ? Object.keys(byKat).sort().map(kat => `
                 <div class="card mb-3">
                     <div class="card-header" style="background:var(--color-stone-light);">
@@ -4835,12 +4835,12 @@ Router.register('admin-auffuellliste', async () => {
                         </table>
                     </div>
                 </div>
-            `).join('') : '<p class="text-muted text-center" style="padding:40px;">Keine GetrÃ¤nke zum AuffÃ¼llen</p>'}
+            `).join('') : '<p class="text-muted text-center" style="padding:40px;">Keine Getraenke zum Auffuellen</p>'}
         </div>
     </div>`);
 });
 
-// AuffÃ¼llliste drucken - fÃ¼r Thermodrucker optimiert
+// Auffuellliste drucken - fuer Thermodrucker optimiert
 window.printAuffuellliste = async () => {
     try {
         console.log('ðŸ–¨ï¸ printAuffuellliste gestartet...');
@@ -4851,10 +4851,10 @@ window.printAuffuellliste = async () => {
         }
         
         const liste = await Buchungen.getAuffuellliste();
-        console.log('âœ… AuffÃ¼llliste fÃ¼r Druck geladen:', liste.length, 'Positionen');
+        console.log('âœ… Auffuellliste fuer Druck geladen:', liste.length, 'Positionen');
         
         if (liste.length === 0) {
-            Utils.showToast('Keine GetrÃ¤nke zum AuffÃ¼llen', 'info');
+            Utils.showToast('Keine Getraenke zum Auffuellen', 'info');
             return;
         }
         
@@ -4879,7 +4879,7 @@ window.printAuffuellliste = async () => {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>AuffÃ¼llliste - ${datum}</title>
+            <title>Auffuellliste - ${datum}</title>
             <style>
                 @page { 
                     margin: 0; 
@@ -4996,7 +4996,7 @@ window.printAuffuellliste = async () => {
             <div class="total">GESAMT: ${total} STUeCK</div>
             
             <div class="footer">
-                SÃ¶llerhaus Kassa
+                Soellerhaus Kassa
             </div>
         </body>
         </html>
@@ -5014,13 +5014,13 @@ window.printAuffuellliste = async () => {
     }
 };
 
-// Nur AuffÃ¼llliste zurÃ¼cksetzen (NICHT Export!)
+// Nur Auffuellliste zuruecksetzen (NICHT Export!)
 window.resetAuffuelllisteOhneExport = async () => {
-    if (!confirm('AuffÃ¼llliste zurÃ¼cksetzen?\n\nDie GetrÃ¤nke wurden aufgefuellt und die Liste wird auf 0 gesetzt.\n\n(Dies hat keinen Einfluss auf den Registrierkasse-Export)')) return;
+    if (!confirm('Auffuellliste zuruecksetzen?\n\nDie Getraenke wurden aufgefuellt und die Liste wird auf 0 gesetzt.\n\n(Dies hat keinen Einfluss auf den Registrierkasse-Export)')) return;
     
     try {
         await Buchungen.markAsAufgefuellt();
-        Utils.showToast('âœ… AuffÃ¼llliste zurÃ¼ckgesetzt', 'success');
+        Utils.showToast('âœ… Auffuellliste zurueckgesetzt', 'success');
         Router.navigate('admin-auffuellliste');
     } catch(e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -5031,8 +5031,8 @@ window.resetAuffuelllisteOhneExport = async () => {
 Router.register('admin-alle-buchungen', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Alle aktiven GÃ¤ste laden fÃ¼r Dropdown
-    let alleGÃ¤ste = [];
+    // Alle aktiven Gaeste laden fuer Dropdown
+    let alleGaeste = [];
     if (supabaseClient && isOnline) {
         const { data } = await supabaseClient
             .from('profiles')
@@ -5043,7 +5043,7 @@ Router.register('admin-alle-buchungen', async () => {
         if (data) {
             // DEDUPLIZIERUNG: Nur einen Eintrag pro Name
             const seenNames = new Set();
-            alleGÃ¤ste = data.filter(g => {
+            alleGaeste = data.filter(g => {
                 const name = (g.display_name || g.vorname || '').toUpperCase().trim();
                 if (seenNames.has(name)) return false;
                 seenNames.add(name);
@@ -5051,12 +5051,12 @@ Router.register('admin-alle-buchungen', async () => {
             }).map(g => ({ id: g.id, name: g.display_name || g.vorname }));
         }
     }
-    if (alleGÃ¤ste.length === 0) {
+    if (alleGaeste.length === 0) {
         const local = await db.registeredGuests.toArray();
-        const filtered = local.filter(g => !g.gelÃ¶scht && g.aktiv !== false);
+        const filtered = local.filter(g => !g.geloescht && g.aktiv !== false);
         // Deduplizierung auch lokal
         const seenNames = new Set();
-        alleGÃ¤ste = filtered.filter(g => {
+        alleGaeste = filtered.filter(g => {
             const name = (g.nachname || g.firstName || '').toUpperCase().trim();
             if (seenNames.has(name)) return false;
             seenNames.add(name);
@@ -5064,13 +5064,13 @@ Router.register('admin-alle-buchungen', async () => {
         }).map(g => ({ id: g.id, name: g.nachname || g.firstName }));
     }
     
-    // AusgewÃ¤hlter Gast aus State
+    // Ausgewaehlter Gast aus State
     const selectedGastId = State.selectedGastFilter || '';
     
     // Alle Buchungen laden (inkl. stornierte zur Anzeige)
     let bs = await Buchungen.getAll({ includeStorniert: true });
     
-    // Filter nach Gast wenn ausgewÃ¤hlt
+    // Filter nach Gast wenn ausgewaehlt
     if (selectedGastId) {
         bs = bs.filter(b => b.user_id === selectedGastId || b.gast_id === selectedGastId);
     }
@@ -5087,24 +5087,24 @@ Router.register('admin-alle-buchungen', async () => {
     
     // Gesamtsumme und Gastname
     const gesamtSumme = bs.filter(b => !b.storniert).reduce((s,b) => s + b.preis * b.menge, 0);
-    const selectedGastName = alleGÃ¤ste.find(g => g.id === selectedGastId)?.name || 'Alle GÃ¤ste';
+    const selectedGastName = alleGaeste.find(g => g.id === selectedGastId)?.name || 'Alle Gaeste';
     
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title"> Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
-        <!-- GÃ„STE FILTER -->
+        <!-- GAeSTE FILTER -->
         <div class="card mb-3" style="background:#fffde7;">
             <div style="padding:16px;">
                 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
                     <div style="flex:1;min-width:200px;">
-                        <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:4px;">Gast auswÃ¤hlen:</label>
+                        <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:4px;">Gast auswaehlen:</label>
                         <select id="gast-filter" class="form-input" style="width:100%;padding:12px;font-size:1rem;" onchange="filterBuchungenByGast(this.value)">
-                            <option value="">-- Alle GÃ¤ste --</option>
-                            ${alleGÃ¤ste.map(g => `<option value="${g.id}" ${g.id === selectedGastId ? 'selected' : ''}>${g.name}</option>`).join('')}
+                            <option value="">-- Alle Gaeste --</option>
+                            ${alleGaeste.map(g => `<option value="${g.id}" ${g.id === selectedGastId ? 'selected' : ''}>${g.name}</option>`).join('')}
                         </select>
                     </div>
                     ${selectedGastId ? `
                         <button class="btn btn-primary" onclick="showAddBuchungForGastModal('${selectedGastId}', '${selectedGastName}')" style="padding:12px 20px;">
-                            + Buchung hinzufÃ¼gen
+                            + Buchung hinzufuegen
                         </button>
                     ` : ''}
                 </div>
@@ -5114,7 +5114,7 @@ Router.register('admin-alle-buchungen', async () => {
         <div class="card mb-3" style="background:var(--color-alpine-green);color:white;">
             <div style="padding:16px;text-align:center;">
                 <div style="font-size:1.5rem;font-weight:700;">${bs.length} Buchungen</div>
-                <div>${selectedGastId ? selectedGastName : 'Alle GÃ¤ste'} | Summe: ${Utils.formatCurrency(gesamtSumme)}</div>
+                <div>${selectedGastId ? selectedGastName : 'Alle Gaeste'} | Summe: ${Utils.formatCurrency(gesamtSumme)}</div>
             </div>
         </div>
         
@@ -5128,7 +5128,7 @@ Router.register('admin-alle-buchungen', async () => {
                     <h3 style="font-weight:700;margin:0;"> ${datum}</h3>
                     <div style="display:flex;align-items:center;gap:12px;">
                         <span style="font-weight:600;color:var(--color-alpine-green);">${buchungen.length} Buchungen * ${Utils.formatCurrency(tagesUmsatz)}</span>
-                        <button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="handleDeleteBuchungenByDate('${datum}')" title="Alle Buchungen dieses Tages lÃ¶schen"> Tag lÃ¶schen</button>
+                        <button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="handleDeleteBuchungenByDate('${datum}')" title="Alle Buchungen dieses Tages loeschen"> Tag loeschen</button>
                     </div>
                 </div>
                 <div class="card-body" style="padding:0;max-height:400px;overflow-y:auto;">
@@ -5169,19 +5169,19 @@ Router.register('admin-alle-buchungen', async () => {
     </div>`);
 });
 
-// Gruppe abgereist - Alle Buchungen exportieren und abschlieÃƒÅ¸en
+// Gruppe abgereist - Alle Buchungen exportieren und abschliessen
 // Filter Buchungen nach Gast
 window.filterBuchungenByGast = (gastId) => {
     State.selectedGastFilter = gastId;
     Router.navigate('admin-alle-buchungen');
 };
 
-// Modal zum HinzufÃ¼gen von Buchungen Ã¶ffnen
+// Modal zum Hinzufuegen von Buchungen oeffnen
 window.showAddBuchungForGastModal = async (gastId, gastName) => {
     const modalHtml = `
     <div id="add-buchung-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;justify-content:center;align-items:center;">
         <div style="background:white;padding:24px;border-radius:12px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
-            <h3 style="margin-bottom:16px;">Buchung hinzufÃ¼gen fÃ¼r ${gastName}</h3>
+            <h3 style="margin-bottom:16px;">Buchung hinzufuegen fuer ${gastName}</h3>
             <input type="hidden" id="modal-gast-id" value="${gastId}">
             <input type="hidden" id="modal-gast-name" value="${gastName}">
             
@@ -5209,7 +5209,7 @@ window.closeAddBuchungModal = () => {
     if (modal) modal.remove();
 };
 
-// Artikel suchen fÃ¼r Modal
+// Artikel suchen fuer Modal
 window.searchArtikelForBuchungModal = async (query) => {
     const resultsDiv = document.getElementById('artikel-results-modal');
     
@@ -5236,7 +5236,7 @@ window.searchArtikelForBuchungModal = async (query) => {
     `).join('');
 };
 
-// Buchung fÃ¼r ausgewÃ¤hlten Gast hinzufÃ¼gen
+// Buchung fuer ausgewaehlten Gast hinzufuegen
 window.addBuchungForSelectedGast = async (artikelId) => {
     const gastId = document.getElementById('modal-gast-id').value;
     const gastName = document.getElementById('modal-gast-name').value;
@@ -5276,7 +5276,7 @@ window.addBuchungForSelectedGast = async (artikelId) => {
         // Lokal speichern
         try { await db.buchungen.add(buchung); } catch(e) {}
         
-        Utils.showToast(`${artikel.name} fÃ¼r ${gastName} gebucht`, 'success');
+        Utils.showToast(`${artikel.name} fuer ${gastName} gebucht`, 'success');
         closeAddBuchungModal();
         Router.navigate('admin-alle-buchungen');
     } catch (e) {
@@ -5284,7 +5284,7 @@ window.addBuchungForSelectedGast = async (artikelId) => {
     }
 };
 
-// Admin Buchung lÃ¶schen (stornieren)
+// Admin Buchung loeschen (stornieren)
 window.handleAdminDeleteBuchung = async (buchungId) => {
     if (!confirm('Diese Buchung wirklich stornieren?')) return;
     try {
@@ -5296,9 +5296,9 @@ window.handleAdminDeleteBuchung = async (buchungId) => {
     }
 };
 
-// Alle Buchungen eines Tages ENDGUeLTIG lÃ¶schen
+// Alle Buchungen eines Tages ENDGUeLTIG loeschen
 window.handleDeleteBuchungenByDate = async (datum) => {
-    if (!confirm(`âš ï¸ ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGUeLTIG gelÃ¶scht!\n\nDies kann nicht rueckgÃ¤ngig gemacht werden.\n\nFortfahren?`)) return;
+    if (!confirm(`âš ï¸ ACHTUNG!\n\nAlle Buchungen vom ${datum} werden ENDGUeLTIG geloescht!\n\nDies kann nicht rueckgaengig gemacht werden.\n\nFortfahren?`)) return;
     
     try {
         // Buchungen von diesem Datum laden
@@ -5325,19 +5325,19 @@ window.handleDeleteBuchungenByDate = async (datum) => {
             return;
         }
         
-        // Endgueltig lÃ¶schen (nicht nur stornieren)
+        // Endgueltig loeschen (nicht nur stornieren)
         for (const id of buchungenIds) {
-            // Lokal lÃ¶schen
+            // Lokal loeschen
             try { await db.buchungen.delete(id); } catch(e) {}
             
-            // Supabase lÃ¶schen
+            // Supabase loeschen
             if (supabaseClient && isOnline) {
                 await supabaseClient.from('buchungen').delete().eq('buchung_id', id);
             }
         }
         
         await DataProtection.createBackup();
-        Utils.showToast(`âœ… ${buchungenIds.length} Buchungen vom ${datum} gelÃ¶scht`, 'success');
+        Utils.showToast(`âœ… ${buchungenIds.length} Buchungen vom ${datum} geloescht`, 'success');
         Router.navigate('admin-alle-buchungen');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -5347,7 +5347,7 @@ window.handleDeleteBuchungenByDate = async (datum) => {
 // ============ FEHLENDE GETRAeNKE ROUTE ============
 Router.register('admin-fehlende', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
-    const fehlendeOffen = await FehlendeGetrÃ¤nke.getOffene();
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
     const kats = await db.kategorien.toArray();
     const arts = await Artikel.getAll({ aktiv: true });
     
@@ -5358,18 +5358,18 @@ Router.register('admin-fehlende', async () => {
         if (byKat[a.kategorie_id]) byKat[a.kategorie_id].artikel.push(a);
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">âš Fehlende GetrÃ¤nke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title">âš Fehlende Getraenke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#f39c12;color:white;">
             <div style="padding:16px;text-align:center;">
-                <div style="font-size:1.5rem;font-weight:700;">${fehlendeOffen.length} offene GetrÃ¤nke</div>
-                <div>warten auf Uebernahme durch GÃ¤ste</div>
+                <div style="font-size:1.5rem;font-weight:700;">${fehlendeOffen.length} offene Getraenke</div>
+                <div>warten auf Uebernahme durch Gaeste</div>
             </div>
         </div>
         
         ${fehlendeOffen.length ? `
         <div class="card mb-3">
-            <div class="card-header"><h3>Offene fehlende GetrÃ¤nke</h3></div>
+            <div class="card-header"><h3>Offene fehlende Getraenke</h3></div>
             <div class="card-body">
                 ${fehlendeOffen.map(f => `
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--color-stone-light);border-radius:8px;margin-bottom:6px;">
@@ -5388,13 +5388,13 @@ Router.register('admin-fehlende', async () => {
         ` : ''}
         
         <div class="card">
-            <div class="card-header"><h3>Neues fehlendes Getraenk hinzufÃ¼gen</h3></div>
+            <div class="card-header"><h3>Neues fehlendes Getraenk hinzufuegen</h3></div>
             <div class="card-body">
                 <div class="form-group">
                     <label class="form-label">Anzahl</label>
                     <input type="number" id="fehlende-menge" class="form-input" value="1" min="1" max="99" style="width:100px;">
                 </div>
-                <p style="margin:16px 0;color:var(--color-stone-dark);">Artikel auswÃ¤hlen:</p>
+                <p style="margin:16px 0;color:var(--color-stone-dark);">Artikel auswaehlen:</p>
                 ${Object.keys(byKat).map(katId => {
                     const kat = byKat[katId];
                     if (!kat.artikel.length) return '';
@@ -5420,13 +5420,13 @@ Router.register('admin-fehlende', async () => {
 
 window.addFehlendesGetraenk = async (artikelId) => {
     const menge = parseInt(document.getElementById('fehlende-menge')?.value) || 1;
-    await FehlendeGetrÃ¤nke.add(artikelId, menge);
+    await FehlendeGetraenke.add(artikelId, menge);
     Router.navigate('admin-fehlende');
 };
 
 window.deleteFehlendes = async (id) => {
-    if (confirm('Eintrag lÃ¶schen?')) {
-        await FehlendeGetrÃ¤nke.lÃ¶schen(id);
+    if (confirm('Eintrag loeschen?')) {
+        await FehlendeGetraenke.loeschen(id);
         Router.navigate('admin-fehlende');
     }
 };
@@ -5435,7 +5435,7 @@ window.deleteFehlendes = async (id) => {
 Router.register('admin-umlage', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // GÃ¤ste von Supabase laden
+    // Gaeste von Supabase laden
     let totalGuests = 0;
     let ausgenommen = 0;
     
@@ -5447,15 +5447,15 @@ Router.register('admin-umlage', async () => {
             .eq('geloescht', false);
         
         if (profiles) {
-            // GÃ¤ste mit Ausnahme zÃ¤hlen
+            // Gaeste mit Ausnahme zaehlen
             const ohneAusnahme = profiles.filter(g => g.ausnahmeumlage !== true);
             totalGuests = ohneAusnahme.length;
             ausgenommen = profiles.length - totalGuests;
         }
     }
     
-    // Fehlende GetrÃ¤nke laden
-    const fehlendeOffen = await FehlendeGetrÃ¤nke.getOffene();
+    // Fehlende Getraenke laden
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
     const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
     const preisProGast = totalGuests > 0 ? Math.ceil((gesamtPreis / totalGuests) * 100) / 100 : gesamtPreis;
     
@@ -5463,16 +5463,16 @@ Router.register('admin-umlage', async () => {
     <div class="main-content">
         <div class="card mb-3" style="background:var(--color-danger);color:white;">
             <div style="padding:20px;text-align:center;">
-                <div style="font-size:2rem;font-weight:700;">${totalGuests} GÃ¤ste fÃ¼r Umlage</div>
-                <div style="opacity:0.9;">Kosten werden gleichmÃ¤ÃƒÅ¸ig verteilt</div>
-                ${ausgenommen > 0 ? `<div style="margin-top:8px;background:rgba(255,255,255,0.2);padding:6px 12px;border-radius:20px;display:inline-block;">${ausgenommen} GÃ¤ste ausgenommen</div>` : ''}
+                <div style="font-size:2rem;font-weight:700;">${totalGuests} Gaeste fuer Umlage</div>
+                <div style="opacity:0.9;">Kosten werden gleichmaeÃƒÅ¸ig verteilt</div>
+                ${ausgenommen > 0 ? `<div style="margin-top:8px;background:rgba(255,255,255,0.2);padding:6px 12px;border-radius:20px;display:inline-block;">${ausgenommen} Gaeste ausgenommen</div>` : ''}
             </div>
         </div>
         
         ${fehlendeOffen.length ? `
         <div class="card mb-3">
             <div class="card-header" style="background:#f39c12;color:white;">
-                <h3 style="margin:0;">âš Fehlende GetrÃ¤nke (${fehlendeOffen.length})</h3>
+                <h3 style="margin:0;">âš Fehlende Getraenke (${fehlendeOffen.length})</h3>
             </div>
             <div class="card-body">
                 ${fehlendeOffen.map(f => `
@@ -5499,11 +5499,11 @@ Router.register('admin-umlage', async () => {
                     </div>
                 </div>
                 
-                <button class="btn btn-danger btn-block" onclick="bucheUmlageFÃ¼rAlle()" style="margin-top:20px;padding:20px;font-size:1.3rem;font-weight:700;">
+                <button class="btn btn-danger btn-block" onclick="bucheUmlageFuerAlle()" style="margin-top:20px;padding:20px;font-size:1.3rem;font-weight:700;">
                      UMLAGE BUCHEN
                 </button>
                 <p style="text-align:center;margin-top:8px;color:var(--color-stone-dark);font-size:0.9rem;">
-                    ${Utils.formatCurrency(preisProGast)} x ${totalGuests} GÃ¤ste = ${Utils.formatCurrency(preisProGast * totalGuests)}
+                    ${Utils.formatCurrency(preisProGast)} x ${totalGuests} Gaeste = ${Utils.formatCurrency(preisProGast * totalGuests)}
                 </p>
             </div>
         </div>
@@ -5511,7 +5511,7 @@ Router.register('admin-umlage', async () => {
         <div class="card">
             <div class="card-body" style="text-align:center;padding:40px;">
                 <div style="font-size:3rem;margin-bottom:16px;">âœ…</div>
-                <h3>Keine fehlenden GetrÃ¤nke</h3>
+                <h3>Keine fehlenden Getraenke</h3>
                 <p style="color:var(--color-stone-dark);">Es gibt nichts umzulegen.</p>
             </div>
         </div>
@@ -5519,14 +5519,14 @@ Router.register('admin-umlage', async () => {
     </div>`);
 });
 
-window.bucheUmlageFÃ¼rAlle = async () => {
+window.bucheUmlageFuerAlle = async () => {
     // NUR Supabase!
     if (!supabaseClient || !isOnline) {
         Utils.showToast('Keine Internetverbindung!', 'error');
         return;
     }
     
-    // Alle aktiven GÃ¤ste von Supabase holen
+    // Alle aktiven Gaeste von Supabase holen
     const { data: profiles, error: profileError } = await supabaseClient
         .from('profiles')
         .select('*')
@@ -5534,32 +5534,32 @@ window.bucheUmlageFÃ¼rAlle = async () => {
         .eq('geloescht', false);
     
     if (profileError) {
-        Utils.showToast('Fehler beim Laden der GÃ¤ste', 'error');
+        Utils.showToast('Fehler beim Laden der Gaeste', 'error');
         return;
     }
     
-    // WICHTIG: GÃ¤ste mit Ausnahme Umlage filtern!
-    const alleGÃ¤ste = (profiles || []).filter(g => g.ausnahmeumlage !== true);
-    const ausgenommen = (profiles || []).length - alleGÃ¤ste.length;
-    const totalGuests = alleGÃ¤ste.length;
+    // WICHTIG: Gaeste mit Ausnahme Umlage filtern!
+    const alleGaeste = (profiles || []).filter(g => g.ausnahmeumlage !== true);
+    const ausgenommen = (profiles || []).length - alleGaeste.length;
+    const totalGuests = alleGaeste.length;
     
     if (totalGuests === 0) {
-        Utils.showToast('Keine aktiven GÃ¤ste fÃ¼r Umlage', 'error');
+        Utils.showToast('Keine aktiven Gaeste fuer Umlage', 'error');
         return;
     }
     
-    const fehlendeOffen = await FehlendeGetrÃ¤nke.getOffene();
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
     if (fehlendeOffen.length === 0) {
-        Utils.showToast('Keine fehlenden GetrÃ¤nke', 'error');
+        Utils.showToast('Keine fehlenden Getraenke', 'error');
         return;
     }
     
     const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
     const preisProGast = Math.ceil((gesamtPreis / totalGuests) * 100) / 100;
     
-    let confirmMsg = `UMLAGE durchfÃ¼hren?\n\n${fehlendeOffen.length} fehlende GetrÃ¤nke\nGesamtwert: ${Utils.formatCurrency(gesamtPreis)}\n\n${Utils.formatCurrency(preisProGast)} x ${totalGuests} GÃ¤ste`;
+    let confirmMsg = `UMLAGE durchfuehren?\n\n${fehlendeOffen.length} fehlende Getraenke\nGesamtwert: ${Utils.formatCurrency(gesamtPreis)}\n\n${Utils.formatCurrency(preisProGast)} x ${totalGuests} Gaeste`;
     if (ausgenommen > 0) {
-        confirmMsg += `\n\n(${ausgenommen} GÃ¤ste ausgenommen)`;
+        confirmMsg += `\n\n(${ausgenommen} Gaeste ausgenommen)`;
     }
     
     if (!confirm(confirmMsg)) {
@@ -5572,8 +5572,8 @@ window.bucheUmlageFÃ¼rAlle = async () => {
     let erfolg = 0;
     let fehler = 0;
     
-    // FÃ¼r jeden Gast eine Buchung erstellen - DIREKT nach Supabase
-    for (const gast of alleGÃ¤ste) {
+    // Fuer jeden Gast eine Buchung erstellen - DIREKT nach Supabase
+    for (const gast of alleGaeste) {
         const gastId = gast.id;
         const gastName = gast.vorname || gast.display_name || gast.first_name;
         
@@ -5599,12 +5599,12 @@ window.bucheUmlageFÃ¼rAlle = async () => {
             console.error('âŒ Umlage Buchung Fehler:', gastName, insertError.message, insertError.details, insertError.hint);
             fehler++;
         } else {
-            console.log('âœ… Umlage gebucht fÃ¼r:', gastName, data);
+            console.log('âœ… Umlage gebucht fuer:', gastName, data);
             erfolg++;
         }
     }
     
-    // Alle fehlenden GetrÃ¤nke als umgelegt markieren - in Supabase
+    // Alle fehlenden Getraenke als umgelegt markieren - in Supabase
     for (const f of fehlendeOffen) {
         await supabaseClient
             .from('fehlende_getraenke')
@@ -5616,9 +5616,9 @@ window.bucheUmlageFÃ¼rAlle = async () => {
     }
     
     if (ausgenommen > 0) {
-        Utils.showToast(`âœ… Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} GÃ¤ste verteilt (${ausgenommen} ausgenommen)`, 'success');
+        Utils.showToast(`âœ… Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gaeste verteilt (${ausgenommen} ausgenommen)`, 'success');
     } else {
-        Utils.showToast(`âœ… Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} GÃ¤ste verteilt`, 'success');
+        Utils.showToast(`âœ… Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gaeste verteilt`, 'success');
     }
     
     Router.navigate('admin-dashboard');
@@ -5628,7 +5628,7 @@ window.bucheUmlageFÃ¼rAlle = async () => {
 Router.register('admin-notfall-export', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Alle verfÃ¼gbaren Datums-Werte laden
+    // Alle verfuegbaren Datums-Werte laden
     let alleDaten = [];
     if (supabaseClient && isOnline) {
         try {
@@ -5668,7 +5668,7 @@ Router.register('admin-notfall-export', async () => {
         <!-- LETZTE ID EINSTELLUNG -->
         <div class="card mb-3" style="border:2px solid #e74c3c;">
             <div class="card-header" style="background:#e74c3c;color:white;">
-                <h3 style="margin:0;"> Letzte ID fÃ¼r Access</h3>
+                <h3 style="margin:0;"> Letzte ID fuer Access</h3>
             </div>
             <div class="card-body">
                 <p style="font-size:0.9rem;color:#666;margin-bottom:12px;">
@@ -5677,37 +5677,37 @@ Router.register('admin-notfall-export', async () => {
                 <div style="display:flex;gap:12px;align-items:center;">
                     <input type="number" id="last-export-id" value="${lastExportId}" class="form-input" style="width:150px;font-size:1.2rem;font-weight:bold;">
                     <button class="btn btn-danger" onclick="saveLastExportId()"> Speichern</button>
-                    <span style="color:#888;font-size:0.9rem;">NÃ¤chste Buchung: ID ${lastExportId + 1}</span>
+                    <span style="color:#888;font-size:0.9rem;">Naechste Buchung: ID ${lastExportId + 1}</span>
                 </div>
             </div>
         </div>
         
         <div class="card mb-3">
-            <div class="card-header"><h3 style="margin:0;"> Zeitraum wÃ¤hlen</h3></div>
+            <div class="card-header"><h3 style="margin:0;"> Zeitraum waehlen</h3></div>
             <div class="card-body">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
                     <div>
                         <label style="font-weight:600;display:block;margin-bottom:8px;">Von Datum:</label>
                         <select id="notfall-von" class="form-input" style="width:100%;">
-                            <option value="">-- WÃ¤hlen --</option>
+                            <option value="">-- Waehlen --</option>
                             ${alleDaten.map(d => `<option value="${d}">${d}</option>`).join('')}
                         </select>
                     </div>
                     <div>
                         <label style="font-weight:600;display:block;margin-bottom:8px;">Bis Datum:</label>
                         <select id="notfall-bis" class="form-input" style="width:100%;">
-                            <option value="">-- WÃ¤hlen --</option>
+                            <option value="">-- Waehlen --</option>
                             ${alleDaten.map(d => `<option value="${d}">${d}</option>`).join('')}
                         </select>
                     </div>
                 </div>
                 
                 <div style="margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;">
-                    <div id="notfall-vorschau" style="color:#666;">Bitte Zeitraum wÃ¤hlen...</div>
+                    <div id="notfall-vorschau" style="color:#666;">Bitte Zeitraum waehlen...</div>
                 </div>
                 
                 <button class="btn btn-secondary btn-block" onclick="handleNotfallExportMitDatum()" style="padding:12px;">
-                     AusgewÃ¤hlten Zeitraum exportieren (Excel fÃ¼r Access)
+                     Ausgewaehlten Zeitraum exportieren (Excel fuer Access)
                 </button>
             </div>
         </div>
@@ -5716,7 +5716,7 @@ Router.register('admin-notfall-export', async () => {
             <div style="padding:16px;">
                 <strong> Info:</strong><br>
                 <small style="color:#888;">
-                    * VerfÃ¼gbare Tage: ${alleDaten.length}<br>
+                    * Verfuegbare Tage: ${alleDaten.length}<br>
                     * Aeltestes Datum: ${alleDaten[alleDaten.length-1] || '-'}<br>
                     * Neuestes Datum: ${alleDaten[0] || '-'}<br>
                     * Export-Format: Exakt wie Access-Tabelle "Buchenungsdetail"
@@ -5725,7 +5725,7 @@ Router.register('admin-notfall-export', async () => {
         </div>
     </div>`);
     
-    // Event Listener fÃ¼r Vorschau
+    // Event Listener fuer Vorschau
     document.getElementById('notfall-von')?.addEventListener('change', updateNotfallVorschau);
     document.getElementById('notfall-bis')?.addEventListener('change', updateNotfallVorschau);
 });
@@ -5750,7 +5750,7 @@ window.updateNotfallVorschau = async () => {
     const vorschauEl = document.getElementById('notfall-vorschau');
     
     if (!von || !bis) {
-        vorschauEl.innerHTML = 'Bitte Zeitraum wÃ¤hlen...';
+        vorschauEl.innerHTML = 'Bitte Zeitraum waehlen...';
         return;
     }
     
@@ -5785,7 +5785,7 @@ window.handleNotfallExportMitDatum = async () => {
     const bis = document.getElementById('notfall-bis')?.value;
     
     if (!von || !bis) {
-        Utils.showToast('Bitte Von und Bis Datum wÃ¤hlen', 'warning');
+        Utils.showToast('Bitte Von und Bis Datum waehlen', 'warning');
         return;
     }
     
@@ -5811,7 +5811,7 @@ window.handleNotfallExportMitDatum = async () => {
     }
     
     if (bs.length === 0) {
-        Utils.showToast('Keine Buchungen im gewÃ¤hlten Zeitraum', 'warning');
+        Utils.showToast('Keine Buchungen im gewaehlten Zeitraum', 'warning');
         return;
     }
     
@@ -5822,7 +5822,7 @@ window.handleNotfallExportMitDatum = async () => {
     
     let lastId = parseInt(localStorage.getItem('lastExportId') || '20037');
     
-    // Datum formatieren fÃ¼r Access
+    // Datum formatieren fuer Access
     const formatDatumForAccess = (datum) => {
         if (!datum) return '';
         if (datum.match(/^\d{4}-\d{2}-\d{2}/)) return datum.substring(0, 10);
@@ -5851,7 +5851,7 @@ window.handleNotfallExportMitDatum = async () => {
             'Gastid': gastIdNum,
             'Gastname': b.gast_vorname || '',
             'Gastvorname': '',
-            'Gastgruppe': b.group_name || b.gastgruppe || 'keiner Gruppe zugehÃ¶rig',
+            'Gastgruppe': b.group_name || b.gastgruppe || 'keiner Gruppe zugehoerig',
             'Gastgruppennr': 0,
             'bezahlt': false,
             'Steuer': parseInt(b.steuer_prozent) || 10,
@@ -5869,7 +5869,7 @@ window.handleNotfallExportMitDatum = async () => {
             'Anfang2': 0,
             'Bestand2': 0,
             'Basisbestand2': 0,
-            'AuffÃ¼llmenge2': 0,
+            'Auffuellmenge2': 0,
             'Fehlbestand2': 0,
             'Warengruppe1': 0
         };
@@ -5908,7 +5908,7 @@ Router.register('admin-gruppen', async () => {
                 <div>
                     <div style="font-weight:700;font-size:1.2rem;">Gruppe bei Anmeldung abfragen</div>
                     <div style="font-size:0.9rem;opacity:0.9;">
-                        ${isAktiv ? 'GÃ¤ste muessen nach Login eine Gruppe wÃ¤hlen' : 'Keine Gruppenabfrage beim Login'}
+                        ${isAktiv ? 'Gaeste muessen nach Login eine Gruppe waehlen' : 'Keine Gruppenabfrage beim Login'}
                     </div>
                 </div>
                 <label class="switch" style="position:relative;display:inline-block;width:60px;height:34px;">
@@ -5951,7 +5951,7 @@ Router.register('admin-gruppen', async () => {
             <div class="card" style="background:#e74c3c;color:white;">
                 <div style="padding:16px;">
                     âš <strong>Achtung:</strong> Gruppenabfrage ist aktiv, aber keine Gruppen hinterlegt!
-                    <br>GÃ¤ste kÃ¶nnen sich nicht anmelden, bis mindestens eine Gruppe existiert.
+                    <br>Gaeste koennen sich nicht anmelden, bis mindestens eine Gruppe existiert.
                 </div>
             </div>
         ` : ''}
@@ -5959,14 +5959,14 @@ Router.register('admin-gruppen', async () => {
         <div class="card mt-3" style="background:var(--color-stone-light);">
             <div style="padding:16px;">
                 <strong> Hinweis:</strong><br>
-                * Wenn aktiv, muessen GÃ¤ste nach dem Login eine Gruppe wÃ¤hlen<br>
+                * Wenn aktiv, muessen Gaeste nach dem Login eine Gruppe waehlen<br>
                 * Die Gruppe wird bei jeder Buchung gespeichert<br>
-                * Max. 3 Gruppen mÃ¶glich (z.B. verschiedene Unis)
+                * Max. 3 Gruppen moeglich (z.B. verschiedene Unis)
             </div>
         </div>
     </div>`);
     
-    // CSS fÃ¼r Toggle
+    // CSS fuer Toggle
     const style = document.createElement('style');
     style.textContent = `
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -5992,7 +5992,7 @@ window.toggleGruppenAbfrage = async (aktiv) => {
     Router.navigate('admin-gruppen');
 };
 
-// Gruppe hinzufÃ¼gen Modal
+// Gruppe hinzufuegen Modal
 window.showAddGruppeModal = () => {
     const name = prompt('Gruppenname eingeben (z.B. "Uni Innsbruck"):');
     if (name && name.trim()) {
@@ -6002,13 +6002,13 @@ window.showAddGruppeModal = () => {
 
 window.addGruppe = async (name) => {
     try {
-        console.log('Ã¢Å¾â€¢ FÃ¼ge Gruppe hinzu:', name);
+        console.log('Ã¢Å¾â€¢ Fuege Gruppe hinzu:', name);
         const result = await Gruppen.add(name);
-        console.log('âœ… Gruppe hinzugefÃ¼gt:', result);
+        console.log('âœ… Gruppe hinzugefuegt:', result);
         Utils.showToast(`Gruppe "${name}" hinzugefuegt`, 'success');
         Router.navigate('admin-gruppen');
     } catch (e) {
-        console.error('âŒ Gruppe hinzufÃ¼gen Fehler:', e);
+        console.error('âŒ Gruppe hinzufuegen Fehler:', e);
         Utils.showToast(e.message, 'error');
     }
 };
@@ -6031,12 +6031,12 @@ window.editGruppe = async (id, name) => {
     }
 };
 
-// Gruppe lÃ¶schen
+// Gruppe loeschen
 window.deleteGruppe = async (id) => {
-    if (!confirm('Diese Gruppe wirklich lÃ¶schen?\n\nBereits gespeicherte Buchungen behalten ihre Gruppenzuordnung.')) return;
+    if (!confirm('Diese Gruppe wirklich loeschen?\n\nBereits gespeicherte Buchungen behalten ihre Gruppenzuordnung.')) return;
     try {
         await Gruppen.delete(id);
-        Utils.showToast('Gruppe gelÃ¶scht', 'success');
+        Utils.showToast('Gruppe geloescht', 'success');
         Router.navigate('admin-gruppen');
     } catch (e) {
         Utils.showToast(e.message, 'error');
@@ -6061,7 +6061,7 @@ Router.register('admin-preismodus', async () => {
                     ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
                 </div>
                 <div style="font-size:1rem;opacity:0.9;">
-                    ${isHP ? 'HP-Preise werden fÃ¼r alle neuen Buchungen verwendet' : 'Standard-Preise werden fÃ¼r alle neuen Buchungen verwendet'}
+                    ${isHP ? 'HP-Preise werden fuer alle neuen Buchungen verwendet' : 'Standard-Preise werden fuer alle neuen Buchungen verwendet'}
                 </div>
             </div>
         </div>
@@ -6071,7 +6071,7 @@ Router.register('admin-preismodus', async () => {
             <div class="card-header"><h3 style="margin:0;">Preismodus wechseln</h3></div>
             <div class="card-body">
                 <p style="color:#666;margin-bottom:20px;">
-                    Waehle den Preismodus fÃ¼r neue GÃ¤ste-Logins. Bereits getÃ¤tigte Buchungen sind davon nicht betroffen.
+                    Waehle den Preismodus fuer neue Gaeste-Logins. Bereits getaetigte Buchungen sind davon nicht betroffen.
                 </p>
                 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
@@ -6113,8 +6113,8 @@ Router.register('admin-preismodus', async () => {
             <div style="padding:16px;">
                 <h4 style="margin:0 0 12px 0;"> Hinweise</h4>
                 <ul style="margin:0;padding-left:20px;color:#666;font-size:0.9rem;">
-                    <li style="margin-bottom:8px;">Der Preismodus gilt fÃ¼r <strong>alle neuen Buchungen</strong> nach dem Wechsel</li>
-                    <li style="margin-bottom:8px;">Bereits getÃ¤tigte Buchungen behalten ihren urspruenglichen Preis</li>
+                    <li style="margin-bottom:8px;">Der Preismodus gilt fuer <strong>alle neuen Buchungen</strong> nach dem Wechsel</li>
+                    <li style="margin-bottom:8px;">Bereits getaetigte Buchungen behalten ihren urspruenglichen Preis</li>
                     <li style="margin-bottom:8px;">HP-Preise werden in der <strong>Artikelverwaltung</strong> gepflegt</li>
                     <li>Der Export enthaelt immer den tatsaechlich gebuchten Preis</li>
                 </ul>
@@ -6129,7 +6129,7 @@ window.setPreismodus = async (modus) => {
     State.currentPreisModus = modus;
     
     const name = modus === 'hp' ? 'Halbpension (HP)' : 'Selbstversorger';
-    Utils.showToast(`Preismodus auf "${name}" geÃ¤ndert`, 'success');
+    Utils.showToast(`Preismodus auf "${name}" geaendert`, 'success');
     Router.navigate('admin-preismodus');
 };
 
@@ -6140,7 +6140,7 @@ Router.register('admin-nachricht', async () => {
     const aktiveNachricht = await GastNachricht.getAktive();
     const verbleibendeZeit = aktiveNachricht ? GastNachricht.getVerbleibendeZeit(aktiveNachricht) : null;
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title"> GÃ¤ste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title"> Gaeste-Nachricht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- INFO BOX -->
@@ -6151,15 +6151,15 @@ Router.register('admin-nachricht', async () => {
                     <div>
                         <div style="font-weight:700;font-size:1.1rem;">So funktioniert's</div>
                         <div style="font-size:0.9rem;opacity:0.9;">
-                            Sende wichtige Nachrichten an alle GÃ¤ste auf der Login-Seite
+                            Sende wichtige Nachrichten an alle Gaeste auf der Login-Seite
                         </div>
                     </div>
                 </div>
                 <ul style="margin:0;padding-left:20px;font-size:0.9rem;opacity:0.95;">
                     <li>Nachricht erscheint permanent auf der Login-Seite</li>
                     <li>Automatisches Ablaufen nach <strong>18 Stunden</strong></li>
-                    <li>GÃ¤ste kÃ¶nnen die Nachricht <strong>nicht</strong> wegklicken</li>
-                    <li>Nur du (Admin) kannst die Nachricht manuell lÃ¶schen</li>
+                    <li>Gaeste koennen die Nachricht <strong>nicht</strong> wegklicken</li>
+                    <li>Nur du (Admin) kannst die Nachricht manuell loeschen</li>
                 </ul>
             </div>
         </div>
@@ -6239,7 +6239,7 @@ Router.register('admin-nachricht', async () => {
                             <input type="radio" name="nachricht-typ" value="warnung" style="display:none;">
                             <span style="font-size:2rem;margin-bottom:8px;">âš </span>
                             <span style="font-weight:600;">Warnung</span>
-                            <span style="font-size:0.8rem;color:var(--color-stone-dark);">AuffÃ¤llig</span>
+                            <span style="font-size:0.8rem;color:var(--color-stone-dark);">Auffaellig</span>
                         </label>
                         <label style="display:flex;flex-direction:column;align-items:center;padding:16px;background:var(--color-stone-light);border-radius:12px;cursor:pointer;border:3px solid transparent;transition:all 0.2s;" onclick="selectTyp('dringend')">
                             <input type="radio" name="nachricht-typ" value="dringend" style="display:none;">
@@ -6273,8 +6273,8 @@ Router.register('admin-nachricht', async () => {
                     <button onclick="setBeispiel('Heute Abend 19:00 Uhr gemeinsames Grillen auf der Terrasse!')" style="text-align:left;padding:10px;background:white;border:1px solid var(--color-stone-medium);border-radius:8px;cursor:pointer;">
                          "Heute Abend 19:00 Uhr gemeinsames Grillen auf der Terrasse!"
                     </button>
-                    <button onclick="setBeispiel('Bitte Kuehlschrank kontrollieren - es fehlen GetrÃ¤nke!')" style="text-align:left;padding:10px;background:white;border:1px solid var(--color-stone-medium);border-radius:8px;cursor:pointer;">
-                         "Bitte Kuehlschrank kontrollieren - es fehlen GetrÃ¤nke!"
+                    <button onclick="setBeispiel('Bitte Kuehlschrank kontrollieren - es fehlen Getraenke!')" style="text-align:left;padding:10px;background:white;border:1px solid var(--color-stone-medium);border-radius:8px;cursor:pointer;">
+                         "Bitte Kuehlschrank kontrollieren - es fehlen Getraenke!"
                     </button>
                 </div>
             </div>
@@ -6293,7 +6293,7 @@ Router.register('admin-tagesmenu', async () => {
     
     const menuData = await TagesMenu.getAlleMenus();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title"> TagesmenÃ¼</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title"> Tagesmenue</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
         <!-- INFO BOX -->
@@ -6304,14 +6304,14 @@ Router.register('admin-tagesmenu', async () => {
                     <div>
                         <div style="font-weight:700;font-size:1.1rem;">So funktioniert's</div>
                         <div style="font-size:0.9rem;opacity:0.9;">
-                            Zeige Mittags- und/oder AbendmenÃ¼ auf der Startseite
+                            Zeige Mittags- und/oder Abendmenue auf der Startseite
                         </div>
                     </div>
                 </div>
                 <ul style="margin:0;padding-left:20px;font-size:0.9rem;opacity:0.95;">
-                    <li>MenÃ¼s werden automatisch nach der eingestellten Uhrzeit ausgeblendet</li>
-                    <li>Nutze *** oder **** als Trenner zwischen GÃ¤ngen</li>
-                    <li>GÃ¤ste sehen die Servierzeit im Button</li>
+                    <li>Menues werden automatisch nach der eingestellten Uhrzeit ausgeblendet</li>
+                    <li>Nutze *** oder **** als Trenner zwischen Gaengen</li>
+                    <li>Gaeste sehen die Servierzeit im Button</li>
                 </ul>
             </div>
         </div>
@@ -6320,7 +6320,7 @@ Router.register('admin-tagesmenu', async () => {
         <div class="card mb-3" style="border:3px solid ${menuData.mittag?.aktiv ? '#f39c12' : '#ddd'};">
             <div class="card-header" style="background:${menuData.mittag?.aktiv ? 'linear-gradient(135deg, #f39c12, #e67e22)' : '#95a5a6'};color:white;">
                 <h2 class="card-title" style="margin:0;color:white;display:flex;align-items:center;gap:10px;">
-                    <span></span> MittagsmenÃ¼
+                    <span></span> Mittagsmenue
                     ${menuData.mittag?.aktiv ? '<span style="background:rgba(255,255,255,0.3);padding:2px 10px;border-radius:12px;font-size:0.8rem;">AKTIV</span>' : ''}
                 </h2>
             </div>
@@ -6337,12 +6337,12 @@ Router.register('admin-tagesmenu', async () => {
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label" style="font-weight:600;">MenÃ¼-Text</label>
+                    <label class="form-label" style="font-weight:600;">Menue-Text</label>
                     <textarea id="mittag-text" class="form-input" rows="6" placeholder="Gemischter Salat
 
 ****
 
-KÃ¤sespaetzle mit Roestzwiebeln
+Kaesespaetzle mit Roestzwiebeln
 
 ***
 
@@ -6362,7 +6362,7 @@ Dessert" style="font-size:0.95rem;line-height:1.5;">${menuData.mittag?.text || '
         <div class="card mb-3" style="border:3px solid ${menuData.abend?.aktiv ? '#8B4513' : '#ddd'};">
             <div class="card-header" style="background:${menuData.abend?.aktiv ? 'linear-gradient(135deg, #8B4513, #D2691E)' : '#95a5a6'};color:white;">
                 <h2 class="card-title" style="margin:0;color:white;display:flex;align-items:center;gap:10px;">
-                    <span></span> AbendmenÃ¼
+                    <span></span> Abendmenue
                     ${menuData.abend?.aktiv ? '<span style="background:rgba(255,255,255,0.3);padding:2px 10px;border-radius:12px;font-size:0.8rem;">AKTIV</span>' : ''}
                 </h2>
             </div>
@@ -6379,13 +6379,13 @@ Dessert" style="font-size:0.95rem;line-height:1.5;">${menuData.mittag?.text || '
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label" style="font-weight:600;">MenÃ¼-Text</label>
+                    <label class="form-label" style="font-weight:600;">Menue-Text</label>
                     <textarea id="abend-text" class="form-input" rows="6" placeholder="Tagessuppe
 
 ****
 
 Schweinsbraten mit Knoedel
-(Vegane Variante verfÃ¼gbar)
+(Vegane Variante verfuegbar)
 
 ***
 
@@ -6403,7 +6403,7 @@ Apfelstrudel mit Vanillesauce" style="font-size:0.95rem;line-height:1.5;">${menu
         
         <!-- ALLE SPEICHERN -->
         <button class="btn btn-block" onclick="speichereAlleMenus()" style="padding:20px;font-size:1.2rem;background:var(--color-alpine-green);color:white;border:none;">
-             Alle Ã„nderungen speichern
+             Alle Aenderungen speichern
         </button>
         
     </div>`);
@@ -6417,7 +6417,7 @@ window.toggleMittagMenu = async () => {
     const ausblenden = document.getElementById('mittag-ausblenden')?.value || '14:30';
     
     if (!menuData.mittag.aktiv && !text) {
-        Utils.showToast('Bitte erst MenÃ¼-Text eingeben!', 'error');
+        Utils.showToast('Bitte erst Menue-Text eingeben!', 'error');
         return;
     }
     
@@ -6440,7 +6440,7 @@ window.toggleAbendMenu = async () => {
     const ausblenden = document.getElementById('abend-ausblenden')?.value || '19:30';
     
     if (!menuData.abend.aktiv && !text) {
-        Utils.showToast('Bitte erst MenÃ¼-Text eingeben!', 'error');
+        Utils.showToast('Bitte erst Menue-Text eingeben!', 'error');
         return;
     }
     
@@ -6455,7 +6455,7 @@ window.toggleAbendMenu = async () => {
     Router.navigate('admin-tagesmenu');
 };
 
-// Alle MenÃ¼s speichern (Text und Zeiten, ohne Aktivierungs-Status zu Ã¤ndern)
+// Alle Menues speichern (Text und Zeiten, ohne Aktivierungs-Status zu aendern)
 window.speichereAlleMenus = async () => {
     const menuData = await TagesMenu.getAlleMenus();
     
@@ -6473,7 +6473,7 @@ window.speichereAlleMenus = async () => {
     Router.navigate('admin-tagesmenu');
 };
 
-// Typ auswÃ¤hlen (visuelle Markierung)
+// Typ auswaehlen (visuelle Markierung)
 window.selectTyp = (typ) => {
     const labels = document.querySelectorAll('label[onclick^="selectTyp"]');
     labels.forEach(label => {
@@ -6498,7 +6498,7 @@ window.selectTyp = (typ) => {
 // Beispiel-Text setzen
 window.setBeispiel = (text) => {
     document.getElementById('nachricht-text').value = text;
-    Utils.showToast('Text eingefÃ¼gt!', 'info');
+    Utils.showToast('Text eingefuegt!', 'info');
 };
 
 // Nachricht erstellen
@@ -6526,7 +6526,7 @@ window.erstelleNachricht = async () => {
 
 // Nachricht deaktivieren
 window.deaktiviereNachricht = async () => {
-    if (!confirm('Nachricht wirklich deaktivieren?\n\nSie wird fÃ¼r alle GÃ¤ste sofort ausgeblendet.')) return;
+    if (!confirm('Nachricht wirklich deaktivieren?\n\nSie wird fuer alle Gaeste sofort ausgeblendet.')) return;
     
     try {
         await GastNachricht.deaktivieren();
@@ -6578,7 +6578,7 @@ Router.register('admin-cheese', async () => {
         <tr>
             <td colspan="6" style="padding:40px;text-align:center;color:#888;">
                 <div style="font-size:3rem;margin-bottom:12px;"></div>
-                <div style="font-size:1.1rem;">Keine offenen KÃ¤se-Bestellungen</div>
+                <div style="font-size:1.1rem;">Keine offenen Kaese-Bestellungen</div>
             </td>
         </tr>`;
     
@@ -6589,9 +6589,9 @@ Router.register('admin-cheese', async () => {
     UI.render(`
     <div class="app-header">
         <div class="header-left">
-            <button class="btn btn-secondary" onclick="Router.navigate('admin-dashboard')">â† ZurÃ¼ck</button>
+            <button class="btn btn-secondary" onclick="Router.navigate('admin-dashboard')">â† Zurueck</button>
         </div>
-        <div class="header-title"> KÃ¤se-Bestellungen</div>
+        <div class="header-title"> Kaese-Bestellungen</div>
         <div class="header-right">
             <button class="btn btn-secondary" onclick="Router.navigate('admin-cheese')"></button>
         </div>
@@ -6633,12 +6633,12 @@ Router.register('admin-cheese', async () => {
         </div>
         
         <div style="margin-top:20px;padding:16px;background:#fff3cd;border-radius:10px;font-size:0.9rem;color:#856404;">
-            <strong> Hinweis:</strong> Erledigte Bestellungen werden aus dieser Liste entfernt, bleiben aber fÃ¼r Auswertungen in der Datenbank erhalten.
+            <strong> Hinweis:</strong> Erledigte Bestellungen werden aus dieser Liste entfernt, bleiben aber fuer Auswertungen in der Datenbank erhalten.
         </div>
     </div>`);
 });
 
-// KÃ¤se-Bestellung als erledigt markieren
+// Kaese-Bestellung als erledigt markieren
 window.handleCheeseOrderDone = async (orderId) => {
     if (!confirm('Bestellung wirklich als erledigt markieren?')) return;
     
@@ -6654,7 +6654,7 @@ window.handleCheeseOrderDone = async (orderId) => {
 Router.register('admin-guests', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Alle GÃ¤ste laden - IMMER von Supabase wenn online (enthÃ¤lt pin_hash)
+    // Alle Gaeste laden - IMMER von Supabase wenn online (enthaelt pin_hash)
     let guests = [];
     let loadedFrom = 'lokal';
     
@@ -6664,11 +6664,11 @@ Router.register('admin-guests', async () => {
                 .from('profiles')
                 .select('*')
                 .eq('geloescht', false)
-                .eq('aktiv', true)  // Nur AKTIVE GÃ¤ste (nicht ausgecheckt)
+                .eq('aktiv', true)  // Nur AKTIVE Gaeste (nicht ausgecheckt)
                 .order('vorname');
             
             if (error) {
-                console.error('Supabase GÃ¤ste laden Fehler:', error);
+                console.error('Supabase Gaeste laden Fehler:', error);
             } else if (data && data.length > 0) {
                 loadedFrom = 'Supabase';
                 
@@ -6677,7 +6677,7 @@ Router.register('admin-guests', async () => {
                 const uniqueData = data.filter(g => {
                     const name = (g.display_name || g.vorname || g.first_name || '').toUpperCase().trim();
                     if (seenNames.has(name)) {
-                        console.log('âš ï¸ Duplikat Ã¼bersprungen:', name);
+                        console.log('âš ï¸ Duplikat uebersprungen:', name);
                         return false;
                     }
                     seenNames.add(name);
@@ -6695,21 +6695,21 @@ Router.register('admin-guests', async () => {
                         passwort: pin,  // PIN aus Supabase
                         passwordHash: pin,
                         pin_hash: pin,
-                        gruppenname: g.group_name || 'keiner Gruppe zugehÃ¶rig',
+                        gruppenname: g.group_name || 'keiner Gruppe zugehoerig',
                         ausnahmeumlage: g.ausnahmeumlage || false
                     };
                 });
-                console.log('âœ… GÃ¤ste von Supabase geladen:', guests.length, '(nach Deduplizierung)');
+                console.log('âœ… Gaeste von Supabase geladen:', guests.length, '(nach Deduplizierung)');
             }
         } catch(e) {
-            console.error('Supabase GÃ¤ste laden Exception:', e);
+            console.error('Supabase Gaeste laden Exception:', e);
         }
     }
     
     // Fallback: Lokale Daten - nur aktive, dedupliziert
     if (guests.length === 0) {
         let localGuests = await db.registeredGuests.toArray();
-        localGuests = localGuests.filter(g => !g.gelÃ¶scht && g.aktiv !== false);
+        localGuests = localGuests.filter(g => !g.geloescht && g.aktiv !== false);
         
         // Deduplizierung
         const seenNames = new Set();
@@ -6719,10 +6719,10 @@ Router.register('admin-guests', async () => {
             seenNames.add(name);
             return true;
         });
-        console.log('âš ï¸ GÃ¤ste von lokalem Cache geladen:', guests.length);
+        console.log('âš ï¸ Gaeste von lokalem Cache geladen:', guests.length);
     }
     
-    // Inaktive GÃ¤ste zaehlen (fÃ¼r Button)
+    // Inaktive Gaeste zaehlen (fuer Button)
     let inaktivCount = 0;
     if (supabaseClient && isOnline) {
         const { count } = await supabaseClient
@@ -6744,7 +6744,7 @@ Router.register('admin-guests', async () => {
     const gruppen = await db.gruppen.toArray();
     const gruppenAktiv = gruppen.filter(g => g.aktiv);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title"> GÃ¤steverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">â†</button><div class="header-title"> Gaesteverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <style>
             .switch { position:relative; display:inline-block; width:50px; height:26px; }
@@ -6763,7 +6763,7 @@ Router.register('admin-guests', async () => {
                         <label style="font-weight:600;font-size:0.85rem;">Nachname:</label>
                         <div style="display:flex;gap:8px;">
                             <input type="text" id="search-nachname" class="form-input" style="flex:1;">
-                            <button class="btn btn-secondary" onclick="filterGÃ¤steTabelle()">suchen</button>
+                            <button class="btn btn-secondary" onclick="filterGaesteTabelle()">suchen</button>
                         </div>
                     </div>
                     <div style="flex:1;min-width:150px;">
@@ -6772,12 +6772,12 @@ Router.register('admin-guests', async () => {
                             <select id="search-gruppe" class="form-input" style="flex:1;">
                                 <option value="">Alle Gruppen</option>
                                 ${gruppenAktiv.map(g => `<option value="${g.name}">${g.name}</option>`).join('')}
-                                <option value="keiner Gruppe zugehÃ¶rig">keiner Gruppe zugehÃ¶rig</option>
+                                <option value="keiner Gruppe zugehoerig">keiner Gruppe zugehoerig</option>
                             </select>
-                            <button class="btn btn-secondary" onclick="filterGÃ¤steTabelle()">suchen</button>
+                            <button class="btn btn-secondary" onclick="filterGaesteTabelle()">suchen</button>
                         </div>
                     </div>
-                    <button class="btn btn-secondary" onclick="clearGÃ¤steFilter()">Suche lÃ¶schen</button>
+                    <button class="btn btn-secondary" onclick="clearGaesteFilter()">Suche loeschen</button>
                     <button class="btn btn-primary" onclick="openNeuerGastModal()">+ Neuer Gast</button>
                 </div>
             </div>
@@ -6786,11 +6786,11 @@ Router.register('admin-guests', async () => {
         <!-- Tabelle -->
         <div class="card">
             <div class="card-header" style="background:#fffde7;display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-weight:700;">Aktive GÃ¤ste (${guests.length})</span>
-                <button class="btn btn-secondary" onclick="exportGÃ¤steExcel()"> Export fÃ¼r Access</button>
+                <span style="font-weight:700;">Aktive Gaeste (${guests.length})</span>
+                <button class="btn btn-secondary" onclick="exportGaesteExcel()"> Export fuer Access</button>
             </div>
             <div style="overflow-x:auto;">
-                <table id="gÃ¤ste-tabelle" style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+                <table id="gaeste-tabelle" style="width:100%;border-collapse:collapse;font-size:0.9rem;">
                     <thead>
                         <tr style="background:#fffde7;">
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:120px;">Nachname</th>
@@ -6802,10 +6802,10 @@ Router.register('admin-guests', async () => {
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:180px;">Aktionen</th>
                         </tr>
                     </thead>
-                    <tbody id="gÃ¤ste-tbody">
-                        ${guests.length === 0 ? '<tr><td colspan="7" style="padding:20px;text-align:center;color:#666;">Keine GÃ¤ste vorhanden</td></tr>' : guests.map(g => {
+                    <tbody id="gaeste-tbody">
+                        ${guests.length === 0 ? '<tr><td colspan="7" style="padding:20px;text-align:center;color:#666;">Keine Gaeste vorhanden</td></tr>' : guests.map(g => {
                             const name = g.nachname || g.firstName || '-';
-                            const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehÃ¶rig';
+                            const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehoerig';
                             const pw = g.passwort || g.passwordHash || g.pin_hash;
                             const pwDisplay = pw ? pw : '<span style="color:#e74c3c;">âš KEINE</span>';
                             const pwStyle = pw ? 'color:#2c3e50;' : 'color:#e74c3c;';
@@ -6815,7 +6815,7 @@ Router.register('admin-guests', async () => {
                             const lastLogin = g.last_login_at || g.lastLoginAt;
                             const lastLoginFormatted = lastLogin ? new Date(lastLogin).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-';
                             return `
-                            <tr class="gÃ¤ste-row" data-name="${name.toLowerCase()}" data-gruppe="${grpName.toLowerCase()}" data-id="${g.id}">
+                            <tr class="gaeste-row" data-name="${name.toLowerCase()}" data-gruppe="${grpName.toLowerCase()}" data-id="${g.id}">
                                 <td style="padding:10px;border:1px solid #ddd;font-weight:600;">${name}</td>
                                 <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:1.2rem;font-weight:bold;${pwStyle}">${pwDisplay}</td>
@@ -6828,9 +6828,9 @@ Router.register('admin-guests', async () => {
                                     </label>
                                 </td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;white-space:nowrap;">
-                                    <button class="btn btn-primary" onclick="adminBuchenFÃ¼rGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="FÃ¼r diesen Gast buchen"></button>
+                                    <button class="btn btn-primary" onclick="adminBuchenFuerGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="Fuer diesen Gast buchen"></button>
                                     <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">âœï¸</button>
-                                    <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="LÃ¶schen"></button>
+                                    <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Loeschen"></button>
                                 </td>
                             </tr>`;
                         }).join('')}
@@ -6838,7 +6838,7 @@ Router.register('admin-guests', async () => {
                 </table>
             </div>
             <div style="padding:12px;background:#f8f9fa;border-top:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <small>Gesamt: ${guests.length} aktive GÃ¤ste | Ausgenommen von Umlage: ${guests.filter(g => g.ausnahmeumlage).length}</small>
+                <small>Gesamt: ${guests.length} aktive Gaeste | Ausgenommen von Umlage: ${guests.filter(g => g.ausnahmeumlage).length}</small>
                 <div style="display:flex;gap:8px;">
                     ${inaktivCount > 0 ? `<button class="btn btn-secondary" onclick="Router.navigate('admin-guests-inaktiv')" style="padding:6px 12px;font-size:0.85rem;"> Inaktive (${inaktivCount})</button>` : ''}
                     <button class="btn btn-secondary" onclick="syncPinsToSupabase()" style="padding:6px 12px;font-size:0.85rem;"> Sync</button>
@@ -6847,7 +6847,7 @@ Router.register('admin-guests', async () => {
         </div>
     </div>
     
-    <!-- Modal fÃ¼r Neuer/Bearbeiten Gast -->
+    <!-- Modal fuer Neuer/Bearbeiten Gast -->
     <div id="gast-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
         <div style="background:white;padding:24px;border-radius:12px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
             <h3 id="gast-modal-title" style="margin-bottom:16px;">Neuer Gast</h3>
@@ -6864,7 +6864,7 @@ Router.register('admin-guests', async () => {
                 <div>
                     <label style="font-weight:600;">Gruppenname:</label>
                     <select id="gast-gruppenname" class="form-input">
-                        <option value="keiner Gruppe zugehÃ¶rig">keiner Gruppe zugehÃ¶rig</option>
+                        <option value="keiner Gruppe zugehoerig">keiner Gruppe zugehoerig</option>
                         ${gruppenAktiv.map(g => `<option value="${g.name}">${g.name}</option>`).join('')}
                     </select>
                 </div>
@@ -6890,7 +6890,7 @@ Router.register('admin-guests', async () => {
 Router.register('admin-guests-inaktiv', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Inaktive GÃ¤ste laden (aktiv = false)
+    // Inaktive Gaeste laden (aktiv = false)
     let guests = [];
     
     if (supabaseClient && isOnline) {
@@ -6908,26 +6908,26 @@ Router.register('admin-guests-inaktiv', async () => {
                     nachname: g.vorname || g.first_name,
                     firstName: g.vorname || g.first_name,
                     passwort: g.pin_hash,
-                    gruppenname: g.group_name || 'keiner Gruppe zugehÃ¶rig'
+                    gruppenname: g.group_name || 'keiner Gruppe zugehoerig'
                 }));
             }
         } catch(e) {
-            console.error('Inaktive GÃ¤ste laden Fehler:', e);
+            console.error('Inaktive Gaeste laden Fehler:', e);
         }
     }
     
     // Fallback lokal
     if (guests.length === 0) {
         const all = await db.registeredGuests.toArray();
-        guests = all.filter(g => !g.gelÃ¶scht && g.aktiv === false);
+        guests = all.filter(g => !g.geloescht && g.aktiv === false);
     }
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">â†’</button><div class="header-title"> Inaktive GÃ¤ste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">â†’</button><div class="header-title"> Inaktive Gaeste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;text-align:center;">
-                <div style="font-size:1.5rem;font-weight:700;">${guests.length} inaktive GÃ¤ste</div>
-                <div style="opacity:0.9;">Diese GÃ¤ste haben ausgecheckt und sind nicht mehr aktiv</div>
+                <div style="font-size:1.5rem;font-weight:700;">${guests.length} inaktive Gaeste</div>
+                <div style="opacity:0.9;">Diese Gaeste haben ausgecheckt und sind nicht mehr aktiv</div>
             </div>
         </div>
         
@@ -6942,7 +6942,7 @@ Router.register('admin-guests-inaktiv', async () => {
                         </tr>
                     </thead>
                     <tbody>
-                        ${guests.length === 0 ? '<tr><td colspan="3" style="padding:20px;text-align:center;color:#666;">Keine inaktiven GÃ¤ste</td></tr>' : guests.map(g => {
+                        ${guests.length === 0 ? '<tr><td colspan="3" style="padding:20px;text-align:center;color:#666;">Keine inaktiven Gaeste</td></tr>' : guests.map(g => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || '-';
                             return `
@@ -6951,7 +6951,7 @@ Router.register('admin-guests-inaktiv', async () => {
                                 <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;">
                                     <button class="btn btn-primary" onclick="reactivateGast('${g.id}', '${name}')" style="padding:6px 12px;" title="Wieder aktivieren"> Reaktivieren</button>
-                                    <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;margin-left:4px;" title="Endgueltig lÃ¶schen"></button>
+                                    <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;margin-left:4px;" title="Endgueltig loeschen"></button>
                                 </td>
                             </tr>`;
                         }).join('')}
@@ -6962,7 +6962,7 @@ Router.register('admin-guests-inaktiv', async () => {
         
         <div class="card mt-3" style="background:#fff3cd;border:1px solid #ffc107;">
             <div style="padding:12px;">
-                <strong> Hinweis:</strong> Ausgecheckte GÃ¤ste kÃ¶nnen sich nicht mehr anmelden. 
+                <strong> Hinweis:</strong> Ausgecheckte Gaeste koennen sich nicht mehr anmelden. 
                 Mit "Reaktivieren" kann ein Gast wieder aktiviert werden.
             </div>
         </div>
@@ -6973,7 +6973,7 @@ Router.register('admin-guests-inaktiv', async () => {
 // Sync alle lokalen PINs nach Supabase
 window.syncPinsToSupabase = async () => {
     if (!supabaseClient || !isOnline) {
-        Utils.showToast('Offline - Sync nicht mÃ¶glich', 'error');
+        Utils.showToast('Offline - Sync nicht moeglich', 'error');
         return;
     }
     
@@ -6984,7 +6984,7 @@ window.syncPinsToSupabase = async () => {
     let errors = 0;
     
     for (const g of localGuests) {
-        if (!g.id || g.gelÃ¶scht) continue;
+        if (!g.id || g.geloescht) continue;
         
         const pin = g.passwort || g.passwordHash;
         if (!pin) continue;
@@ -6996,7 +6996,7 @@ window.syncPinsToSupabase = async () => {
                 .update({ 
                     pin_hash: pin,
                     vorname: g.nachname || g.firstName,
-                    group_name: g.gruppenname || g.group_name || 'keiner Gruppe zugehÃ¶rig'
+                    group_name: g.gruppenname || g.group_name || 'keiner Gruppe zugehoerig'
                 })
                 .eq('id', g.id);
             
@@ -7008,13 +7008,13 @@ window.syncPinsToSupabase = async () => {
                         id: g.id,
                         pin_hash: pin,
                         vorname: g.nachname || g.firstName,
-                        group_name: g.gruppenname || g.group_name || 'keiner Gruppe zugehÃ¶rig',
+                        group_name: g.gruppenname || g.group_name || 'keiner Gruppe zugehoerig',
                         aktiv: true,
                         geloescht: false
                     });
                 
                 if (insertError) {
-                    console.error('Sync Fehler fÃ¼r', g.id, insertError);
+                    console.error('Sync Fehler fuer', g.id, insertError);
                     errors++;
                 } else {
                     synced++;
@@ -7023,7 +7023,7 @@ window.syncPinsToSupabase = async () => {
                 synced++;
             }
         } catch (e) {
-            console.error('Sync Exception fÃ¼r', g.id, e);
+            console.error('Sync Exception fuer', g.id, e);
             errors++;
         }
     }
@@ -7068,11 +7068,11 @@ window.reactivateGast = async (id, name) => {
     Router.navigate('admin-guests-inaktiv');
 };
 
-window.filterGÃ¤steTabelle = () => {
+window.filterGaesteTabelle = () => {
     const suchName = (document.getElementById('search-nachname')?.value || '').toLowerCase();
     const suchGruppe = (document.getElementById('search-gruppe')?.value || '').toLowerCase();
     
-    document.querySelectorAll('.gÃ¤ste-row').forEach(row => {
+    document.querySelectorAll('.gaeste-row').forEach(row => {
         const name = row.dataset.name || '';
         const gruppe = row.dataset.gruppe || '';
         
@@ -7083,10 +7083,10 @@ window.filterGÃ¤steTabelle = () => {
     });
 };
 
-window.clearGÃ¤steFilter = () => {
+window.clearGaesteFilter = () => {
     document.getElementById('search-nachname').value = '';
     document.getElementById('search-gruppe').value = '';
-    document.querySelectorAll('.gÃ¤ste-row').forEach(row => row.style.display = '');
+    document.querySelectorAll('.gaeste-row').forEach(row => row.style.display = '');
 };
 
 // Modal Funktionen
@@ -7094,7 +7094,7 @@ window.openNeuerGastModal = async () => {
     document.getElementById('gast-modal-title').textContent = 'Neuer Gast anlegen';
     document.getElementById('gast-edit-id').value = '';
     document.getElementById('gast-nachname').value = '';
-    document.getElementById('gast-gruppenname').value = 'keiner Gruppe zugehÃ¶rig';
+    document.getElementById('gast-gruppenname').value = 'keiner Gruppe zugehoerig';
     document.getElementById('gast-passwort').value = '';
     
     document.getElementById('gast-modal').style.display = 'flex';
@@ -7121,7 +7121,7 @@ window.editGast = async (id) => {
                     firstName: data.vorname || data.first_name,
                     passwort: data.pin_hash,
                     passwordHash: data.pin_hash,
-                    gruppenname: data.group_name || 'keiner Gruppe zugehÃ¶rig'
+                    gruppenname: data.group_name || 'keiner Gruppe zugehoerig'
                 };
                 console.log('Gast von Supabase geladen:', gast.nachname);
             }
@@ -7132,20 +7132,20 @@ window.editGast = async (id) => {
     
     // Fallback: Lokaler Cache
     if (!gast) {
-        const alleGÃ¤ste = await db.registeredGuests.toArray();
-        gast = alleGÃ¤ste.find(g => String(g.id) === String(id));
+        const alleGaeste = await db.registeredGuests.toArray();
+        gast = alleGaeste.find(g => String(g.id) === String(id));
     }
     
     if (!gast) {
         Utils.showToast('Gast nicht gefunden!', 'error');
-        console.error('Gast nicht gefunden fÃ¼r ID:', id);
+        console.error('Gast nicht gefunden fuer ID:', id);
         return;
     }
     
     document.getElementById('gast-modal-title').textContent = 'Gast bearbeiten';
     document.getElementById('gast-edit-id').value = gast.id;
     document.getElementById('gast-nachname').value = gast.nachname || gast.firstName || '';
-    document.getElementById('gast-gruppenname').value = gast.gruppenname || gast.group_name || 'keiner Gruppe zugehÃ¶rig';
+    document.getElementById('gast-gruppenname').value = gast.gruppenname || gast.group_name || 'keiner Gruppe zugehoerig';
     document.getElementById('gast-passwort').value = gast.passwort || gast.passwordHash || '';
     
     document.getElementById('gast-modal').style.display = 'flex';
@@ -7167,8 +7167,8 @@ window.toggleAusnahme = async (id, checked) => {
         }
         
         // Lokal updaten
-        const alleGÃ¤ste = await db.registeredGuests.toArray();
-        const gast = alleGÃ¤ste.find(g => String(g.id) === String(id));
+        const alleGaeste = await db.registeredGuests.toArray();
+        const gast = alleGaeste.find(g => String(g.id) === String(id));
         
         if (gast) {
             await db.registeredGuests.update(gast.id, { ausnahmeumlage: checked });
@@ -7204,22 +7204,22 @@ window.saveGast = async () => {
         return;
     }
     
-    // Alle GÃ¤ste laden (von Supabase wenn online)
-    let alleGÃ¤ste = [];
+    // Alle Gaeste laden (von Supabase wenn online)
+    let alleGaeste = [];
     if (supabaseClient && isOnline) {
         try {
             const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false).eq('aktiv', true);
-            if (data) alleGÃ¤ste = data.map(g => ({ ...g, nachname: g.vorname, passwort: g.pin_hash }));
+            if (data) alleGaeste = data.map(g => ({ ...g, nachname: g.vorname, passwort: g.pin_hash }));
         } catch(e) {}
     }
-    if (alleGÃ¤ste.length === 0) {
-        alleGÃ¤ste = await db.registeredGuests.toArray();
-        alleGÃ¤ste = alleGÃ¤ste.filter(g => !g.gelÃ¶scht && g.aktiv !== false);
+    if (alleGaeste.length === 0) {
+        alleGaeste = await db.registeredGuests.toArray();
+        alleGaeste = alleGaeste.filter(g => !g.geloescht && g.aktiv !== false);
     }
     
-    // PrÃ¼fen ob Name schon vergeben - NUR bei AKTIVEN GÃ¤sten!
-    // Ausgecheckte GÃ¤ste (aktiv=false) blockieren den Namen NICHT
-    const nameExists = alleGÃ¤ste.find(g => 
+    // Pruefen ob Name schon vergeben - NUR bei AKTIVEN Gaesten!
+    // Ausgecheckte Gaeste (aktiv=false) blockieren den Namen NICHT
+    const nameExists = alleGaeste.find(g => 
         ((g.nachname || g.vorname || g.firstName || '').toUpperCase() === nachname) && 
         String(g.id) !== String(editId)
     );
@@ -7228,7 +7228,7 @@ window.saveGast = async () => {
         return;
     }
     
-    // PIN-Duplikate sind erlaubt - keine PrÃ¼fung nÃ¶tig
+    // PIN-Duplikate sind erlaubt - keine Pruefung noetig
     
     if (editId) {
         // === BEARBEITEN ===
@@ -7297,7 +7297,7 @@ window.saveGast = async () => {
         
         const now = new Date().toISOString();
         
-        // Generiere pseudo-Email fÃ¼r Supabase Auth (WICHTIG fÃ¼r Buchungen!)
+        // Generiere pseudo-Email fuer Supabase Auth (WICHTIG fuer Buchungen!)
         const uniqueId = Utils.uuid().substring(0, 8);
         const email = `${nachname.toLowerCase().replace(/[^a-z]/g, '')}.${uniqueId}@kassa.local`;
         
@@ -7306,10 +7306,10 @@ window.saveGast = async () => {
         
         let finalId = Utils.uuid(); // Fallback ID
         
-        // Supabase Auth User erstellen (WICHTIG fÃ¼r RLS/Buchungen!)
+        // Supabase Auth User erstellen (WICHTIG fuer RLS/Buchungen!)
         if (supabaseClient && isOnline) {
             try {
-                // 1. Supabase Auth SignUp - erstellt User UND ermÃ¶glicht Auth Session
+                // 1. Supabase Auth SignUp - erstellt User UND ermoeglicht Auth Session
                 const { data: authData, error: authError } = await supabaseClient.auth.signUp({
                     email: email,
                     password: supabasePassword,
@@ -7331,7 +7331,7 @@ window.saveGast = async () => {
                 finalId = authData.user?.id || finalId;
                 console.log('âœ… Supabase Auth User erstellt mit ID:', finalId);
                 
-                // 2. Profile aktualisieren mit zusÃ¤tzlichen Daten
+                // 2. Profile aktualisieren mit zusaetzlichen Daten
                 const { error: profileError } = await supabaseClient
                     .from('profiles')
                     .upsert({ 
@@ -7386,8 +7386,8 @@ window.saveGast = async () => {
 window.handleDeleteGast = async (id) => {
     console.log('handleDeleteGast called with id:', id);
     
-    const alleGÃ¤ste = await db.registeredGuests.toArray();
-    const gast = alleGÃ¤ste.find(g => String(g.id) === String(id));
+    const alleGaeste = await db.registeredGuests.toArray();
+    const gast = alleGaeste.find(g => String(g.id) === String(id));
     
     if (!gast) {
         Utils.showToast('Gast nicht gefunden!', 'error');
@@ -7395,25 +7395,25 @@ window.handleDeleteGast = async (id) => {
     }
     
     const name = gast.nachname || gast.firstName;
-    if (!confirm(`Gast "${name}" wirklich lÃ¶schen?`)) return;
+    if (!confirm(`Gast "${name}" wirklich loeschen?`)) return;
     
     // Soft delete
     await db.registeredGuests.update(gast.id, {
-        gelÃ¶scht: true,
-        gelÃ¶schtAm: new Date().toISOString(),
+        geloescht: true,
+        geloeschtAm: new Date().toISOString(),
         aktiv: false
     });
     
     await DataProtection.createBackup();
-    Utils.showToast('Gast gelÃ¶scht', 'success');
+    Utils.showToast('Gast geloescht', 'success');
     Router.navigate('admin-guests');
 };
 
-// Admin bucht fÃ¼r Gast
-window.adminBuchenFÃ¼rGast = async (id) => {
-    console.log('adminBuchenFÃ¼rGast called with id:', id);
+// Admin bucht fuer Gast
+window.adminBuchenFuerGast = async (id) => {
+    console.log('adminBuchenFuerGast called with id:', id);
     
-    // Versuche zuerst das Profil von Supabase zu laden (hat Email fÃ¼r Auth)
+    // Versuche zuerst das Profil von Supabase zu laden (hat Email fuer Auth)
     let gast = null;
     if (supabaseClient && isOnline) {
         try {
@@ -7440,8 +7440,8 @@ window.adminBuchenFÃ¼rGast = async (id) => {
     
     // Fallback: Lokal laden
     if (!gast) {
-        const alleGÃ¤ste = await db.registeredGuests.toArray();
-        gast = alleGÃ¤ste.find(g => String(g.id) === String(id));
+        const alleGaeste = await db.registeredGuests.toArray();
+        gast = alleGaeste.find(g => String(g.id) === String(id));
     }
     
     if (!gast) {
@@ -7451,7 +7451,7 @@ window.adminBuchenFÃ¼rGast = async (id) => {
     
     const name = gast.nachname || gast.firstName;
     
-    // WICHTIG: Auth Session fÃ¼r den Gast erstellen (fÃ¼r RLS/Buchungen)
+    // WICHTIG: Auth Session fuer den Gast erstellen (fuer RLS/Buchungen)
     if (supabaseClient && isOnline && gast.email && gast.passwort) {
         try {
             const supabasePassword = 'PIN_' + gast.passwort + '_KASSA';
@@ -7460,10 +7460,10 @@ window.adminBuchenFÃ¼rGast = async (id) => {
                 password: supabasePassword
             });
             if (error) {
-                console.warn('Auth Session fÃ¼r Gast fehlgeschlagen:', error.message);
+                console.warn('Auth Session fuer Gast fehlgeschlagen:', error.message);
                 // Trotzdem fortfahren - Buchung wird lokal gespeichert
             } else {
-                console.log('âœ… Auth Session fÃ¼r Gast erstellt');
+                console.log('âœ… Auth Session fuer Gast erstellt');
             }
         } catch(e) {
             console.warn('Auth Session Exception:', e);
@@ -7480,16 +7480,16 @@ window.adminBuchenFÃ¼rGast = async (id) => {
     // Gruppe setzen falls vorhanden
     State.selectedGroup = gast.gruppenname || gast.group_name || null;
     
-    Utils.showToast(`Buchen fÃ¼r: ${name}`, 'info');
+    Utils.showToast(`Buchen fuer: ${name}`, 'info');
     
-    // Zum BuchungsmenÃ¼ navigieren
+    // Zum Buchungsmenue navigieren
     Router.navigate('buchen');
 };
 
-// Export fÃ¼r Access
-window.exportGÃ¤steExcel = async () => {
+// Export fuer Access
+window.exportGaesteExcel = async () => {
     let guests = await db.registeredGuests.toArray();
-    guests = guests.filter(g => !g.gelÃ¶scht);
+    guests = guests.filter(g => !g.geloescht);
     
     const rows = guests.map((g, index) => ({
         'ID': index + 6700,
@@ -7502,7 +7502,7 @@ window.exportGÃ¤steExcel = async () => {
         'Email-Name': '',
         'Geburtsdatum': '',
         'Gruppennr': 0,
-        'Gruppenname': g.gruppenname || g.group_name || 'keiner Gruppe zugehÃ¶rig',
+        'Gruppenname': g.gruppenname || g.group_name || 'keiner Gruppe zugehoerig',
         'Aktiv': true,
         'Passwort': g.passwort || g.passwordHash || '',
         'Ausnahmeumlage': g.ausnahmeumlage || false
@@ -7510,13 +7510,13 @@ window.exportGÃ¤steExcel = async () => {
     
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, 'GÃ¤ste');
+    XLSX.utils.book_append_sheet(wb, ws, 'Gaeste');
     
     const heute = new Date();
     const datumStr = `${heute.getDate().toString().padStart(2,'0')}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getFullYear()}`;
-    XLSX.writeFile(wb, `GÃ¤ste_Export_${datumStr}.xlsx`);
+    XLSX.writeFile(wb, `Gaeste_Export_${datumStr}.xlsx`);
     
-    Utils.showToast(`${guests.length} GÃ¤ste exportiert`, 'success');
+    Utils.showToast(`${guests.length} Gaeste exportiert`, 'success');
 };
 
 Router.register('admin-articles', async () => {
@@ -7608,7 +7608,7 @@ Router.register('admin-articles', async () => {
         
         return `<tr class="article-row" data-name="${a.name.toLowerCase()}" data-sku="${(a.sku||'').toLowerCase()}" data-id="${a.artikel_id}">
             <td style="width:50px;text-align:center;font-family:monospace;font-size:0.85rem;">
-                <span onclick="changeArtikelId(${a.artikel_id})" style="cursor:pointer;padding:4px 8px;background:#f0f0f0;border-radius:4px;border:1px solid #ddd;" title="Klicken zum Ã„ndern der ID">${a.artikel_id}</span>
+                <span onclick="changeArtikelId(${a.artikel_id})" style="cursor:pointer;padding:4px 8px;background:#f0f0f0;border-radius:4px;border:1px solid #ddd;" title="Klicken zum Aendern der ID">${a.artikel_id}</span>
             </td>
             <td style="width:40px;text-align:center;font-weight:700;color:var(--color-alpine-green);">${pos}</td>
             <td style="width:50px;text-align:center;">${img}</td>
@@ -7687,7 +7687,7 @@ Router.register('admin-articles', async () => {
             <div class="card-body">
                 <p style="margin-bottom:16px;color:var(--color-stone-dark);">CSV: <code>ID,Artikelname,Preis,Warengruppe</code><br><small>Bei gleicher ID: Update</small></p>
                 <input type="file" id="artikel-import" accept=".csv" style="display:none" onchange="handleArtikelImport(event)">
-                <button class="btn btn-primary" onclick="document.getElementById('artikel-import').click()"> CSV auswÃ¤hlen</button>
+                <button class="btn btn-primary" onclick="document.getElementById('artikel-import').click()"> CSV auswaehlen</button>
                 <button class="btn btn-secondary" onclick="DataProtection.exportArticlesCSV()" style="margin-left:8px;"> Export</button>
             </div>
         </div>
@@ -7730,7 +7730,7 @@ Router.register('admin-articles', async () => {
     <div id="article-modal-container"></div>`);
 });
 
-// Filter fÃ¼r Artikel-Tabelle
+// Filter fuer Artikel-Tabelle
 window.filterArticleTable = (q) => {
     const ql = q.toLowerCase();
     document.querySelectorAll('.article-row').forEach(row => {
@@ -7739,7 +7739,7 @@ window.filterArticleTable = (q) => {
     });
 };
 
-// Tabellen-Styling und PIN-Dots dynamisch hinzufÃ¼gen
+// Tabellen-Styling und PIN-Dots dynamisch hinzufuegen
 if (!document.getElementById('table-styles')) {
     const style = document.createElement('style');
     style.id = 'table-styles';
@@ -7843,15 +7843,15 @@ Router.register('admin-artikel-sortierung', async () => {
                     <h1 style="font-size:1.5rem;margin:0;"> Artikel sortieren</h1>
                     <p style="color:#666;font-size:0.9rem;margin:4px 0 0;">Drag & Drop zum Umsortieren (nur aktive Artikel)</p>
                 </div>
-                <button class="btn btn-secondary" onclick="Router.navigate('admin')">â† ZurÃ¼ck</button>
+                <button class="btn btn-secondary" onclick="Router.navigate('admin')">â† Zurueck</button>
             </div>
             
             <div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:8px;padding:12px;margin-bottom:20px;">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <span style="font-size:1.2rem;"></span>
                     <div>
-                        <strong>Hinweis:</strong> Ziehen Sie Artikel innerhalb einer Kategorie um die Reihenfolge zu Ã¤ndern.
-                        Ã„nderungen werden automatisch in der Cloud gespeichert.
+                        <strong>Hinweis:</strong> Ziehen Sie Artikel innerhalb einer Kategorie um die Reihenfolge zu aendern.
+                        Aenderungen werden automatisch in der Cloud gespeichert.
                     </div>
                 </div>
             </div>
@@ -7962,7 +7962,7 @@ Router.register('admin-artikel-sortierung', async () => {
     initArtikelSortierungDragDrop();
 });
 
-// Drag & Drop fÃ¼r Artikel-Sortierung
+// Drag & Drop fuer Artikel-Sortierung
 function initArtikelSortierungDragDrop() {
     const containers = document.querySelectorAll('.sort-artikel-container');
     let draggedItem = null;
@@ -8017,7 +8017,7 @@ function initArtikelSortierungDragDrop() {
                         }
                         
                         updatePositionNumbers();
-                        showSortierungStatus('Reihenfolge geÃ¤ndert - Speichern nicht vergessen!', 'warning');
+                        showSortierungStatus('Reihenfolge geaendert - Speichern nicht vergessen!', 'warning');
                     }
                 }
             });
@@ -8101,10 +8101,10 @@ window.speichereSortierungSupabase = async () => {
 
 Router.register('dashboard', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
-    // PrÃ¼fen ob Gruppenauswahl nÃ¶tig
+    // Pruefen ob Gruppenauswahl noetig
     const gruppenAktiv = await Gruppen.isAbfrageAktiv();
     if (gruppenAktiv && !State.selectedGroup) {
-        Router.navigate('gruppe-wÃ¤hlen');
+        Router.navigate('gruppe-waehlen');
         return;
     }
     // Direkt zur Buchen-Seite weiterleiten
@@ -8114,16 +8114,16 @@ Router.register('dashboard', async () => {
 Router.register('buchen', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
     
-    // SyncManager starten fÃ¼r Hintergrund-Synchronisation
+    // SyncManager starten fuer Hintergrund-Synchronisation
     SyncManager.startBackgroundSync();
     
     // i18n Setup
     const t = (key, params) => i18n.t(key, params);
     
-    // PrÃ¼fen ob Gruppenauswahl nÃ¶tig
+    // Pruefen ob Gruppenauswahl noetig
     const gruppenAktiv = await Gruppen.isAbfrageAktiv();
     if (gruppenAktiv && !State.selectedGroup) {
-        Router.navigate('gruppe-wÃ¤hlen');
+        Router.navigate('gruppe-waehlen');
         return;
     }
     
@@ -8167,11 +8167,11 @@ Router.register('buchen', async () => {
         nachDatum[b.datum].push(b);
     });
     
-    // Fehlende GetrÃ¤nke laden
-    const fehlendeOffen = await FehlendeGetrÃ¤nke.getOffene();
+    // Fehlende Getraenke laden
+    const fehlendeOffen = await FehlendeGetraenke.getOffene();
     
     // Aktuelle Gruppe
-    const currentGroup = (State.selectedGroup && State.selectedGroup !== 'keiner Gruppe zugehÃ¶rig') ? State.selectedGroup : '';
+    const currentGroup = (State.selectedGroup && State.selectedGroup !== 'keiner Gruppe zugehoerig') ? State.selectedGroup : '';
     
     const renderTileContent = (a) => {
         if (a.bild && a.bild.startsWith('data:')) {
@@ -8338,7 +8338,7 @@ window.toggleWarenkorbDropdown = () => {
     }
 };
 
-// Dropdown schlieÃƒÅ¸en wenn ausserhalb geklickt
+// Dropdown schliessen wenn ausserhalb geklickt
 document.addEventListener('click', (e) => {
     const dropdown = document.getElementById('warenkorb-dropdown');
     const btn = document.getElementById('warenkorb-btn');
@@ -8363,14 +8363,14 @@ window.toggleBuchungsDetails = () => {
     }
 };
 
-// Fehlende GetrÃ¤nke uebernehmen
+// Fehlende Getraenke uebernehmen
 window.uebernehmeFehlend = async (id) => {
     const gastId = State.currentUser?.id || State.currentUser?.gast_id;
     const gastName = State.currentUser?.firstName || State.currentUser?.vorname;
     if (!gastId) return;
     
     try {
-        await FehlendeGetrÃ¤nke.uebernehmen(id, gastId, gastName);
+        await FehlendeGetraenke.uebernehmen(id, gastId, gastName);
         Router.navigate('buchen'); // Seite neu laden - Artikel verschwindet
     } catch (e) {
         Utils.showToast(e.message || 'Fehler', 'error');
@@ -8390,7 +8390,7 @@ window.bucheArtikelDirekt = async (id) => {
     }
 };
 
-// Long-Press fÃ¼r Mengenauswahl
+// Long-Press fuer Mengenauswahl
 let artikelPressTimer = null;
 let artikelPressId = null;
 let artikelLongPressed = false;
@@ -8398,7 +8398,7 @@ let artikelLongPressed = false;
 let artikelTouchStartX = null;
 let artikelTouchStartY = null;
 let artikelPressStartTime = null; // Zeitpunkt des Touch-Starts
-const TOUCH_MOVE_THRESHOLD = 30; // Pixel - wenn mehr bewegt, ist es ein Scroll (erhÃ¶ht fÃ¼r besseres Scrollen)
+const TOUCH_MOVE_THRESHOLD = 30; // Pixel - wenn mehr bewegt, ist es ein Scroll (erhoeht fuer besseres Scrollen)
 
 window.artikelPressStart = (event, artikelId) => {
     // NICHT event.preventDefault() bei touchstart - sonst funktioniert Scrollen nicht!
@@ -8419,7 +8419,7 @@ window.artikelPressStart = (event, artikelId) => {
     // Nach 500ms Long-Press -> Mengen-Modal zeigen
     artikelPressTimer = setTimeout(async () => {
         artikelLongPressed = true;
-        // Vibration feedback wenn verfÃ¼gbar
+        // Vibration feedback wenn verfuegbar
         if (navigator.vibrate) navigator.vibrate(50);
         await showMengenModal(artikelId);
     }, 500);
@@ -8464,7 +8464,7 @@ window.artikelPressEnd = (event) => {
         touchEndY = event.clientY;
     }
     
-    // PrÃ¼fen ob es ein Scroll war (Finger hat sich zu viel bewegt)
+    // Pruefen ob es ein Scroll war (Finger hat sich zu viel bewegt)
     let wasScroll = false;
     if (artikelTouchStartX !== null && artikelTouchStartY !== null) {
         const deltaX = Math.abs(touchEndX - artikelTouchStartX);
@@ -8472,8 +8472,8 @@ window.artikelPressEnd = (event) => {
         wasScroll = deltaX > TOUCH_MOVE_THRESHOLD || deltaY > TOUCH_MOVE_THRESHOLD;
     }
     
-    // Wenn kein Long-Press UND kein Scroll, dann normaler Klick (1 StÃ¼ck buchen)
-    // Touch-Dauer prÃ¼fen (mindestens 20ms um versehentliches Antippen zu vermeiden)
+    // Wenn kein Long-Press UND kein Scroll, dann normaler Klick (1 Stueck buchen)
+    // Touch-Dauer pruefen (mindestens 20ms um versehentliches Antippen zu vermeiden)
     const touchDuration = artikelPressStartTime ? (Date.now() - artikelPressStartTime) : 1000;
     if (!artikelLongPressed && artikelPressId && !wasScroll && touchDuration >= 20) {
         bucheArtikelDirekt(artikelPressId);
@@ -8650,9 +8650,9 @@ window.syncFromCloud = async (silent = false) => {
     if (!silent) Utils.showToast(' Synchronisiere...', 'info');
     
     try {
-        // Lokalen GÃ¤ste-Cache lÃ¶schen
+        // Lokalen Gaeste-Cache loeschen
         await db.registeredGuests.clear();
-        console.log('âœ… Lokaler GÃ¤ste-Cache gelÃ¶scht');
+        console.log('âœ… Lokaler Gaeste-Cache geloescht');
         
         // Alle Profile von Supabase laden
         const { data: profiles, error } = await supabaseClient
@@ -8681,7 +8681,7 @@ window.syncFromCloud = async (silent = false) => {
                         passwordHash: p.pin_hash,
                         gruppenname: p.group_name,
                         group_name: p.group_name,
-                        gelÃ¶scht: p.gelÃ¶scht,
+                        geloescht: p.geloescht,
                         email: p.email
                     });
                 } catch(e) {
@@ -8701,15 +8701,15 @@ window.syncFromCloud = async (silent = false) => {
     }
 };
 
-// Lokalen Cache komplett lÃ¶schen (fÃ¼r Debugging)
+// Lokalen Cache komplett loeschen (fuer Debugging)
 window.clearLocalCache = async () => {
-    if (!confirm('Lokalen Cache wirklich lÃ¶schen?\n\nDaten werden beim nÃ¤chsten Laden von Supabase neu geladen.')) return;
+    if (!confirm('Lokalen Cache wirklich loeschen?\n\nDaten werden beim naechsten Laden von Supabase neu geladen.')) return;
     
     try {
         await db.registeredGuests.clear();
         await db.buchungen.clear();
         localStorage.clear();
-        Utils.showToast('âœ… Cache gelÃ¶scht - Seite wird neu geladen', 'success');
+        Utils.showToast('âœ… Cache geloescht - Seite wird neu geladen', 'success');
         setTimeout(() => location.reload(), 1000);
     } catch(e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
@@ -8724,7 +8724,7 @@ window.handleRegisterSubmit = async () => {
     try { 
         console.log('Registrierung startet...', v.trim(), p.length);
         await RegisteredGuests.register(v.trim(), p); 
-        // Nach Registrierung prÃ¼fen ob Gruppe gewÃ¤hlt werden muss
+        // Nach Registrierung pruefen ob Gruppe gewaehlt werden muss
         setTimeout(async () => await navigateAfterLogin(), 500); 
     } catch(e) {
         console.error('Registrierung Fehler:', e);
@@ -8753,17 +8753,17 @@ window.handleRestoreGuest = async id => {
     Router.navigate('admin-guests');
 };
 window.handlePermanentDeleteGuest = async id => { 
-    if(confirm('Gast ENDGUeLTIG lÃ¶schen?\n\nDiese Aktion kann nicht rueckgÃ¤ngig gemacht werden!')) { 
+    if(confirm('Gast ENDGUeLTIG loeschen?\n\nDiese Aktion kann nicht rueckgaengig gemacht werden!')) { 
         await RegisteredGuests.deletePermanent(id); 
         Router.navigate('admin-guests'); 
     } 
 };
-window.handleDeleteArticle = async id => { if(confirm('Artikel lÃ¶schen?')) { await Artikel.delete(id); Router.navigate('admin-articles'); } };
+window.handleDeleteArticle = async id => { if(confirm('Artikel loeschen?')) { await Artikel.delete(id); Router.navigate('admin-articles'); } };
 window.toggleArtikelAktiv = async (id, aktiv) => {
     console.log('ðŸ”„ toggleArtikelAktiv aufgerufen:', id, aktiv);
     
     try {
-        // Bei manueller Deaktivierung auch aktiv_bis lÃ¶schen
+        // Bei manueller Deaktivierung auch aktiv_bis loeschen
         const updateData = { aktiv: aktiv };
         if (!aktiv) {
             updateData.aktiv_bis = null; // Zeitbegrenzung entfernen
@@ -8876,7 +8876,7 @@ window.showZeitbegrenzungModal = (artikelId, artikelName) => {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 };
 
-// Zeitbegrenzung Modal schlieÃƒÅ¸en
+// Zeitbegrenzung Modal schliessen
 window.closeZeitModal = () => {
     const modal = document.getElementById('zeit-modal-overlay');
     if (modal) modal.remove();
@@ -8918,7 +8918,7 @@ window.setZeitbegrenzung = async (artikelId, stunden) => {
             let zeitText = '';
             if (tage > 0) zeitText = `${tage} Tag(e)`;
             else zeitText = `${restStunden} Stunden`;
-            Utils.showToast(`âœ… Artikel aktiv fÃ¼r ${zeitText}`, 'success');
+            Utils.showToast(`âœ… Artikel aktiv fuer ${zeitText}`, 'success');
         } else {
             Utils.showToast('âœ… Zeitbegrenzung entfernt', 'success');
         }
@@ -8931,7 +8931,7 @@ window.setZeitbegrenzung = async (artikelId, stunden) => {
     }
 };
 
-// Preis direkt in Tabelle Ã¤ndern (SV oder HP)
+// Preis direkt in Tabelle aendern (SV oder HP)
 window.quickUpdatePreis = async (id, typ, wert) => {
     try {
         const preis = parseFloat(wert) || 0;
@@ -8947,13 +8947,13 @@ window.quickUpdatePreis = async (id, typ, wert) => {
         artikelCache = null;
         
         const label = typ === 'hp' ? 'HP-Preis' : 'SV-Preis';
-        Utils.showToast(`${label} auf ${Utils.formatCurrency(preis)} geÃ¤ndert`, 'success');
+        Utils.showToast(`${label} auf ${Utils.formatCurrency(preis)} geaendert`, 'success');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
     }
 };
 
-// MwSt direkt Ã¤ndern
+// MwSt direkt aendern
 window.quickUpdateMwst = async (id, mwst) => {
     try {
         // ZUERST Supabase updaten (wichtig!)
@@ -8964,16 +8964,16 @@ window.quickUpdateMwst = async (id, mwst) => {
         
         await db.artikel.update(id, { steuer_prozent: mwst });
         artikelCache = null;
-        Utils.showToast(`MwSt auf ${mwst}% geÃ¤ndert`, 'success');
+        Utils.showToast(`MwSt auf ${mwst}% geaendert`, 'success');
     } catch (e) {
         Utils.showToast('Fehler: ' + e.message, 'error');
     }
 };
 
-// Kategorie direkt Ã¤ndern
+// Kategorie direkt aendern
 window.changeArtikelKategorie = async (id, neueKategorieId) => {
     try {
-        const katMap = {1:'Alkoholfreie GetrÃ¤nke',2:'Biere',3:'Weine',4:'SchnÃ¤pse & Spirituosen',5:'HeiÃƒÅ¸e GetrÃ¤nke',6:'Suesses & Salziges',7:'Sonstiges'};
+        const katMap = {1:'Alkoholfreie Getraenke',2:'Biere',3:'Weine',4:'Schnaepse & Spirituosen',5:'Heisse Getraenke',6:'Suesses & Salziges',7:'Sonstiges'};
         const iconMap = {1:'',2:'',3:'',4:'',5:'[Kaffee]',6:'',7:''};
         
         const updateData = { 
@@ -8993,7 +8993,7 @@ window.changeArtikelKategorie = async (id, neueKategorieId) => {
         });
         
         artikelCache = null;
-        Utils.showToast('Kategorie geÃ¤ndert', 'success');
+        Utils.showToast('Kategorie geaendert', 'success');
         
         // Seite neu laden um Artikel in neuer Kategorie zu zeigen
         Router.navigate('admin-articles');
@@ -9002,7 +9002,7 @@ window.changeArtikelKategorie = async (id, neueKategorieId) => {
     }
 };
 
-// Artikel-ID Ã¤ndern (fÃ¼r Registrierkasse wichtig!)
+// Artikel-ID aendern (fuer Registrierkasse wichtig!)
 window.changeArtikelId = async (alteId) => {
     const artikel = await Artikel.getById(alteId);
     if (!artikel) {
@@ -9010,7 +9010,7 @@ window.changeArtikelId = async (alteId) => {
         return;
     }
     
-    const neueIdStr = prompt(`âš ï¸ ACHTUNG: Artikel-ID Ã¤ndern\n\nDiese ID wird fÃ¼r die Registrierkasse verwendet!\nNur Ã¤ndern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
+    const neueIdStr = prompt(`âš ï¸ ACHTUNG: Artikel-ID aendern\n\nDiese ID wird fuer die Registrierkasse verwendet!\nNur aendern wenn Sie genau wissen was Sie tun.\n\nAktuelle ID: ${alteId}\nArtikel: ${artikel.name}\n\nNeue ID eingeben:`, alteId);
     
     if (neueIdStr === null) return; // Abgebrochen
     
@@ -9021,19 +9021,19 @@ window.changeArtikelId = async (alteId) => {
     }
     
     if (neueId === alteId) {
-        Utils.showToast('ID wurde nicht geÃ¤ndert', 'info');
+        Utils.showToast('ID wurde nicht geaendert', 'info');
         return;
     }
     
-    // PrÃ¼fen ob neue ID bereits existiert
+    // Pruefen ob neue ID bereits existiert
     const existing = await Artikel.getById(neueId);
     if (existing) {
         Utils.showToast(`ID ${neueId} ist bereits vergeben (${existing.name})`, 'error');
         return;
     }
     
-    // BestÃ¤tigung einholen
-    if (!confirm(`âš ï¸ LETZTE WARNUNG!\n\nArtikel-ID wirklich Ã¤ndern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
+    // Bestaetigung einholen
+    if (!confirm(`âš ï¸ LETZTE WARNUNG!\n\nArtikel-ID wirklich aendern?\n\nVon: ${alteId}\nNach: ${neueId}\n\nArtikel: ${artikel.name}\n\nDies kann Auswirkungen auf bestehende Buchungen haben!`)) {
         return;
     }
     
@@ -9041,11 +9041,11 @@ window.changeArtikelId = async (alteId) => {
         // Neuen Artikel mit neuer ID erstellen
         const neuerArtikel = { ...artikel, artikel_id: neueId };
         
-        // In IndexedDB: Alten lÃ¶schen, neuen anlegen
+        // In IndexedDB: Alten loeschen, neuen anlegen
         await db.artikel.delete(alteId);
         await db.artikel.add(neuerArtikel);
         
-        // In Supabase: Alten lÃ¶schen, neuen anlegen
+        // In Supabase: Alten loeschen, neuen anlegen
         if (supabaseClient && isOnline) {
             await supabaseClient.from('artikel').delete().eq('artikel_id', alteId);
             await supabaseClient.from('artikel').insert(neuerArtikel);
@@ -9054,15 +9054,15 @@ window.changeArtikelId = async (alteId) => {
         artikelCache = null;
         await DataProtection.createBackup();
         
-        Utils.showToast(`âœ… Artikel-ID geÃ¤ndert: ${alteId} â†’ ${neueId}`, 'success');
+        Utils.showToast(`âœ… Artikel-ID geaendert: ${alteId} â†’ ${neueId}`, 'success');
         Router.navigate('admin-articles');
     } catch (e) {
-        console.error('ID Ã¤ndern Fehler:', e);
+        console.error('ID aendern Fehler:', e);
         Utils.showToast('Fehler: ' + e.message, 'error');
     }
 };
 
-// Foto Upload fÃ¼r Artikel direkt in Tabelle
+// Foto Upload fuer Artikel direkt in Tabelle
 window.triggerArtikelBildUpload = (artikelId) => {
     // Hidden input erstellen falls nicht vorhanden
     let input = document.getElementById('artikel-bild-upload-hidden');
@@ -9113,7 +9113,7 @@ window.handleArtikelBildUpload = async (event) => {
         Utils.showToast('Fehler: ' + e.message, 'error');
     }
     
-    // Input zurÃ¼cksetzen
+    // Input zuruecksetzen
     event.target.value = '';
 };
 window.filterGuestList = q => { document.querySelectorAll('.guest-item').forEach(i => { i.style.display = i.dataset.name.includes(q.toLowerCase()) ? '' : 'none'; }); };
@@ -9139,7 +9139,7 @@ window.showAddArticleModal = () => {
     <div class="form-group" style="text-align:center;">
         <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;"></div>
         <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
-        <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;"> Foto wÃ¤hlen</button>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;"> Foto waehlen</button>
         <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">x</button>
     </div>
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" placeholder="z.B. Cola 0.5l"></div>
@@ -9172,7 +9172,7 @@ window.showAddArticleModal = () => {
     
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
         <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" placeholder="1" min="1" value="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
-        <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie GetrÃ¤nke</option><option value="2">Biere</option><option value="3">Weine</option><option value="4">SchnÃ¤pse & Spirituosen</option><option value="5">HeiÃƒÅ¸e GetrÃ¤nke</option><option value="6">Suesses & Salziges</option><option value="7">Sonstiges</option></select></div>
+        <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input"><option value="1">Alkoholfreie Getraenke</option><option value="2">Biere</option><option value="3">Weine</option><option value="4">Schnaepse & Spirituosen</option><option value="5">Heisse Getraenke</option><option value="6">Suesses & Salziges</option><option value="7">Sonstiges</option></select></div>
     </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" checked><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveNewArticle()">Speichern</button></div></div></div>`;
@@ -9191,7 +9191,7 @@ window.showEditArticleModal = async id => {
     <div class="form-group" style="text-align:center;">
         <div id="article-image-preview" style="width:120px;height:120px;margin:0 auto 12px;border-radius:12px;background:var(--color-stone-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;">${previewContent}</div>
         <input type="file" id="article-image" accept="image/*" style="display:none" onchange="handleImagePreview(event)">
-        <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;"> Foto wÃ¤hlen</button>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('article-image').click()" style="padding:8px 16px;"> Foto waehlen</button>
         <button type="button" class="btn btn-secondary" onclick="clearImagePreview()" style="padding:8px 16px;margin-left:8px;">x</button>
     </div>
     <div class="form-group"><label class="form-label">Name *</label><input type="text" id="article-name" class="form-input" value="${a.name}"></div>
@@ -9224,7 +9224,7 @@ window.showEditArticleModal = async id => {
     
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
         <div class="form-group"><label class="form-label">Position</label><input type="number" id="article-sort" class="form-input" value="${a.sortierung||1}" min="1"><small style="color:var(--color-stone-dark);">Reihenfolge in Kategorie</small></div>
-        <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie GetrÃ¤nke',2:'Biere',3:'Weine',4:'SchnÃ¤pse & Spirituosen',5:'HeiÃƒÅ¸e GetrÃ¤nke',6:'Suesses & Salziges',7:'Sonstiges'}[i]}</option>`).join('')}</select></div>
+        <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getraenke',2:'Biere',3:'Weine',4:'Schnaepse & Spirituosen',5:'Heisse Getraenke',6:'Suesses & Salziges',7:'Sonstiges'}[i]}</option>`).join('')}</select></div>
     </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
@@ -9259,7 +9259,7 @@ window.saveNewArticle = async () => {
     const name = document.getElementById('article-name')?.value;
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
-    const katMap = {1:'Alkoholfreie GetrÃ¤nke',2:'Biere',3:'Weine',4:'SchnÃ¤pse & Spirituosen',5:'HeiÃƒÅ¸e GetrÃ¤nke',6:'Suesses & Salziges',7:'Sonstiges'};
+    const katMap = {1:'Alkoholfreie Getraenke',2:'Biere',3:'Weine',4:'Schnaepse & Spirituosen',5:'Heisse Getraenke',6:'Suesses & Salziges',7:'Sonstiges'};
     const iconMap = {1:'',2:'',3:'',4:'',5:'[Kaffee]',6:'',7:''};
     
     // Beide Preise lesen
@@ -9290,19 +9290,19 @@ window.saveEditArticle = async () => {
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
     const katId = parseInt(document.getElementById('article-category')?.value) || 1;
     const newPos = parseInt(document.getElementById('article-sort')?.value) || 1;
-    const katMap = {1:'Alkoholfreie GetrÃ¤nke',2:'Biere',3:'Weine',4:'SchnÃ¤pse & Spirituosen',5:'HeiÃƒÅ¸e GetrÃ¤nke',6:'Suesses & Salziges',7:'Sonstiges'};
+    const katMap = {1:'Alkoholfreie Getraenke',2:'Biere',3:'Weine',4:'Schnaepse & Spirituosen',5:'Heisse Getraenke',6:'Suesses & Salziges',7:'Sonstiges'};
     const iconMap = {1:'',2:'',3:'',4:'',5:'[Kaffee]',6:'',7:''};
     
     // Beide Preise lesen
     const preisSV = parseFloat(document.getElementById('article-price-sv')?.value) || 0;
     const preisHP = parseFloat(document.getElementById('article-price-hp')?.value) || 0;
     
-    // Alten Artikel holen fÃ¼r Positions-Tausch
+    // Alten Artikel holen fuer Positions-Tausch
     const oldArticle = await Artikel.getById(id);
     const oldPos = oldArticle?.sortierung || 1;
     const oldKat = oldArticle?.kategorie_id;
     
-    // Wenn Position oder Kategorie geÃ¤ndert wurde, Platztausch prÃ¼fen
+    // Wenn Position oder Kategorie geaendert wurde, Platztausch pruefen
     if (oldPos !== newPos || oldKat !== katId) {
         // Finde Artikel der aktuell auf der neuen Position ist (in der neuen Kategorie)
         const allArticles = await Artikel.getAll();
@@ -9366,7 +9366,7 @@ window.saveEditArticle = async () => {
                 console.error('Sync Fehler:', e);
             }
             
-            // GÃ¤ste-Daten von Supabase laden
+            // Gaeste-Daten von Supabase laden
             try {
                 const { data: profiles, error } = await supabaseClient
                     .from('profiles')
@@ -9374,8 +9374,8 @@ window.saveEditArticle = async () => {
                     .order('display_name');
                 
                 if (!error && profiles) {
-                    // Nur nicht-gelÃ¶schte Profile cachen
-                    const aktive = profiles.filter(p => p.gelÃ¶scht !== true);
+                    // Nur nicht-geloeschte Profile cachen
+                    const aktive = profiles.filter(p => p.geloescht !== true);
                     console.log('âœ… Profile geladen:', aktive.length, 'aktiv von', profiles.length, 'gesamt');
                     
                     for (const p of aktive) {
@@ -9402,7 +9402,7 @@ window.saveEditArticle = async () => {
             console.log('âš Offline-Modus - Lokale Daten');
         }
     
-        // Seed Artikel falls nÃ¶tig
+        // Seed Artikel falls noetig
         try {
             await Artikel.seed();
         } catch(e) {
@@ -9413,11 +9413,11 @@ window.saveEditArticle = async () => {
         try {
             await db.kategorien.clear();
             await db.kategorien.bulkAdd([
-                {kategorie_id:1, name:'Alkoholfreie GetrÃ¤nke', sortierung:10},
+                {kategorie_id:1, name:'Alkoholfreie Getraenke', sortierung:10},
                 {kategorie_id:2, name:'Biere', sortierung:20},
                 {kategorie_id:3, name:'Weine', sortierung:30},
-                {kategorie_id:4, name:'SchnÃ¤pse & Spirituosen', sortierung:40},
-                {kategorie_id:5, name:'HeiÃƒÅ¸e GetrÃ¤nke', sortierung:50},
+                {kategorie_id:4, name:'Schnaepse & Spirituosen', sortierung:40},
+                {kategorie_id:5, name:'Heisse Getraenke', sortierung:50},
                 {kategorie_id:6, name:'Suesses & Salziges', sortierung:60},
                 {kategorie_id:7, name:'Sonstiges', sortierung:70}
             ]);
@@ -9481,7 +9481,7 @@ Datum: ${datum}
 
 Screenshot beifuegen:`;
     
-    // WhatsApp Link Ã¶ffnen
+    // WhatsApp Link oeffnen
     const encodedNachricht = encodeURIComponent(nachricht);
     const whatsappUrl = `https://wa.me/${whatsappNummer}?text=${encodedNachricht}`;
     
@@ -9495,7 +9495,7 @@ window.migrateLocalToSupabase = async () => {
         return;
     }
     
-    if (!confirm('Alle lokalen Buchungen nach Supabase migrieren?\n\nDies lÃ¤dt alle Buchungen aus der lokalen Datenbank hoch.')) {
+    if (!confirm('Alle lokalen Buchungen nach Supabase migrieren?\n\nDies laedt alle Buchungen aus der lokalen Datenbank hoch.')) {
         return;
     }
     
@@ -9517,7 +9517,7 @@ window.migrateLocalToSupabase = async () => {
         
         for (const b of lokaleBuchungen) {
             try {
-                // PrÃ¼fen ob schon in Supabase existiert
+                // Pruefen ob schon in Supabase existiert
                 const { data: existing } = await supabaseClient
                     .from('buchungen')
                     .select('buchung_id')
@@ -9529,7 +9529,7 @@ window.migrateLocalToSupabase = async () => {
                     continue;
                 }
                 
-                // Buchung fÃ¼r Supabase vorbereiten
+                // Buchung fuer Supabase vorbereiten
                 const buchungData = {
                     buchung_id: b.buchung_id,
                     user_id: b.user_id || b.gast_id,
@@ -9569,8 +9569,8 @@ window.migrateLocalToSupabase = async () => {
             }
         }
         
-        Utils.showToast(`âœ… Migration fertig!\n${hochgeladen} hochgeladen\n${uebersprungen} Ã¼bersprungen\n${fehler} Fehler`, 'success');
-        console.log(`ðŸ“Š Migration: ${hochgeladen} hochgeladen, ${uebersprungen} Ã¼bersprungen, ${fehler} Fehler`);
+        Utils.showToast(`âœ… Migration fertig!\n${hochgeladen} hochgeladen\n${uebersprungen} uebersprungen\n${fehler} Fehler`, 'success');
+        console.log(`ðŸ“Š Migration: ${hochgeladen} hochgeladen, ${uebersprungen} uebersprungen, ${fehler} Fehler`);
         
         // Dashboard neu laden
         Router.navigate('admin-dashboard');
@@ -9582,7 +9582,7 @@ window.migrateLocalToSupabase = async () => {
 };
 
 // ===========================================
-// VIRTUELLE TASTATUR fÃ¼r Touch-GerÃ¤te
+// VIRTUELLE TASTATUR fuer Touch-Geraete
 // ===========================================
 const VirtualKeyboard = {
     activeInput: null,
@@ -9628,7 +9628,7 @@ const VirtualKeyboard = {
                 </div>
             `;
         } else {
-            // VollstÃ¤ndige Tastatur fÃ¼r Namen
+            // Vollstaendige Tastatur fuer Namen
             return `
                 <div id="virtual-keyboard" class="virtual-keyboard full">
                     <div class="vk-header">
@@ -9643,10 +9643,10 @@ const VirtualKeyboard = {
                             ${['Q','W','E','R','T','Z','U','I','O','P'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
                         </div>
                         <div class="vk-row">
-                            ${['A','S','D','F','G','H','J','K','L','Ã„'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
+                            ${['A','S','D','F','G','H','J','K','L','Ae'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
                         </div>
                         <div class="vk-row">
-                            ${['Y','X','C','V','B','N','M','Ã–','Ãœ'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
+                            ${['Y','X','C','V','B','N','M','Oe','Ue'].map(k => `<button class="vk-key" onclick="VirtualKeyboard.press('${k}')">${k}</button>`).join('')}
                             <button class="vk-key vk-back" onclick="VirtualKeyboard.backspace()">âŒ«</button>
                         </div>
                         <div class="vk-row">
@@ -9663,7 +9663,7 @@ const VirtualKeyboard = {
     
     // Tastatur anzeigen
     show(inputElement, type = 'full') {
-        this.hide(); // Alte schlieÃƒÅ¸en
+        this.hide(); // Alte schliessen
         this.activeInput = inputElement;
         
         // Container erstellen
@@ -9672,7 +9672,7 @@ const VirtualKeyboard = {
         container.innerHTML = this.createKeyboardHTML(type);
         document.body.appendChild(container);
         
-        // Display mit aktuellem Wert fÃ¼llen
+        // Display mit aktuellem Wert fuellen
         const display = document.getElementById('vk-display');
         if (display) {
             display.value = inputElement.value || '';
@@ -9680,7 +9680,7 @@ const VirtualKeyboard = {
         
         this.isVisible = true;
         
-        // Style hinzufÃ¼gen falls noch nicht vorhanden
+        // Style hinzufuegen falls noch nicht vorhanden
         if (!document.getElementById('vk-styles')) {
             const style = document.createElement('style');
             style.id = 'vk-styles';
@@ -9834,7 +9834,7 @@ const VirtualKeyboard = {
         this.activeInput = null;
     },
     
-    // Taste drÃ¼cken
+    // Taste druecken
     press(key) {
         const display = document.getElementById('vk-display');
         if (display) {
@@ -9842,7 +9842,7 @@ const VirtualKeyboard = {
         }
     },
     
-    // LÃ¶schen
+    // Loeschen
     backspace() {
         const display = document.getElementById('vk-display');
         if (display && display.value.length > 0) {
@@ -9850,7 +9850,7 @@ const VirtualKeyboard = {
         }
     },
     
-    // Alles lÃ¶schen
+    // Alles loeschen
     clear() {
         const display = document.getElementById('vk-display');
         if (display) {
@@ -9858,12 +9858,12 @@ const VirtualKeyboard = {
         }
     },
     
-    // BestÃ¤tigen
+    // Bestaetigen
     confirm() {
         const display = document.getElementById('vk-display');
         if (this.activeInput && display) {
             this.activeInput.value = display.value;
-            // Event auslÃ¶sen damit andere Handler es mitbekommen
+            // Event ausloesen damit andere Handler es mitbekommen
             this.activeInput.dispatchEvent(new Event('input', { bubbles: true }));
             this.activeInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
@@ -9871,10 +9871,10 @@ const VirtualKeyboard = {
     }
 };
 
-// Global verfÃ¼gbar machen
+// Global verfuegbar machen
 window.VirtualKeyboard = VirtualKeyboard;
 
-// Hilfsfunktionen fÃ¼r einfache Nutzung
+// Hilfsfunktionen fuer einfache Nutzung
 window.showNumpad = (inputId) => {
     const input = document.getElementById(inputId);
     if (input) VirtualKeyboard.show(input, 'numpad');
