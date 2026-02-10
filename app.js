@@ -2495,7 +2495,7 @@ const RegisteredGuests = {
     
     async getAll() { 
         if (supabaseClient && isOnline) {
-            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false).eq('aktiv', true).order('first_name');
+            const { data } = await supabaseClient.from('profiles').select('id, vorname, first_name, display_name, group_name, aktiv, geloescht, email, visibleId').eq('geloescht', false).eq('aktiv', true).order('first_name');
             return (data || []).map(g => ({ ...g, firstName: g.first_name }));
         }
         const all = await db.registeredGuests.toArray();
@@ -2504,7 +2504,7 @@ const RegisteredGuests = {
     
     async getGelöschte() {
         if (supabaseClient && isOnline) {
-            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', true);
+            const { data } = await supabaseClient.from('profiles').select('id, vorname, first_name, display_name, group_name, aktiv, geloescht, email, visibleId').eq('geloescht', true);
             return (data || []).map(g => ({ ...g, firstName: g.first_name }));
         }
         const all = await db.registeredGuests.toArray();
@@ -2658,7 +2658,7 @@ const Auth = {
             try {
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 if (session?.user) {
-                    const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', session.user.id).single();
+                    const { data: profile } = await supabaseClient.from('profiles').select('id, vorname, first_name, display_name, group_name, aktiv, geloescht, email, visibleId').eq('id', session.user.id).single();
                     if (profile && !profile.geloescht && !profile.gelöscht) {
                         State.setUser({ ...session.user, ...profile, firstName: profile.first_name });
                         return true;
@@ -7275,8 +7275,8 @@ Router.register('admin-guests', async () => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
                             const pw = g.passwort || g.passwordHash || g.pin_hash;
-                            const pwDisplay = pw ? pw : '<span style="color:#e74c3c;">⚠KEINE</span>';
-                            const pwStyle = pw ? 'color:#2c3e50;' : 'color:#e74c3c;';
+                            const pwDisplay = pw ? '<span style="color:#27ae60;">🔒 PIN gesetzt</span>' : '<span style="color:#e74c3c;">⚠️ KEINE PIN</span>';
+                            const pwStyle = '';
                             const ausnahme = g.ausnahmeumlage || false;
                             const createdAt = g.created_at || g.createdAt;
                             const createdFormatted = createdAt ? new Date(createdAt).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-';
@@ -7339,7 +7339,7 @@ Router.register('admin-guests', async () => {
                 <div>
                     <label style="font-weight:600;">Passwort (PIN): *</label>
                     <div style="display:flex;gap:8px;">
-                        <input type="text" id="gast-passwort" class="form-input" placeholder="4-stellige PIN" maxlength="4" style="font-family:monospace;font-size:1.5rem;letter-spacing:8px;text-align:center;font-weight:bold;flex:1;">
+                        <input type="password" id="gast-passwort" class="form-input" placeholder="Neue PIN eingeben" maxlength="4" style="font-family:monospace;font-size:1.5rem;letter-spacing:8px;text-align:center;font-weight:bold;flex:1;">
                         <button type="button" class="btn btn-secondary" onclick="showNumpad('gast-passwort')" style="padding:12px 16px;font-size:1.3rem;" title="Numpad">🔢</button>
                     </div>
                     <small style="color:#666;">Der Gast meldet sich mit dieser PIN an</small>
@@ -7614,7 +7614,7 @@ window.editGast = async (id) => {
     document.getElementById('gast-edit-id').value = gast.id;
     document.getElementById('gast-nachname').value = gast.nachname || gast.firstName || '';
     document.getElementById('gast-gruppenname').value = gast.gruppenname || gast.group_name || 'keiner Gruppe zugehörig';
-    document.getElementById('gast-passwort').value = gast.passwort || gast.passwordHash || '';
+    document.getElementById('gast-passwort').value = ''; // PIN nie anzeigen - nur neue PIN eingeben wenn gewünscht
     
     document.getElementById('gast-modal').style.display = 'flex';
 };
@@ -7667,7 +7667,11 @@ window.saveGast = async () => {
         return;
     }
     
-    if (!passwort || passwort.length < 4) {
+    if (!editId && (!passwort || passwort.length < 4)) {
+        Utils.showToast('PIN muss mindestens 4 Zeichen haben!', 'error');
+        return;
+    }
+    if (passwort && passwort.length < 4) {
         Utils.showToast('PIN muss mindestens 4 Zeichen haben!', 'error');
         return;
     }
@@ -7676,8 +7680,8 @@ window.saveGast = async () => {
     let alleGäste = [];
     if (supabaseClient && isOnline) {
         try {
-            const { data } = await supabaseClient.from('profiles').select('*').eq('geloescht', false).eq('aktiv', true);
-            if (data) alleGäste = data.map(g => ({ ...g, nachname: g.vorname, passwort: g.pin_hash }));
+            const { data } = await supabaseClient.from('profiles').select('id, vorname, first_name, display_name, group_name, aktiv, geloescht, email, visibleId').eq('geloescht', false).eq('aktiv', true);
+            if (data) alleGäste = data.map(g => ({ ...g, nachname: g.vorname }));
         } catch(e) {}
     }
     if (alleGäste.length === 0) {
@@ -7702,47 +7706,52 @@ window.saveGast = async () => {
         // === BEARBEITEN ===
         console.log('Bearbeite Gast:', editId);
         
-        // Supabase zuerst updaten
         if (supabaseClient && isOnline) {
             try {
-                // ZUERST: Alte PIN und Email laden (BEVOR wir pin_hash überschreiben!)
-                const { data: altesProfile } = await supabaseClient
-                    .from('profiles')
-                    .select('pin_hash, email')
-                    .eq('id', editId)
-                    .single();
+                // Update-Objekt vorbereiten - PIN nur wenn neue eingegeben
+                const updateData = { 
+                    vorname: nachname,
+                    display_name: nachname,
+                    first_name: nachname,
+                    group_name: gruppenname,
+                    aktiv: true,
+                    geloescht: false
+                };
                 
-                const altePIN = altesProfile?.pin_hash;
-                const gastEmail = altesProfile?.email;
+                let altePIN = null;
+                let gastEmail = null;
                 
-                // Profile updaten (pin_hash = neue PIN)
+                if (passwort) {
+                    // Neue PIN eingegeben → alte PIN laden für Auth-Sync
+                    const { data: altesProfile } = await supabaseClient
+                        .from('profiles')
+                        .select('pin_hash, email')
+                        .eq('id', editId)
+                        .single();
+                    
+                    altePIN = altesProfile?.pin_hash;
+                    gastEmail = altesProfile?.email;
+                    updateData.pin_hash = passwort;
+                }
+                
+                // Profile updaten
                 const { error } = await supabaseClient
                     .from('profiles')
-                    .update({ 
-                        vorname: nachname,
-                        display_name: nachname,
-                        first_name: nachname,
-                        pin_hash: passwort,
-                        group_name: gruppenname,
-                        aktiv: true,
-                        geloescht: false
-                    })
+                    .update(updateData)
                     .eq('id', editId);
                 
                 if (error) {
                     console.error('Supabase Update Fehler:', error);
                     Utils.showToast('Supabase Fehler: ' + error.message, 'error');
                 } else {
-                    console.log('✅ Gast in Supabase aktualisiert (PIN: ' + passwort + ')');
+                    console.log('✅ Gast in Supabase aktualisiert');
                     
                     // AUTH-PASSWORT SYNCHRONISIEREN wenn PIN geändert wurde
-                    if (altePIN && altePIN !== passwort && gastEmail) {
-                        console.log('🔑 PIN wurde geändert - synchronisiere Auth-Passwort...');
+                    if (passwort && altePIN && altePIN !== passwort && gastEmail) {
+                        console.log('🔑 PIN geändert - synchronisiere Auth...');
                         try {
-                            // 1. Admin-Session merken (Admin-Passwort aus localStorage)
                             const adminPw = sessionStorage.getItem('_admin_pw');
                             
-                            // 2. Als Gast einloggen mit ALTER PIN
                             const altesPw = 'PIN_' + altePIN + '_KASSA';
                             const { data: gastLogin, error: gastLoginErr } = await supabaseClient.auth.signInWithPassword({
                                 email: gastEmail,
@@ -7750,29 +7759,26 @@ window.saveGast = async () => {
                             });
                             
                             if (gastLoginErr) {
-                                console.warn('⚠️ Konnte nicht als Gast einloggen (alte PIN ungültig?):', gastLoginErr.message);
+                                console.warn('⚠️ Konnte nicht als Gast einloggen:', gastLoginErr.message);
                             } else {
-                                // 3. Auth-Passwort auf NEUE PIN ändern
                                 const neuesPw = 'PIN_' + passwort + '_KASSA';
                                 const { error: updateErr } = await supabaseClient.auth.updateUser({
                                     password: neuesPw
                                 });
                                 
                                 if (updateErr) {
-                                    console.error('❌ Auth-Passwort Update fehlgeschlagen:', updateErr.message);
-                                    Utils.showToast('⚠️ PIN gespeichert, aber Auth-Passwort konnte nicht aktualisiert werden!', 'warning');
+                                    console.error('Auth-Passwort Update fehlgeschlagen:', updateErr.message);
+                                    Utils.showToast('⚠️ PIN gespeichert, aber Auth konnte nicht aktualisiert werden!', 'warning');
                                 } else {
-                                    console.log('✅ Auth-Passwort erfolgreich synchronisiert!');
+                                    console.log('✅ Auth-Passwort synchronisiert');
                                 }
                             }
                             
-                            // 4. Wieder als Admin einloggen
                             if (adminPw) {
                                 await supabaseClient.auth.signInWithPassword({
                                     email: 'admin@soellerhaus.local',
                                     password: adminPw
                                 });
-                                console.log('✅ Admin-Session wiederhergestellt');
                             }
                         } catch(authSyncErr) {
                             console.error('Auth-Sync Fehler:', authSyncErr);
@@ -7785,30 +7791,25 @@ window.saveGast = async () => {
         }
         
         // Lokal auch updaten
+        const localUpdate = {
+            nachname: nachname,
+            firstName: nachname,
+            gruppenname: gruppenname,
+            group_name: gruppenname,
+            aktiv: true,
+            geloescht: false
+        };
+        if (passwort) {
+            localUpdate.passwort = passwort;
+            localUpdate.passwordHash = passwort;
+        }
         try {
-            await db.registeredGuests.update(editId, {
-                nachname: nachname,
-                firstName: nachname,
-                gruppenname: gruppenname,
-                group_name: gruppenname,
-                passwort: passwort,
-                passwordHash: passwort,
-                aktiv: true,
-                geloescht: false
-            });
+            await db.registeredGuests.update(editId, localUpdate);
         } catch(e) {
-            // Falls ID nicht als Key existiert, versuche mit where
             const local = await db.registeredGuests.toArray();
             const found = local.find(g => String(g.id) === String(editId));
             if (found) {
-                await db.registeredGuests.update(found.id, {
-                    nachname: nachname,
-                    firstName: nachname,
-                    gruppenname: gruppenname,
-                    group_name: gruppenname,
-                    passwort: passwort,
-                    passwordHash: passwort
-                });
+                await db.registeredGuests.update(found.id, localUpdate);
             }
         }
         
