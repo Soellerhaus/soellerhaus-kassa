@@ -935,7 +935,7 @@ const GastNachricht = {
         
         const icons = {
             info: '',
-            warnung: '⚠',
+            warnung: '⚠️',
             dringend: ''
         };
         
@@ -1049,154 +1049,81 @@ db.open().then(async () => {
 // TAGESMENUe - Menü auf der Startseite anzeigen
 // ===========================================
 const TagesMenu = {
-    // Prüfen ob eine Uhrzeit aktuell überschritten ist
+    WOCHENTAGE: ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'],
+    getHeuteIndex() { const d = new Date().getDay(); return d === 0 ? 6 : d - 1; },
+    getHeuteName() { return this.WOCHENTAGE[this.getHeuteIndex()]; },
     istZeitVorbei(uhrzeitStr) {
         if (!uhrzeitStr) return false;
         const [stunden, minuten] = uhrzeitStr.split(':').map(Number);
         const jetzt = new Date();
-        const jetztMinuten = jetzt.getHours() * 60 + jetzt.getMinutes();
-        const zielMinuten = stunden * 60 + minuten;
-        return jetztMinuten >= zielMinuten;
+        return (jetzt.getHours() * 60 + jetzt.getMinutes()) >= (stunden * 60 + minuten);
     },
-    
-    // Automatisch deaktivieren wenn Ausblende-Zeit erreicht
     async autoDeaktivieren(menuTyp, menuData) {
         try {
-            console.log(`⏰ ${menuTyp}-Menü wird automatisch deaktiviert (Ausblende-Zeit erreicht)`);
             menuData[menuTyp].aktiv = false;
             menuData[menuTyp].auto_deaktiviert = new Date().toISOString();
-            
-            // In Supabase speichern
-            if (supabaseClient && isOnline) {
-                await supabaseClient
-                    .from('settings')
-                    .upsert({ key: 'tages_menu_v2', value: menuData });
-            }
-            
-            // Lokal speichern
+            if (supabaseClient && isOnline) await supabaseClient.from('settings').upsert({ key: 'tages_menu_v2', value: menuData });
             await db.settings.put({ key: 'tages_menu_v2', value: JSON.stringify(menuData) });
-            
-            console.log(`✅ ${menuTyp}-Menü automatisch deaktiviert`);
-        } catch(e) {
-            console.error('Auto-Deaktivierung Fehler:', e);
-        }
+        } catch(e) { console.error('Auto-Deaktivierung Fehler:', e); }
     },
-    
-    // Aktive Menüs holen (Mittag und/oder Abend, je nach Uhrzeit)
     async getAktiv() {
         let menuData = null;
-        
-        // Erst von Supabase wenn online
         if (supabaseClient && isOnline) {
             try {
-                const { data } = await supabaseClient
-                    .from('settings')
-                    .select('value')
-                    .eq('key', 'tages_menu_v2')
-                    .single();
-                
-                if (data?.value) {
-                    menuData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-                    // Lokal cachen
-                    await db.settings.put({ key: 'tages_menu_v2', value: JSON.stringify(menuData) });
-                }
-            } catch(e) {
-                console.log('Kein Menü v2 in Supabase');
-            }
-        }
-        
-        // Fallback: Lokal
-        if (!menuData) {
-            try {
-                const setting = await db.settings.get('tages_menu_v2');
-                if (setting?.value) {
-                    menuData = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
-                }
+                const { data } = await supabaseClient.from('settings').select('value').eq('key', 'tages_menu_v2').single();
+                if (data?.value) { menuData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value; await db.settings.put({ key: 'tages_menu_v2', value: JSON.stringify(menuData) }); }
             } catch(e) {}
         }
-        
+        if (!menuData) { try { const setting = await db.settings.get('tages_menu_v2'); if (setting?.value) menuData = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value; } catch(e) {} }
         if (!menuData) return null;
         
-        // Prüfen welche Menüs gerade sichtbar sind
+        // Neues Wochentag-Format
+        if (menuData.wochentage) {
+            const heute = this.getHeuteName().toLowerCase();
+            const heuteMenu = menuData.wochentage[heute];
+            if (!heuteMenu) return null;
+            const result = { mittag: null, abend: null };
+            if (heuteMenu.abend?.aktiv && heuteMenu.abend?.text) {
+                if (this.istZeitVorbei(heuteMenu.abend.ausblenden_um)) { heuteMenu.abend.aktiv = false; await this.speichern(menuData); } else { result.abend = heuteMenu.abend; }
+            }
+            if (heuteMenu.mittag?.aktiv && heuteMenu.mittag?.text) {
+                if (this.istZeitVorbei(heuteMenu.mittag.ausblenden_um)) { heuteMenu.mittag.aktiv = false; await this.speichern(menuData); } else { result.mittag = heuteMenu.mittag; }
+            }
+            if (!result.mittag && !result.abend) return null;
+            return result;
+        }
+        // Altes Format - Kompatibilität
         const result = { mittag: null, abend: null };
-        
-        // Mittagsmenü: aktiv und noch nicht ausgeblendet?
-        if (menuData.mittag?.aktiv && menuData.mittag?.text) {
-            if (this.istZeitVorbei(menuData.mittag.ausblenden_um)) {
-                // Ausblende-Zeit erreicht -> automatisch deaktivieren!
-                await this.autoDeaktivieren('mittag', menuData);
-            } else {
-                result.mittag = menuData.mittag;
-            }
-        }
-        
-        // Abendmenü: aktiv und noch nicht ausgeblendet?
-        if (menuData.abend?.aktiv && menuData.abend?.text) {
-            if (this.istZeitVorbei(menuData.abend.ausblenden_um)) {
-                // Ausblende-Zeit erreicht -> automatisch deaktivieren!
-                await this.autoDeaktivieren('abend', menuData);
-            } else {
-                result.abend = menuData.abend;
-            }
-        }
-        
-        // Wenn keins aktiv, null zurückgeben
+        if (menuData.mittag?.aktiv && menuData.mittag?.text) { if (this.istZeitVorbei(menuData.mittag.ausblenden_um)) { await this.autoDeaktivieren('mittag', menuData); } else { result.mittag = menuData.mittag; } }
+        if (menuData.abend?.aktiv && menuData.abend?.text) { if (this.istZeitVorbei(menuData.abend.ausblenden_um)) { await this.autoDeaktivieren('abend', menuData); } else { result.abend = menuData.abend; } }
         if (!result.mittag && !result.abend) return null;
-        
         return result;
     },
-    
-    // Alle Menü-Daten laden (für Admin)
     async getAlleMenus() {
         let menuData = null;
-        
-        if (supabaseClient && isOnline) {
-            try {
-                const { data } = await supabaseClient
-                    .from('settings')
-                    .select('value')
-                    .eq('key', 'tages_menu_v2')
-                    .single();
-                
-                if (data?.value) {
-                    menuData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-                }
-            } catch(e) {}
+        if (supabaseClient && isOnline) { try { const { data } = await supabaseClient.from('settings').select('value').eq('key', 'tages_menu_v2').single(); if (data?.value) menuData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value; } catch(e) {} }
+        if (!menuData) { try { const setting = await db.settings.get('tages_menu_v2'); if (setting?.value) menuData = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value; } catch(e) {} }
+        // Migration altes → neues Format
+        if (menuData && !menuData.wochentage) {
+            const def = { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } };
+            const neu = { wochentage: {} };
+            this.WOCHENTAGE.forEach(t => { neu.wochentage[t.toLowerCase()] = JSON.parse(JSON.stringify(def)); });
+            const heute = this.getHeuteName().toLowerCase();
+            if (menuData.abend) neu.wochentage[heute].abend = menuData.abend;
+            if (menuData.mittag) neu.wochentage[heute].mittag = menuData.mittag;
+            menuData = neu;
         }
-        
-        if (!menuData) {
-            try {
-                const setting = await db.settings.get('tages_menu_v2');
-                if (setting?.value) {
-                    menuData = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
-                }
-            } catch(e) {}
+        if (!menuData || !menuData.wochentage) {
+            const def = { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } };
+            menuData = { wochentage: {} };
+            this.WOCHENTAGE.forEach(t => { menuData.wochentage[t.toLowerCase()] = JSON.parse(JSON.stringify(def)); });
         }
-        
-        return menuData || {
-            mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' },
-            abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }
-        };
+        return menuData;
     },
-    
-    // Menüs speichern
     async speichern(menuData) {
-        // Lokal speichern
         await db.settings.put({ key: 'tages_menu_v2', value: JSON.stringify(menuData) });
-        
-        // Supabase
-        if (supabaseClient && isOnline) {
-            try {
-                await supabaseClient.from('settings').upsert({ 
-                    key: 'tages_menu_v2', 
-                    value: menuData 
-                });
-            } catch(e) {
-                console.error('Menü Supabase sync error:', e);
-            }
-        }
-        
-        Utils.showToast(' Menü gespeichert!', 'success');
+        if (supabaseClient && isOnline) { try { await supabaseClient.from('settings').upsert({ key: 'tages_menu_v2', value: menuData }); } catch(e) { console.error('Menü sync error:', e); } }
+        Utils.showToast('🍽️ Menü gespeichert!', 'success');
         return menuData;
     },
     
@@ -2693,6 +2620,8 @@ const Auth = {
             if (data.user && data.user.email === 'admin@soellerhaus.local') {
                 State.isAdmin = true;
                 State.adminUser = data.user;
+                // Admin-Passwort merken für Auth-Sync bei PIN-Änderungen
+                try { sessionStorage.setItem('_admin_pw', pw); } catch(e) {}
                 console.log('✅ Admin-Login erfolgreich');
                 Utils.showToast('Admin-Login erfolgreich!', 'success'); 
                 return true;
@@ -5027,14 +4956,19 @@ Router.register('admin-dashboard', async () => {
         </style>
         
         <!-- ALLE BUCHUNGEN ANSEHEN -->
-        <button class="btn btn-block" onclick="Router.navigate('admin-alle-buchungen')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;background:#6c5ce7;color:white;border:none;">
+        <button class="btn btn-block" onclick="Router.navigate('admin-alle-buchungen')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;background:#6c5ce7;color:white;border:none;">
              Alle Buchungen ansehen<br>
             <small style="opacity:0.9;">(${bs.length} gesamt * bearbeiten/löschen)</small>
         </button>
         
+        <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;background:linear-gradient(135deg, #636e72, #2d3436);color:white;border:none;">
+            📋 Alte Belege (ausgecheckte Gäste)<br>
+            <small style="opacity:0.9;">(Belege von abgereisten Gästen abrufen)</small>
+        </button>
+        
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
-                ⚠Fehlende Getränke<br><small>(${fehlendeOffen.length} offen)</small>
+                🚨 Fehlende Getränke<br><small>(${fehlendeOffen.length} offen)</small>
             </button>
             <button class="btn btn-danger" onclick="Router.navigate('admin-umlage')" style="padding:16px;">
                  Umlage buchen<br><small>(auf alle Gäste)</small>
@@ -5165,11 +5099,14 @@ Router.register('admin-auffuellliste', async () => {
         Utils.showToast('Fehler beim Laden: ' + e.message, 'error');
     }
     
-    // Nach Kategorie gruppieren
+    // Nach Kategorie gruppieren - mit Normalisierung (z.B. Spezi → Alkoholfreie Getränke)
     const byKat = {};
     liste.forEach(item => {
-        if (!byKat[item.kategorie_name]) byKat[item.kategorie_name] = [];
-        byKat[item.kategorie_name].push(item);
+        let katName = item.kategorie_name || 'Sonstiges';
+        // Alles mit kategorie_id 1 = Alkoholfrei
+        if (item.kategorie_id === 1 || item.kategorie_id === '1') katName = 'Alkoholfreie Getränke';
+        if (!byKat[katName]) byKat[katName] = [];
+        byKat[katName].push(item);
     });
     
     const total = liste.reduce((s, i) => s + i.menge, 0);
@@ -5243,11 +5180,13 @@ window.printAuffuellliste = async () => {
             return;
         }
         
-        // Nach Kategorie gruppieren
+        // Nach Kategorie gruppieren (Spezi-Fix: kategorie_id 1 = Alkoholfrei)
         const byKat = {};
         liste.forEach(item => {
-            if (!byKat[item.kategorie_name]) byKat[item.kategorie_name] = [];
-            byKat[item.kategorie_name].push(item);
+            let katName = item.kategorie_name || 'Sonstiges';
+            if (item.kategorie_id === 1 || item.kategorie_id === '1') katName = 'Alkoholfreie Getränke';
+            if (!byKat[katName]) byKat[katName] = [];
+            byKat[katName].push(item);
         });
         
         const total = liste.reduce((s, i) => s + i.menge, 0);
@@ -5554,6 +5493,42 @@ Router.register('admin-alle-buchungen', async () => {
     </div>`);
 });
 
+// ============ ALTE BELEGE (ausgecheckte Gäste) ============
+Router.register('admin-alte-belege', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    let inaktiveGäste = [];
+    if (supabaseClient && isOnline) {
+        try { const { data } = await supabaseClient.from('profiles').select('id, vorname, first_name, display_name, group_name').eq('aktiv', false).eq('geloescht', false).order('vorname'); if (data) inaktiveGäste = data.map(g => ({ id: g.id, name: g.display_name || g.vorname || g.first_name || '?', gruppe: g.group_name || '-' })); } catch(e) {}
+        try { const { data } = await supabaseClient.from('profiles').select('id, vorname, first_name, display_name, group_name').eq('geloescht', true).order('vorname'); if (data) data.forEach(g => inaktiveGäste.push({ id: g.id, name: (g.display_name || g.vorname || g.first_name || '?') + ' (gelöscht)', gruppe: g.group_name || '-' })); } catch(e) {}
+    }
+    const seenIds = new Set(); inaktiveGäste = inaktiveGäste.filter(g => { if (seenIds.has(g.id)) return false; seenIds.add(g.id); return true; });
+    const selectedId = State.alteBelegeGastId || ''; let buchungen = []; let selectedName = ''; let gesamtSumme = 0;
+    if (selectedId) {
+        selectedName = inaktiveGäste.find(g => g.id === selectedId)?.name || '?';
+        try { const { data } = await supabaseClient.from('buchungen').select('*').or(`user_id.eq.${selectedId},gast_id.eq.${selectedId}`).order('erstellt_am', { ascending: false }); if (data) { buchungen = data; gesamtSumme = buchungen.filter(b => !b.storniert).reduce((s,b) => s + (b.preis||0)*(b.menge||0), 0); } } catch(e) {}
+    }
+    const byDatum = {}; buchungen.forEach(b => { const d = b.datum || '?'; if (!byDatum[d]) byDatum[d] = []; byDatum[d].push(b); }); const sortedDates = Object.keys(byDatum).sort().reverse();
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📋 Alte Belege</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Router.navigate('admin-dashboard')">← Dashboard</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3" style="background:linear-gradient(135deg,#636e72,#2d3436);color:white;"><div style="padding:16px;text-align:center;"><div style="font-size:1.3rem;font-weight:700;">📋 Belege ausgecheckter Gäste</div><div style="opacity:0.9;font-size:0.9rem;">${inaktiveGäste.length} verfügbar</div></div></div>
+        <div class="card mb-3" style="background:#fffde7;"><div style="padding:16px;"><label style="font-weight:600;display:block;margin-bottom:8px;">Gast auswählen:</label><select id="alte-belege-gast" class="form-input" style="width:100%;padding:14px;font-size:1.1rem;" onchange="selectAlteBelegeGast(this.value)"><option value="">-- Gast wählen --</option>${inaktiveGäste.map(g => `<option value="${g.id}" ${g.id === selectedId ? 'selected' : ''}>${g.name} (${g.gruppe})</option>`).join('')}</select><input type="text" class="form-input" placeholder="🔍 Suchen..." oninput="filterAlteBelegeDropdown(this.value)" style="width:100%;padding:12px;margin-top:8px;"></div></div>
+        ${selectedId ? `<div class="card mb-3" style="background:var(--color-alpine-green);color:white;"><div style="padding:16px;text-align:center;"><div style="font-size:1.3rem;font-weight:700;">${selectedName}</div><div>${buchungen.length} Buchungen | ${Utils.formatCurrency(gesamtSumme)}</div></div></div>
+        <button class="btn btn-primary btn-block" onclick="druckeAlteBelege('${selectedId}','${selectedName.replace(/'/g,"\\'")}',${gesamtSumme})" style="padding:14px;margin-bottom:16px;">🖨️ Beleg drucken</button>
+        ${sortedDates.map(datum => { const tb = byDatum[datum].sort((a,b) => new Date(b.erstellt_am)-new Date(a.erstellt_am)); const tu = tb.filter(b=>!b.storniert).reduce((s,b)=>s+(b.preis||0)*(b.menge||0),0); return `<div class="card mb-3"><div class="card-header" style="background:var(--color-stone-light);display:flex;justify-content:space-between;"><h3 style="margin:0;">📅 ${datum}</h3><span style="font-weight:600;color:var(--color-alpine-green);">${Utils.formatCurrency(tu)}</span></div><div class="card-body" style="padding:0;"><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead style="background:var(--color-stone-light);"><tr><th style="padding:8px;text-align:left;">Zeit</th><th style="padding:8px;text-align:left;">Artikel</th><th style="padding:8px;text-align:right;">Menge</th><th style="padding:8px;text-align:right;">Preis</th><th style="padding:8px;text-align:center;">Status</th></tr></thead><tbody>${tb.map(b=>`<tr style="border-bottom:1px solid #eee;${b.storniert?'opacity:0.5;text-decoration:line-through;':''}"><td style="padding:8px;">${b.uhrzeit||'-'}</td><td style="padding:8px;">${b.artikel_name||'-'}</td><td style="padding:8px;text-align:right;">${b.menge||0}x</td><td style="padding:8px;text-align:right;font-weight:600;">${Utils.formatCurrency((b.preis||0)*(b.menge||0))}</td><td style="padding:8px;text-align:center;">${b.storniert?'<span style="color:#e74c3c;">Storno</span>':(b.exportiert?'<span style="color:#27ae60;">✓</span>':'<span style="color:#f39c12;">Offen</span>')}</td></tr>`).join('')}</tbody></table></div></div>`}).join('')}` : '<div style="text-align:center;padding:40px;color:#888;"><div style="font-size:3rem;">👆</div><p>Wähle einen ausgecheckten Gast.</p></div>'}
+    </div>`);
+});
+window.selectAlteBelegeGast = (id) => { State.alteBelegeGastId = id; Router.navigate('admin-alte-belege'); };
+window.filterAlteBelegeDropdown = (s) => { const sel = document.getElementById('alte-belege-gast'); if(!sel)return; const t=s.toLowerCase().trim(); Array.from(sel.options).forEach((o,i)=>{if(i===0)return; o.style.display=o.text.toLowerCase().includes(t)?'':'none';}); };
+window.druckeAlteBelege = async (gastId, gastName, gesamtSumme) => {
+    let buchungen = []; try { const {data} = await supabaseClient.from('buchungen').select('*').or(`user_id.eq.${gastId},gast_id.eq.${gastId}`).eq('storniert',false).order('datum',{ascending:true}); if(data) buchungen=data; } catch(e){}
+    if(buchungen.length===0){Utils.showToast('Keine Buchungen','warning');return;}
+    const pw = window.open('','_blank','width=800,height=600'); const byD={}; buchungen.forEach(b=>{const d=b.datum||'?';if(!byD[d])byD[d]=[];byD[d].push(b);}); const fmt=(v)=>new Intl.NumberFormat('de-AT',{style:'currency',currency:'EUR'}).format(v||0);
+    let html=''; Object.keys(byD).sort().forEach(d=>{const bs=byD[d];const ts=bs.reduce((s,b)=>s+(b.preis||0)*(b.menge||0),0); html+=`<h3 style="margin-top:20px;font-size:14px;border-bottom:1px solid #333;">${d} (${fmt(ts)})</h3><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="border-bottom:2px solid #333;"><th style="text-align:left;padding:4px;">Zeit</th><th style="text-align:left;padding:4px;">Artikel</th><th style="text-align:right;padding:4px;">Menge</th><th style="text-align:right;padding:4px;">Preis</th></tr></thead><tbody>${bs.map(b=>`<tr style="border-bottom:1px solid #ddd;"><td style="padding:3px 4px;">${b.uhrzeit||'-'}</td><td style="padding:3px 4px;">${b.artikel_name||'-'}</td><td style="padding:3px 4px;text-align:right;">${b.menge||0}x</td><td style="padding:3px 4px;text-align:right;">${fmt((b.preis||0)*(b.menge||0))}</td></tr>`).join('')}</tbody></table>`;});
+    pw.document.write(`<!DOCTYPE html><html><head><title>Beleg - ${gastName}</title><style>body{font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto;}@media print{.no-print{display:none!important;}}</style></head><body><div style="text-align:center;margin-bottom:20px;"><h1 style="font-size:18px;margin:0;">Söllerhaus Kassa</h1><h2 style="font-size:16px;margin:4px 0;">Beleg: ${gastName}</h2><div style="font-size:12px;color:#666;">${new Date().toLocaleString('de-AT')}</div></div>${html}<div style="margin-top:20px;padding-top:10px;border-top:3px double #333;text-align:right;"><strong style="font-size:16px;">GESAMT: ${fmt(gesamtSumme)}</strong></div><div class="no-print" style="margin-top:20px;text-align:center;"><button onclick="window.print()" style="padding:12px 30px;font-size:16px;background:#2C5F7C;color:white;border:none;border-radius:8px;">🖨️ Drucken</button> <button onclick="window.close()" style="padding:12px 30px;font-size:16px;background:#95a5a6;color:white;border:none;border-radius:8px;">Schließen</button></div></body></html>`);
+    pw.document.close();
+};
+
 // Gruppe abgereist - Alle Buchungen exportieren und abschließen
 // Filter Buchungen nach Gast
 window.filterBuchungenByGast = (gastId) => {
@@ -5743,7 +5718,7 @@ Router.register('admin-fehlende', async () => {
         if (byKat[a.kategorie_id]) byKat[a.kategorie_id].artikel.push(a);
     });
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">⚠Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🚨 Fehlende Getränke</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#f39c12;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -5857,7 +5832,7 @@ Router.register('admin-umlage', async () => {
         ${fehlendeOffen.length ? `
         <div class="card mb-3">
             <div class="card-header" style="background:#f39c12;color:white;">
-                <h3 style="margin:0;">⚠Fehlende Getränke (${fehlendeOffen.length})</h3>
+                <h3 style="margin:0;">🚨 Fehlende Getränke (${fehlendeOffen.length})</h3>
             </div>
             <div class="card-body">
                 ${fehlendeOffen.map(f => `
@@ -5885,11 +5860,17 @@ Router.register('admin-umlage', async () => {
                 </div>
                 
                 <button class="btn btn-danger btn-block" onclick="bucheUmlageFürAlle()" style="margin-top:20px;padding:20px;font-size:1.3rem;font-weight:700;">
-                     UMLAGE BUCHEN
+                    💰 UMLAGE AUF EINZELNE GÄSTE
                 </button>
                 <p style="text-align:center;margin-top:8px;color:var(--color-stone-dark);font-size:0.9rem;">
                     ${Utils.formatCurrency(preisProGast)} x ${totalGuests} Gäste = ${Utils.formatCurrency(preisProGast * totalGuests)}
                 </p>
+                <div style="margin-top:16px;padding-top:16px;border-top:2px dashed #ddd;">
+                    <button class="btn btn-block" onclick="bucheUmlageAufGruppenkonto()" style="padding:20px;font-size:1.1rem;background:linear-gradient(135deg,#9b59b6,#8e44ad);color:white;border:none;font-weight:700;">
+                        👥 UMLAGE AUF GRUPPENKONTO
+                    </button>
+                    <p style="text-align:center;margin-top:8px;color:var(--color-stone-dark);font-size:0.85rem;">Gesamtbetrag wird auf ein Gruppenkonto gebucht</p>
+                </div>
             </div>
         </div>
         ` : `
@@ -6006,6 +5987,51 @@ window.bucheUmlageFürAlle = async () => {
         Utils.showToast(`✅ Umlage: ${Utils.formatCurrency(preisProGast)} auf ${erfolg} Gäste verteilt`, 'success');
     }
     
+    Router.navigate('admin-dashboard');
+};
+
+// Umlage auf Gruppenkonto
+window.bucheUmlageAufGruppenkonto = async () => {
+    if (!supabaseClient || !isOnline) { Utils.showToast('Keine Internetverbindung!', 'error'); return; }
+    const fehlendeOffen = await FehlendeGetränke.getOffene();
+    if (fehlendeOffen.length === 0) { Utils.showToast('Keine fehlenden Getränke', 'error'); return; }
+    const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
+    const { data: profiles } = await supabaseClient.from('profiles').select('id, vorname, display_name, first_name, group_name').eq('aktiv', true).eq('geloescht', false).order('vorname');
+    const gruppenNamen = new Set();
+    (profiles || []).forEach(p => { if (p.group_name && p.group_name !== 'keiner Gruppe zugehörig') gruppenNamen.add(p.group_name); });
+    
+    document.body.insertAdjacentHTML('beforeend', `<div id="umlage-gruppe-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;justify-content:center;align-items:center;"><div style="background:white;padding:24px;border-radius:12px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;"><h3 style="margin-bottom:16px;">👥 Umlage auf Gruppenkonto</h3><div style="background:#f0f4f8;padding:16px;border-radius:8px;margin-bottom:16px;text-align:center;"><div style="font-size:1.3rem;font-weight:700;">${Utils.formatCurrency(gesamtPreis)}</div><div style="color:#666;">${fehlendeOffen.length} fehlende Getränke</div></div><div style="margin-bottom:16px;"><label style="font-weight:600;display:block;margin-bottom:8px;">Auf welches Konto buchen?</label><select id="umlage-gruppenkonto" class="form-input" style="width:100%;padding:14px;font-size:1.1rem;"><option value="">-- Konto wählen --</option>${Array.from(gruppenNamen).map(g => `<option value="${g}">${g} (Gruppe)</option>`).join('')}${(profiles || []).map(p => { const n = p.display_name || p.vorname || p.first_name; return `<option value="gast_${p.id}" data-gast-name="${n}">${n} (Persönlich)</option>`; }).join('')}</select></div><div style="margin-bottom:16px;"><label style="font-weight:600;display:block;margin-bottom:8px;">Wie buchen?</label><div style="display:flex;gap:8px;"><label style="flex:1;padding:12px;border:2px solid #8e44ad;border-radius:8px;cursor:pointer;text-align:center;background:#f3e5f5;" onclick="this.querySelector('input').checked=true;this.style.borderColor='#8e44ad';this.nextElementSibling.style.borderColor='#ddd';this.nextElementSibling.style.background='white';this.style.background='#f3e5f5';"><input type="radio" name="umlage-art" value="gesamt" checked style="display:none;"><div style="font-weight:600;">Gesamtbetrag</div></label><label style="flex:1;padding:12px;border:2px solid #ddd;border-radius:8px;cursor:pointer;text-align:center;" onclick="this.querySelector('input').checked=true;this.style.borderColor='#8e44ad';this.style.background='#f3e5f5';this.previousElementSibling.style.borderColor='#ddd';this.previousElementSibling.style.background='white';"><input type="radio" name="umlage-art" value="einzeln" style="display:none;"><div style="font-weight:600;">Einzelpositionen</div></label></div></div><div style="display:flex;gap:12px;margin-top:24px;"><button class="btn btn-primary" onclick="executeUmlageGruppenkonto()" style="flex:1;padding:14px;background:#8e44ad;border:none;">💰 Buchen</button><button class="btn btn-secondary" onclick="document.getElementById('umlage-gruppe-modal').remove()" style="flex:1;padding:14px;">Abbrechen</button></div></div></div>`);
+};
+
+window.executeUmlageGruppenkonto = async () => {
+    const select = document.getElementById('umlage-gruppenkonto');
+    const kontoWert = select?.value;
+    if (!kontoWert) { Utils.showToast('Bitte ein Konto auswählen!', 'warning'); return; }
+    const alsGesamt = document.querySelector('input[name="umlage-art"]:checked')?.value === 'gesamt';
+    let gastId, gastName;
+    if (kontoWert.startsWith('gast_')) {
+        gastId = kontoWert.replace('gast_', '');
+        gastName = select.querySelector(`option[value="${kontoWert}"]`)?.dataset?.gastName || 'Unbekannt';
+    } else {
+        const { data: gg } = await supabaseClient.from('profiles').select('id, vorname, display_name').eq('group_name', kontoWert).eq('aktiv', true).limit(1);
+        if (!gg || gg.length === 0) { Utils.showToast(`Kein Gast in Gruppe "${kontoWert}" gefunden!`, 'error'); return; }
+        gastId = gg[0].id; gastName = `Gruppenkonto ${kontoWert}`;
+    }
+    const fehlendeOffen = await FehlendeGetränke.getOffene();
+    if (fehlendeOffen.length === 0) { Utils.showToast('Keine fehlenden Getränke', 'error'); return; }
+    const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
+    const heute = Utils.getBuchungsDatum(); const uhrzeit = Utils.formatTime(new Date());
+    if (!confirm(`Umlage auf "${gastName}" buchen?\nBetrag: ${Utils.formatCurrency(gesamtPreis)}\nArt: ${alsGesamt ? 'Gesamtbetrag' : 'Einzelpositionen'}`)) return;
+    let erfolg = 0;
+    if (alsGesamt) {
+        const { error } = await supabaseClient.from('buchungen').insert({ buchung_id: Utils.uuid(), user_id: gastId, gast_vorname: gastName, artikel_id: 324, artikel_name: `Umlage (${fehlendeOffen.length} Pos.)`, preis: gesamtPreis, menge: 1, datum: heute, uhrzeit, erstellt_am: new Date().toISOString(), storniert: false, exportiert: false, ist_umlage: true, group_name: kontoWert.startsWith('gast_') ? '' : kontoWert });
+        if (!error) erfolg = 1;
+    } else {
+        for (const f of fehlendeOffen) { const { error } = await supabaseClient.from('buchungen').insert({ buchung_id: Utils.uuid(), user_id: gastId, gast_vorname: gastName, artikel_id: f.artikel_id, artikel_name: `Umlage: ${f.artikel_name}`, preis: f.artikel_preis, menge: 1, datum: heute, uhrzeit, erstellt_am: new Date().toISOString(), storniert: false, exportiert: false, ist_umlage: true, group_name: kontoWert.startsWith('gast_') ? '' : kontoWert }); if (!error) erfolg++; }
+    }
+    for (const f of fehlendeOffen) { await supabaseClient.from('fehlende_getraenke').update({ uebernommen: true, uebernommen_am: new Date().toISOString() }).eq('id', f.id); }
+    document.getElementById('umlage-gruppe-modal')?.remove();
+    Utils.showToast(`✅ Umlage ${Utils.formatCurrency(gesamtPreis)} auf "${gastName}" gebucht`, 'success');
     Router.navigate('admin-dashboard');
 };
 
@@ -6582,7 +6608,7 @@ Router.register('admin-nachricht', async () => {
             <div class="card-body">
                 <div style="background:var(--color-stone-light);padding:16px;border-radius:8px;margin-bottom:16px;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '' : aktiveNachricht.typ === 'warnung' ? '⚠' : ''}</span>
+                        <span style="font-size:1.5rem;">${aktiveNachricht.typ === 'dringend' ? '🔴' : aktiveNachricht.typ === 'warnung' ? '⚠️' : 'ℹ️'}</span>
                         <span style="background:${aktiveNachricht.typ === 'dringend' ? '#e74c3c' : aktiveNachricht.typ === 'warnung' ? '#f39c12' : '#3498db'};color:white;padding:2px 10px;border-radius:12px;font-size:0.85rem;font-weight:600;">
                             ${aktiveNachricht.typ === 'dringend' ? 'DRINGEND' : aktiveNachricht.typ === 'warnung' ? 'Warnung' : 'Info'}
                         </span>
@@ -6699,185 +6725,63 @@ Router.register('admin-nachricht', async () => {
 // ===========================================
 Router.register('admin-tagesmenu', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
-    
     const menuData = await TagesMenu.getAlleMenus();
+    const selectedTag = State.selectedMenuTag || TagesMenu.getHeuteName().toLowerCase();
+    const tagMenu = menuData.wochentage[selectedTag] || { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } };
+    const tagName = TagesMenu.WOCHENTAGE.find(t => t.toLowerCase() === selectedTag) || selectedTag;
+    const isHeute = selectedTag === TagesMenu.getHeuteName().toLowerCase();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title"> Tagesmenü</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🍽️ Tagesmenü</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
+        <div class="card mb-3" style="background:linear-gradient(135deg, #8B4513, #D2691E);color:white;"><div style="padding:16px;"><div style="display:flex;align-items:center;gap:12px;"><span style="font-size:1.5rem;">🍽️</span><div><div style="font-weight:700;">Wochenmenü-Planung</div><div style="font-size:0.85rem;opacity:0.9;">Menüs pro Wochentag • Abendmenü oben, Mittagsmenü unten</div></div></div></div></div>
         
-        <!-- INFO BOX -->
-        <div class="card mb-3" style="background:linear-gradient(135deg, #8B4513, #D2691E);color:white;">
-            <div style="padding:20px;">
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-                    <span style="font-size:2rem;"></span>
-                    <div>
-                        <div style="font-weight:700;font-size:1.1rem;">So funktioniert's</div>
-                        <div style="font-size:0.9rem;opacity:0.9;">
-                            Zeige Mittags- und/oder Abendmenü auf der Startseite
-                        </div>
-                    </div>
-                </div>
-                <ul style="margin:0;padding-left:20px;font-size:0.9rem;opacity:0.95;">
-                    <li>Menüs werden automatisch nach der eingestellten Uhrzeit ausgeblendet</li>
-                    <li>Nutze *** oder **** als Trenner zwischen Gängen</li>
-                    <li>Gäste sehen die Servierzeit im Button</li>
-                </ul>
-            </div>
+        <div style="display:flex;gap:4px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;">
+            ${TagesMenu.WOCHENTAGE.map(tag => {
+                const tagKey = tag.toLowerCase();
+                const tagM = menuData.wochentage[tagKey];
+                const hatText = tagM?.abend?.text?.trim() || tagM?.mittag?.text?.trim();
+                const istAktiv = tagM?.abend?.aktiv || tagM?.mittag?.aktiv;
+                const isSelected = tagKey === selectedTag;
+                const isHeuteTag = tagKey === TagesMenu.getHeuteName().toLowerCase();
+                return `<button onclick="selectMenuTag('${tagKey}')" style="padding:10px 14px;border:2px solid ${isSelected ? '#8B4513' : istAktiv ? '#27ae60' : '#ddd'};border-radius:10px;background:${isSelected ? 'linear-gradient(135deg,#8B4513,#D2691E)' : istAktiv ? '#e8f5e9' : '#f8f9fa'};color:${isSelected ? 'white' : '#333'};font-weight:${isSelected || isHeuteTag ? '700' : '400'};font-size:0.85rem;white-space:nowrap;cursor:pointer;">${tag.substring(0,2)}${isHeuteTag ? ' 📌' : ''}${hatText ? ' ✓' : ''}</button>`;
+            }).join('')}
         </div>
         
-        <!-- MITTAGSMENUe -->
-        <div class="card mb-3" style="border:3px solid ${menuData.mittag?.aktiv ? '#f39c12' : '#ddd'};">
-            <div class="card-header" style="background:${menuData.mittag?.aktiv ? 'linear-gradient(135deg, #f39c12, #e67e22)' : '#95a5a6'};color:white;">
-                <h2 class="card-title" style="margin:0;color:white;display:flex;align-items:center;gap:10px;">
-                    <span></span> Mittagsmenü
-                    ${menuData.mittag?.aktiv ? '<span style="background:rgba(255,255,255,0.3);padding:2px 10px;border-radius:12px;font-size:0.8rem;">AKTIV</span>' : ''}
-                </h2>
-            </div>
-            <div class="card-body">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-                    <div class="form-group" style="margin:0;">
-                        <label class="form-label" style="font-weight:600;font-size:0.85rem;"> Servierzeit</label>
-                        <input type="time" id="mittag-uhrzeit" class="form-input" value="${menuData.mittag?.uhrzeit || '12:00'}">
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label class="form-label" style="font-weight:600;font-size:0.85rem;"> Ausblenden um</label>
-                        <input type="time" id="mittag-ausblenden" class="form-input" value="${menuData.mittag?.ausblenden_um || '14:30'}">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" style="font-weight:600;">Menü-Text</label>
-                    <textarea id="mittag-text" class="form-input" rows="6" placeholder="Gemischter Salat
-
-****
-
-Käsespaetzle mit Roestzwiebeln
-
-***
-
-Dessert" style="font-size:0.95rem;line-height:1.5;">${menuData.mittag?.text || ''}</textarea>
-                </div>
-                
-                <div style="display:flex;gap:12px;">
-                    <button class="btn ${menuData.mittag?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleMittagMenu()" style="flex:1;padding:14px;">
-                        ${menuData.mittag?.aktiv ? ' Deaktivieren' : '✅ Aktivieren'}
-                    </button>
-                    ${menuData.mittag?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('mittag')" style="padding:14px;"> Vorschau</button>` : ''}
-                </div>
-            </div>
-        </div>
+        <div style="text-align:center;margin-bottom:16px;"><h2 style="margin:0;font-size:1.3rem;">${tagName}${isHeute ? ' (heute)' : ''}</h2></div>
         
-        <!-- ABENDMENUe -->
-        <div class="card mb-3" style="border:3px solid ${menuData.abend?.aktiv ? '#8B4513' : '#ddd'};">
-            <div class="card-header" style="background:${menuData.abend?.aktiv ? 'linear-gradient(135deg, #8B4513, #D2691E)' : '#95a5a6'};color:white;">
-                <h2 class="card-title" style="margin:0;color:white;display:flex;align-items:center;gap:10px;">
-                    <span></span> Abendmenü
-                    ${menuData.abend?.aktiv ? '<span style="background:rgba(255,255,255,0.3);padding:2px 10px;border-radius:12px;font-size:0.8rem;">AKTIV</span>' : ''}
-                </h2>
-            </div>
-            <div class="card-body">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-                    <div class="form-group" style="margin:0;">
-                        <label class="form-label" style="font-weight:600;font-size:0.85rem;"> Servierzeit</label>
-                        <input type="time" id="abend-uhrzeit" class="form-input" value="${menuData.abend?.uhrzeit || '18:00'}">
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label class="form-label" style="font-weight:600;font-size:0.85rem;"> Ausblenden um</label>
-                        <input type="time" id="abend-ausblenden" class="form-input" value="${menuData.abend?.ausblenden_um || '19:30'}">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" style="font-weight:600;">Menü-Text</label>
-                    <textarea id="abend-text" class="form-input" rows="6" placeholder="Tagessuppe
-
-****
-
-Schweinsbraten mit Knoedel
-(Vegane Variante verfügbar)
-
-***
-
-Apfelstrudel mit Vanillesauce" style="font-size:0.95rem;line-height:1.5;">${menuData.abend?.text || ''}</textarea>
-                </div>
-                
-                <div style="display:flex;gap:12px;">
-                    <button class="btn ${menuData.abend?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleAbendMenu()" style="flex:1;padding:14px;">
-                        ${menuData.abend?.aktiv ? ' Deaktivieren' : '✅ Aktivieren'}
-                    </button>
-                    ${menuData.abend?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('abend')" style="padding:14px;"> Vorschau</button>` : ''}
-                </div>
-            </div>
-        </div>
+        <div class="card mb-3" style="border:3px solid ${tagMenu.abend?.aktiv ? '#8B4513' : '#ddd'};"><div class="card-header" style="background:${tagMenu.abend?.aktiv ? 'linear-gradient(135deg,#8B4513,#D2691E)' : '#95a5a6'};color:white;"><h2 class="card-title" style="margin:0;color:white;display:flex;align-items:center;gap:10px;"><span>🌙</span> Abendmenü - ${tagName} ${tagMenu.abend?.aktiv ? '<span style="background:rgba(255,255,255,0.3);padding:2px 10px;border-radius:12px;font-size:0.8rem;">AKTIV</span>' : ''}</h2></div><div class="card-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;"><div class="form-group" style="margin:0;"><label class="form-label" style="font-weight:600;font-size:0.85rem;">⏰ Servierzeit</label><input type="time" id="abend-uhrzeit" class="form-input" value="${tagMenu.abend?.uhrzeit || '18:00'}"></div><div class="form-group" style="margin:0;"><label class="form-label" style="font-weight:600;font-size:0.85rem;">🕐 Ausblenden um</label><input type="time" id="abend-ausblenden" class="form-input" value="${tagMenu.abend?.ausblenden_um || '19:30'}"></div></div><div class="form-group"><label class="form-label" style="font-weight:600;">Menü-Text</label><textarea id="abend-text" class="form-input" rows="6" placeholder="Tagessuppe&#10;****&#10;Schweinsbraten mit Knödel&#10;***&#10;Apfelstrudel" style="font-size:0.95rem;line-height:1.5;">${tagMenu.abend?.text || ''}</textarea></div><div style="display:flex;gap:12px;"><button class="btn ${tagMenu.abend?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleWochentagMenu('abend')" style="flex:1;padding:14px;">${tagMenu.abend?.aktiv ? '⏸️ Deaktivieren' : '✅ Aktivieren'}</button>${tagMenu.abend?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('abend')" style="padding:14px;">👁️ Vorschau</button>` : ''}</div></div></div>
         
-        <!-- ALLE SPEICHERN -->
-        <button class="btn btn-block" onclick="speichereAlleMenus()" style="padding:20px;font-size:1.2rem;background:var(--color-alpine-green);color:white;border:none;">
-             Alle Änderungen speichern
-        </button>
+        <div class="card mb-3" style="border:3px solid ${tagMenu.mittag?.aktiv ? '#f39c12' : '#ddd'};"><div class="card-header" style="background:${tagMenu.mittag?.aktiv ? 'linear-gradient(135deg,#f39c12,#e67e22)' : '#95a5a6'};color:white;"><h2 class="card-title" style="margin:0;color:white;display:flex;align-items:center;gap:10px;"><span>☀️</span> Mittagsmenü - ${tagName} ${tagMenu.mittag?.aktiv ? '<span style="background:rgba(255,255,255,0.3);padding:2px 10px;border-radius:12px;font-size:0.8rem;">AKTIV</span>' : ''}</h2></div><div class="card-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;"><div class="form-group" style="margin:0;"><label class="form-label" style="font-weight:600;font-size:0.85rem;">⏰ Servierzeit</label><input type="time" id="mittag-uhrzeit" class="form-input" value="${tagMenu.mittag?.uhrzeit || '12:00'}"></div><div class="form-group" style="margin:0;"><label class="form-label" style="font-weight:600;font-size:0.85rem;">🕐 Ausblenden um</label><input type="time" id="mittag-ausblenden" class="form-input" value="${tagMenu.mittag?.ausblenden_um || '14:30'}"></div></div><div class="form-group"><label class="form-label" style="font-weight:600;">Menü-Text</label><textarea id="mittag-text" class="form-input" rows="6" placeholder="Gemischter Salat&#10;****&#10;Käsespätzle&#10;***&#10;Dessert" style="font-size:0.95rem;line-height:1.5;">${tagMenu.mittag?.text || ''}</textarea></div><div style="display:flex;gap:12px;"><button class="btn ${tagMenu.mittag?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleWochentagMenu('mittag')" style="flex:1;padding:14px;">${tagMenu.mittag?.aktiv ? '⏸️ Deaktivieren' : '✅ Aktivieren'}</button>${tagMenu.mittag?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('mittag')" style="padding:14px;">👁️ Vorschau</button>` : ''}</div></div></div>
         
+        <button class="btn btn-block" onclick="speichereWochentagMenu()" style="padding:20px;font-size:1.2rem;background:var(--color-alpine-green);color:white;border:none;">💾 ${tagName} speichern</button>
     </div>`);
 });
 
-// Mittag aktivieren/deaktivieren
-window.toggleMittagMenu = async () => {
+window.selectMenuTag = (tag) => { State.selectedMenuTag = tag; Router.navigate('admin-tagesmenu'); };
+
+window.toggleWochentagMenu = async (typ) => {
     const menuData = await TagesMenu.getAlleMenus();
-    const text = document.getElementById('mittag-text')?.value?.trim();
-    const uhrzeit = document.getElementById('mittag-uhrzeit')?.value || '12:00';
-    const ausblenden = document.getElementById('mittag-ausblenden')?.value || '14:30';
-    
-    if (!menuData.mittag.aktiv && !text) {
-        Utils.showToast('Bitte erst Menü-Text eingeben!', 'error');
-        return;
-    }
-    
-    menuData.mittag = {
-        aktiv: !menuData.mittag.aktiv,
-        text: text || menuData.mittag.text,
-        uhrzeit: uhrzeit,
-        ausblenden_um: ausblenden
-    };
-    
+    const tag = State.selectedMenuTag || TagesMenu.getHeuteName().toLowerCase();
+    if (!menuData.wochentage[tag]) menuData.wochentage[tag] = { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } };
+    const text = document.getElementById(`${typ}-text`)?.value?.trim();
+    const uhrzeit = document.getElementById(`${typ}-uhrzeit`)?.value || (typ === 'mittag' ? '12:00' : '18:00');
+    const ausblenden = document.getElementById(`${typ}-ausblenden`)?.value || (typ === 'mittag' ? '14:30' : '19:30');
+    if (!menuData.wochentage[tag][typ].aktiv && !text) { Utils.showToast('Bitte erst Menü-Text eingeben!', 'error'); return; }
+    menuData.wochentage[tag][typ] = { aktiv: !menuData.wochentage[tag][typ].aktiv, text: text || menuData.wochentage[tag][typ].text, uhrzeit, ausblenden_um: ausblenden };
     await TagesMenu.speichern(menuData);
     Router.navigate('admin-tagesmenu');
 };
 
-// Abend aktivieren/deaktivieren
-window.toggleAbendMenu = async () => {
+window.speichereWochentagMenu = async () => {
     const menuData = await TagesMenu.getAlleMenus();
-    const text = document.getElementById('abend-text')?.value?.trim();
-    const uhrzeit = document.getElementById('abend-uhrzeit')?.value || '18:00';
-    const ausblenden = document.getElementById('abend-ausblenden')?.value || '19:30';
-    
-    if (!menuData.abend.aktiv && !text) {
-        Utils.showToast('Bitte erst Menü-Text eingeben!', 'error');
-        return;
-    }
-    
-    menuData.abend = {
-        aktiv: !menuData.abend.aktiv,
-        text: text || menuData.abend.text,
-        uhrzeit: uhrzeit,
-        ausblenden_um: ausblenden
-    };
-    
-    await TagesMenu.speichern(menuData);
-    Router.navigate('admin-tagesmenu');
-};
-
-// Alle Menüs speichern (Text und Zeiten, ohne Aktivierungs-Status zu ändern)
-window.speichereAlleMenus = async () => {
-    const menuData = await TagesMenu.getAlleMenus();
-    
-    // Mittag
-    menuData.mittag.text = document.getElementById('mittag-text')?.value?.trim() || '';
-    menuData.mittag.uhrzeit = document.getElementById('mittag-uhrzeit')?.value || '12:00';
-    menuData.mittag.ausblenden_um = document.getElementById('mittag-ausblenden')?.value || '14:30';
-    
-    // Abend
-    menuData.abend.text = document.getElementById('abend-text')?.value?.trim() || '';
-    menuData.abend.uhrzeit = document.getElementById('abend-uhrzeit')?.value || '18:00';
-    menuData.abend.ausblenden_um = document.getElementById('abend-ausblenden')?.value || '19:30';
-    
+    const tag = State.selectedMenuTag || TagesMenu.getHeuteName().toLowerCase();
+    if (!menuData.wochentage[tag]) menuData.wochentage[tag] = { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } };
+    menuData.wochentage[tag].abend.text = document.getElementById('abend-text')?.value?.trim() || '';
+    menuData.wochentage[tag].abend.uhrzeit = document.getElementById('abend-uhrzeit')?.value || '18:00';
+    menuData.wochentage[tag].abend.ausblenden_um = document.getElementById('abend-ausblenden')?.value || '19:30';
+    menuData.wochentage[tag].mittag.text = document.getElementById('mittag-text')?.value?.trim() || '';
+    menuData.wochentage[tag].mittag.uhrzeit = document.getElementById('mittag-uhrzeit')?.value || '12:00';
+    menuData.wochentage[tag].mittag.ausblenden_um = document.getElementById('mittag-ausblenden')?.value || '14:30';
     await TagesMenu.speichern(menuData);
     Router.navigate('admin-tagesmenu');
 };
@@ -7153,7 +7057,7 @@ Router.register('admin-guests', async () => {
     const gruppen = await db.gruppen.toArray();
     const gruppenAktiv = gruppen.filter(g => g.aktiv);
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title"> Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title"> Gästeverwaltung</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Router.navigate('admin-dashboard')">← Dashboard</button></div></div>
     <div class="main-content">
         <style>
             .switch { position:relative; display:inline-block; width:50px; height:26px; }
@@ -7331,7 +7235,7 @@ Router.register('admin-guests-inaktiv', async () => {
         guests = all.filter(g => !g.gelöscht && g.aktiv === false);
     }
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">→</button><div class="header-title"> Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-guests')">←</button><div class="header-title"> Inaktive Gäste</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Router.navigate('admin-dashboard')">← Dashboard</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;text-align:center;">
@@ -7646,6 +7550,17 @@ window.saveGast = async () => {
         // Supabase zuerst updaten
         if (supabaseClient && isOnline) {
             try {
+                // ZUERST: Alte PIN und Email laden (BEVOR wir pin_hash überschreiben!)
+                const { data: altesProfile } = await supabaseClient
+                    .from('profiles')
+                    .select('pin_hash, email')
+                    .eq('id', editId)
+                    .single();
+                
+                const altePIN = altesProfile?.pin_hash;
+                const gastEmail = altesProfile?.email;
+                
+                // Profile updaten (pin_hash = neue PIN)
                 const { error } = await supabaseClient
                     .from('profiles')
                     .update({ 
@@ -7664,6 +7579,50 @@ window.saveGast = async () => {
                     Utils.showToast('Supabase Fehler: ' + error.message, 'error');
                 } else {
                     console.log('✅ Gast in Supabase aktualisiert (PIN: ' + passwort + ')');
+                    
+                    // AUTH-PASSWORT SYNCHRONISIEREN wenn PIN geändert wurde
+                    if (altePIN && altePIN !== passwort && gastEmail) {
+                        console.log('🔑 PIN wurde geändert - synchronisiere Auth-Passwort...');
+                        try {
+                            // 1. Admin-Session merken (Admin-Passwort aus localStorage)
+                            const adminPw = sessionStorage.getItem('_admin_pw');
+                            
+                            // 2. Als Gast einloggen mit ALTER PIN
+                            const altesPw = 'PIN_' + altePIN + '_KASSA';
+                            const { data: gastLogin, error: gastLoginErr } = await supabaseClient.auth.signInWithPassword({
+                                email: gastEmail,
+                                password: altesPw
+                            });
+                            
+                            if (gastLoginErr) {
+                                console.warn('⚠️ Konnte nicht als Gast einloggen (alte PIN ungültig?):', gastLoginErr.message);
+                            } else {
+                                // 3. Auth-Passwort auf NEUE PIN ändern
+                                const neuesPw = 'PIN_' + passwort + '_KASSA';
+                                const { error: updateErr } = await supabaseClient.auth.updateUser({
+                                    password: neuesPw
+                                });
+                                
+                                if (updateErr) {
+                                    console.error('❌ Auth-Passwort Update fehlgeschlagen:', updateErr.message);
+                                    Utils.showToast('⚠️ PIN gespeichert, aber Auth-Passwort konnte nicht aktualisiert werden!', 'warning');
+                                } else {
+                                    console.log('✅ Auth-Passwort erfolgreich synchronisiert!');
+                                }
+                            }
+                            
+                            // 4. Wieder als Admin einloggen
+                            if (adminPw) {
+                                await supabaseClient.auth.signInWithPassword({
+                                    email: 'admin@soellerhaus.local',
+                                    password: adminPw
+                                });
+                                console.log('✅ Admin-Session wiederhergestellt');
+                            }
+                        } catch(authSyncErr) {
+                            console.error('Auth-Sync Fehler:', authSyncErr);
+                        }
+                    }
                 }
             } catch (e) {
                 console.error('Supabase Update Exception:', e);
