@@ -6129,8 +6129,9 @@ window.executeUmlageGruppenkonto = async () => {
 Router.register('admin-notfall-export', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Alle verfügbaren Datums-Werte laden
+    // Statistik: Alle verfügbaren Datums-Werte laden
     let alleDaten = [];
+    let totalBuchungen = 0;
     if (supabaseClient && isOnline) {
         try {
             const { data } = await supabaseClient
@@ -6139,7 +6140,7 @@ Router.register('admin-notfall-export', async () => {
                 .eq('storniert', false)
                 .order('datum', { ascending: false });
             if (data) {
-                // Unique Datums-Werte
+                totalBuchungen = data.length;
                 alleDaten = [...new Set(data.map(b => b.datum))].filter(d => d);
             }
         } catch(e) {
@@ -6150,23 +6151,36 @@ Router.register('admin-notfall-export', async () => {
     // Fallback lokal
     if (alleDaten.length === 0) {
         const bs = await db.buchungen.toArray();
-        alleDaten = [...new Set(bs.filter(b => !b.storniert).map(b => b.datum))].filter(d => d);
+        const filtered = bs.filter(b => !b.storniert);
+        totalBuchungen = filtered.length;
+        alleDaten = [...new Set(filtered.map(b => b.datum))].filter(d => d);
         alleDaten.sort().reverse();
     }
+    
+    // Datum konvertieren: DD.MM.YYYY → YYYY-MM-DD für input[type=date]
+    const toISO = (d) => {
+        if (!d) return '';
+        if (d.match(/^\d{4}-/)) return d.substring(0,10);
+        const p = d.split('.');
+        if (p.length === 3) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+        return d;
+    };
+    
+    const neuestesDatum = alleDaten[0] ? toISO(alleDaten[0]) : '';
+    const aeltestesDatum = alleDaten[alleDaten.length-1] ? toISO(alleDaten[alleDaten.length-1]) : '';
     
     // Aktuelle letzte ID
     const lastExportId = ExportService.getLastExportId();
     
-    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title"> Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title"> Notfall-Export</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Router.navigate('admin-dashboard')">← Dashboard</button></div></div>
     <div class="main-content">
         <div class="card mb-3" style="background:#95a5a6;color:white;">
             <div style="padding:16px;">
-                <div style="font-weight:700;">⚠Nur im Notfall verwenden</div>
+                <div style="font-weight:700;">⚠️ Nur im Notfall verwenden</div>
                 <div style="font-size:0.9rem;opacity:0.9;">Exportiert Buchungen nach Datum (auch bereits exportierte)</div>
             </div>
         </div>
         
-        <!-- LETZTE ID EINSTELLUNG -->
         <div class="card mb-3" style="border:2px solid #e74c3c;">
             <div class="card-header" style="background:#e74c3c;color:white;">
                 <h3 style="margin:0;"> Letzte ID für Access</h3>
@@ -6189,25 +6203,26 @@ Router.register('admin-notfall-export', async () => {
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
                     <div>
                         <label style="font-weight:600;display:block;margin-bottom:8px;">Von Datum:</label>
-                        <select id="notfall-von" class="form-input" style="width:100%;">
-                            <option value="">-- Wählen --</option>
-                            ${alleDaten.map(d => `<option value="${d}">${d}</option>`).join('')}
-                        </select>
+                        <input type="date" id="notfall-von" class="form-input" style="width:100%;padding:12px;font-size:1rem;" value="${aeltestesDatum}" onchange="updateNotfallVorschau()">
                     </div>
                     <div>
                         <label style="font-weight:600;display:block;margin-bottom:8px;">Bis Datum:</label>
-                        <select id="notfall-bis" class="form-input" style="width:100%;">
-                            <option value="">-- Wählen --</option>
-                            ${alleDaten.map(d => `<option value="${d}">${d}</option>`).join('')}
-                        </select>
+                        <input type="date" id="notfall-bis" class="form-input" style="width:100%;padding:12px;font-size:1rem;" value="${neuestesDatum}" onchange="updateNotfallVorschau()">
                     </div>
                 </div>
                 
-                <div style="margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;">
-                    <div id="notfall-vorschau" style="color:#666;">Bitte Zeitraum wählen...</div>
+                <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+                    <button class="btn btn-secondary" onclick="setNotfallHeute()" style="padding:8px 14px;font-size:0.85rem;">Heute</button>
+                    <button class="btn btn-secondary" onclick="setNotfallLetzte7()" style="padding:8px 14px;font-size:0.85rem;">Letzte 7 Tage</button>
+                    <button class="btn btn-secondary" onclick="setNotfallLetzter30()" style="padding:8px 14px;font-size:0.85rem;">Letzte 30 Tage</button>
+                    <button class="btn btn-secondary" onclick="setNotfallAlles()" style="padding:8px 14px;font-size:0.85rem;">Alles</button>
                 </div>
                 
-                <button class="btn btn-secondary btn-block" onclick="handleNotfallExportMitDatum()" style="padding:12px;">
+                <div style="margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;">
+                    <div id="notfall-vorschau" style="color:#666;">Lade Vorschau...</div>
+                </div>
+                
+                <button class="btn btn-secondary btn-block" onclick="handleNotfallExportMitDatum()" style="padding:14px;font-size:1.05rem;">
                      Ausgewählten Zeitraum exportieren (Excel für Access)
                 </button>
             </div>
@@ -6217,18 +6232,18 @@ Router.register('admin-notfall-export', async () => {
             <div style="padding:16px;">
                 <strong> Info:</strong><br>
                 <small style="color:#888;">
+                    * ${totalBuchungen} Buchungen gesamt<br>
                     * Verfügbare Tage: ${alleDaten.length}<br>
-                    * Aeltestes Datum: ${alleDaten[alleDaten.length-1] || '-'}<br>
-                    * Neuestes Datum: ${alleDaten[0] || '-'}<br>
+                    * Ältestes: ${alleDaten[alleDaten.length-1] || '-'}<br>
+                    * Neuestes: ${alleDaten[0] || '-'}<br>
                     * Export-Format: Exakt wie Access-Tabelle "Buchenungsdetail"
                 </small>
             </div>
         </div>
     </div>`);
     
-    // Event Listener für Vorschau
-    document.getElementById('notfall-von')?.addEventListener('change', updateNotfallVorschau);
-    document.getElementById('notfall-bis')?.addEventListener('change', updateNotfallVorschau);
+    // Sofort Vorschau laden
+    setTimeout(() => updateNotfallVorschau(), 100);
 });
 
 // Letzte ID speichern
@@ -6255,29 +6270,72 @@ window.updateNotfallVorschau = async () => {
         return;
     }
     
-    // Buchungen zaehlen
+    vorschauEl.innerHTML = '<em>Lade...</em>';
+    
+    // Buchungen zählen - Datumsformat-agnostisch
     let count = 0;
     let summe = 0;
     
     if (supabaseClient && isOnline) {
+        // Supabase: Alle Buchungen laden und client-seitig filtern (sicherer bei Mixed-Formaten)
         const { data } = await supabaseClient
             .from('buchungen')
-            .select('preis, menge')
-            .eq('storniert', false)
-            .gte('datum', von)
-            .lte('datum', bis);
+            .select('datum, preis, menge')
+            .eq('storniert', false);
         if (data) {
-            count = data.length;
-            summe = data.reduce((s, b) => s + (b.preis * b.menge), 0);
+            const filtered = data.filter(b => {
+                const bISO = normalizeDateToISO(b.datum);
+                return bISO >= von && bISO <= bis;
+            });
+            count = filtered.length;
+            summe = filtered.reduce((s, b) => s + ((b.preis||0) * (b.menge||0)), 0);
         }
     } else {
         const bs = await db.buchungen.toArray();
-        const filtered = bs.filter(b => !b.storniert && b.datum >= von && b.datum <= bis);
+        const filtered = bs.filter(b => {
+            if (b.storniert) return false;
+            const bISO = normalizeDateToISO(b.datum);
+            return bISO >= von && bISO <= bis;
+        });
         count = filtered.length;
-        summe = filtered.reduce((s, b) => s + (b.preis * b.menge), 0);
+        summe = filtered.reduce((s, b) => s + ((b.preis||0) * (b.menge||0)), 0);
     }
     
     vorschauEl.innerHTML = `<strong>${count} Buchungen</strong> im Zeitraum ${von} bis ${bis}<br>Gesamtsumme: <strong>${Utils.formatCurrency(summe)}</strong>`;
+};
+
+// Hilfsfunktion: Datum in ISO-Format normalisieren (DD.MM.YYYY → YYYY-MM-DD)
+window.normalizeDateToISO = (datum) => {
+    if (!datum) return '';
+    if (datum.match(/^\d{4}-/)) return datum.substring(0, 10);
+    const parts = datum.split('.');
+    if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+    return datum;
+};
+
+// Schnellauswahl-Buttons
+window.setNotfallHeute = () => {
+    const heute = new Date().toISOString().substring(0,10);
+    document.getElementById('notfall-von').value = heute;
+    document.getElementById('notfall-bis').value = heute;
+    updateNotfallVorschau();
+};
+window.setNotfallLetzte7 = () => {
+    const bis = new Date(); const von = new Date(); von.setDate(von.getDate() - 7);
+    document.getElementById('notfall-von').value = von.toISOString().substring(0,10);
+    document.getElementById('notfall-bis').value = bis.toISOString().substring(0,10);
+    updateNotfallVorschau();
+};
+window.setNotfallLetzter30 = () => {
+    const bis = new Date(); const von = new Date(); von.setDate(von.getDate() - 30);
+    document.getElementById('notfall-von').value = von.toISOString().substring(0,10);
+    document.getElementById('notfall-bis').value = bis.toISOString().substring(0,10);
+    updateNotfallVorschau();
+};
+window.setNotfallAlles = () => {
+    document.getElementById('notfall-von').value = '2026-01-01';
+    document.getElementById('notfall-bis').value = new Date().toISOString().substring(0,10);
+    updateNotfallVorschau();
 };
 
 // Notfall Export mit Datum
@@ -6295,20 +6353,27 @@ window.handleNotfallExportMitDatum = async () => {
         return;
     }
     
-    // Buchungen laden
+    // Buchungen laden - Datumsformat-agnostisch
     let bs = [];
     if (supabaseClient && isOnline) {
         const { data } = await supabaseClient
             .from('buchungen')
             .select('*')
             .eq('storniert', false)
-            .gte('datum', von)
-            .lte('datum', bis)
             .order('datum', { ascending: true });
-        if (data) bs = data;
+        if (data) {
+            bs = data.filter(b => {
+                const bISO = normalizeDateToISO(b.datum);
+                return bISO >= von && bISO <= bis;
+            });
+        }
     } else {
         const all = await db.buchungen.toArray();
-        bs = all.filter(b => !b.storniert && b.datum >= von && b.datum <= bis);
+        bs = all.filter(b => {
+            if (b.storniert) return false;
+            const bISO = normalizeDateToISO(b.datum);
+            return bISO >= von && bISO <= bis;
+        });
     }
     
     if (bs.length === 0) {
