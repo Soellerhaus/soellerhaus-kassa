@@ -2146,7 +2146,7 @@ const State = {
         localStorage.removeItem('current_user_type'); 
         this.clearInactivityTimer(); 
     },
-    resetInactivityTimer() { this.clearInactivityTimer(); if (this.currentUser && !['login','register'].includes(this.currentPage)) { this.inactivityTimer = setTimeout(() => { Utils.showToast('Auto-Logout', 'info'); Auth.logout(); }, this.inactivityTimeout); } },
+    resetInactivityTimer() { this.clearInactivityTimer(); if (this.currentUser && !this.isAdmin && !['login','register'].includes(this.currentPage)) { this.inactivityTimer = setTimeout(() => { Utils.showToast('Auto-Logout', 'info'); Auth.logout(); }, this.inactivityTimeout); } },
     clearInactivityTimer() { if (this.inactivityTimer) { clearTimeout(this.inactivityTimer); this.inactivityTimer = null; } }
 };
 window.State = State;
@@ -5482,6 +5482,14 @@ Router.register('admin-alle-buchungen', async () => {
                 </table>
             </div>
         </div>
+        ${selectedGastId ? `
+        <div style="margin-top:24px;padding-top:16px;border-top:3px solid #e74c3c;">
+            <button class="btn btn-block" onclick="gastAuschecken('${selectedGastId}','${selectedGastName.replace(/'/g,"\\'")}',${gesamtSumme})" style="padding:20px;font-size:1.3rem;background:linear-gradient(135deg,#e74c3c,#c0392b);color:white;border:none;font-weight:700;">
+                🏁 ${selectedGastName} AUSCHECKEN & RECHNUNG DRUCKEN
+            </button>
+            <p style="text-align:center;margin-top:8px;color:#e74c3c;font-size:0.85rem;">Druckt Rechnung, markiert als bezahlt und setzt Gast auf inaktiv</p>
+        </div>
+        ` : ''}
     </div>`);
 });
 
@@ -5548,6 +5556,73 @@ window.resetBuchungenFilter = () => {
     State.selectedGastFilter = '';
     State.buchungenDatumVon = '';
     State.buchungenDatumBis = '';
+    Router.navigate('admin-alle-buchungen');
+};
+
+// Gast auschecken: Rechnung drucken + als bezahlt/inaktiv markieren
+window.gastAuschecken = async (gastId, gastName, gesamtSumme) => {
+    if (!confirm(`${gastName} wirklich AUSCHECKEN?\n\nSumme: ${Utils.formatCurrency(gesamtSumme)}\n\n• Rechnung wird gedruckt\n• Gast wird als BEZAHLT markiert\n• Gast wird auf INAKTIV gesetzt`)) return;
+    
+    // 1. Rechnung drucken (Thermodrucker-Format mit MwSt)
+    let buchungen = [];
+    try {
+        const { data } = await supabaseClient.from('buchungen').select('*')
+            .or(`user_id.eq.${gastId},gast_id.eq.${gastId}`)
+            .eq('storniert', false)
+            .order('datum', { ascending: true });
+        if (data) buchungen = data;
+    } catch(e) {}
+    
+    if (buchungen.length > 0) {
+        const mwstSatz = 20;
+        const netto = gesamtSumme / (1 + mwstSatz / 100);
+        const mwstBetrag = gesamtSumme - netto;
+        const byD = {};
+        buchungen.forEach(b => { const d = b.datum || '?'; if (!byD[d]) byD[d] = []; byD[d].push(b); });
+        const fmt = (v) => new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+        
+        let rows = '';
+        Object.keys(byD).sort().forEach(d => {
+            const bs = byD[d];
+            rows += `<tr><td colspan="4" style="padding:6px 0 2px;font-weight:700;border-top:1px dashed #000;font-size:11px;">--- ${d} ---</td></tr>`;
+            bs.forEach(b => {
+                rows += `<tr><td style="padding:1px 2px;font-size:11px;">${b.uhrzeit || ''}</td><td style="padding:1px 2px;font-size:11px;">${b.artikel_name || '-'}</td><td style="padding:1px 2px;text-align:right;font-size:11px;">${b.menge || 0}</td><td style="padding:1px 2px;text-align:right;font-size:11px;">${fmt((b.preis || 0) * (b.menge || 0))}</td></tr>`;
+            });
+        });
+        
+        const pw = window.open('', '_blank', 'width=350,height=700');
+        pw.document.write(`<!DOCTYPE html><html><head><title>Rechnung ${gastName}</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Courier New',monospace;width:72mm;padding:4mm;font-size:11px;line-height:1.3;}table{width:100%;border-collapse:collapse;}@media print{.no-print{display:none!important;}body{width:72mm;padding:2mm;}}</style></head><body><div style="text-align:center;margin-bottom:8px;"><div style="font-size:14px;font-weight:700;">RECHNUNG</div><div style="font-size:13px;font-weight:700;margin:4px 0;">${gastName}</div><div style="font-size:10px;">Checkout: ${new Date().toLocaleString('de-AT')}</div></div><div style="border-top:1px dashed #000;border-bottom:1px dashed #000;margin:4px 0;padding:2px 0;"><table><thead><tr style="font-weight:700;font-size:10px;"><td>Zeit</td><td>Artikel</td><td style="text-align:right;">Anz</td><td style="text-align:right;">Preis</td></tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:6px;padding-top:4px;border-top:2px solid #000;"><table style="font-size:12px;"><tr><td style="font-weight:700;">GESAMT:</td><td style="text-align:right;font-weight:700;font-size:14px;">${fmt(gesamtSumme)}</td></tr></table></div><div style="margin-top:6px;border-top:1px dashed #000;padding-top:4px;font-size:10px;"><table><tr><td>Netto (${mwstSatz}%):</td><td style="text-align:right;">${fmt(netto)}</td></tr><tr><td>MwSt ${mwstSatz}%:</td><td style="text-align:right;">${fmt(mwstBetrag)}</td></tr><tr style="font-weight:700;"><td>Brutto:</td><td style="text-align:right;">${fmt(gesamtSumme)}</td></tr></table></div><div style="text-align:center;margin-top:6px;font-size:10px;font-weight:700;border-top:1px dashed #000;padding-top:4px;">*** BEZAHLT ***</div><div style="text-align:center;margin-top:4px;font-size:9px;">Vielen Dank für Ihren Aufenthalt!</div><div class="no-print" style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;font-size:14px;background:#333;color:white;border:none;border-radius:6px;cursor:pointer;">🖨️ Drucken</button> <button onclick="window.close()" style="padding:10px 24px;font-size:14px;background:#999;color:white;border:none;border-radius:6px;cursor:pointer;">Schließen</button></div></body></html>`);
+        pw.document.close();
+    }
+    
+    // 2. Alle Buchungen als exportiert/bezahlt markieren
+    try {
+        await supabaseClient.from('buchungen')
+            .update({ exportiert: true, bezahlt: true, bezahlt_am: new Date().toISOString() })
+            .or(`user_id.eq.${gastId},gast_id.eq.${gastId}`)
+            .eq('storniert', false);
+        console.log('✅ Buchungen als bezahlt markiert');
+    } catch(e) {
+        console.error('Buchungen bezahlt-Markierung Fehler:', e);
+    }
+    
+    // 3. Gast als inaktiv (ausgecheckt) markieren
+    try {
+        await supabaseClient.from('profiles')
+            .update({ aktiv: false, checkout_am: new Date().toISOString() })
+            .eq('id', gastId);
+        console.log('✅ Gast ausgecheckt:', gastName);
+    } catch(e) {
+        console.error('Gast Checkout Fehler:', e);
+    }
+    
+    // 4. Lokal auch updaten
+    try {
+        await db.registeredGuests.update(gastId, { aktiv: false });
+    } catch(e) {}
+    
+    Utils.showToast(`✅ ${gastName} ausgecheckt & Rechnung gedruckt`, 'success');
+    State.selectedGastFilter = '';
     Router.navigate('admin-alle-buchungen');
 };
 
