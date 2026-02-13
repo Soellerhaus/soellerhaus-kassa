@@ -1812,7 +1812,7 @@ const i18n = {
     translations: {
         de: {
             // Login-Seite
-            'app_title': 'Söllerhaus Kassa',
+            'app_title': 'Kassa',
             'app_subtitle': 'Self-Service Buchung',
             'select_first_letter': 'Wählen Sie den ersten Buchstaben:',
             'no_account': 'Noch kein Account?',
@@ -1895,7 +1895,7 @@ const i18n = {
         },
         en: {
             // Login page
-            'app_title': 'Söllerhaus Kassa',
+            'app_title': 'Kassa',
             'app_subtitle': 'Self-Service Booking',
             'select_first_letter': 'Select the first letter:',
             'no_account': 'No account yet?',
