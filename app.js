@@ -7295,10 +7295,12 @@ Router.register('admin-guests', async () => {
                                         <span class="slider"></span>
                                     </label>
                                 </td>
-                                <td style="padding:10px;border:1px solid #ddd;text-align:center;white-space:nowrap;">
-                                    <button class="btn btn-primary" onclick="adminBuchenFürGast('${g.id}')" style="padding:6px 12px;margin-right:4px;" title="Für diesen Gast buchen"></button>
-                                    <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:6px 10px;margin-right:4px;" title="Bearbeiten">✏️</button>
-                                    <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:6px 10px;" title="Löschen"></button>
+                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">
+                                    <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;">
+                                        <button class="btn btn-primary" onclick="adminSchnellbuchen('${g.id}')" style="padding:5px 8px;font-size:0.75rem;">Buchen</button>
+                                        <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:5px 8px;font-size:0.75rem;">Edit</button>
+                                        <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:5px 8px;font-size:0.75rem;">X</button>
+                                    </div>
                                 </td>
                             </tr>`;
                         }).join('')}
@@ -8060,6 +8062,235 @@ window.adminBuchenFürGast = async (id) => {
     
     // Zum Buchungsmenü navigieren
     Router.navigate('buchen');
+};
+
+// ============ ADMIN SCHNELLBUCHEN (mit Mengenabfrage) ============
+window.adminSchnellbuchen = async (gastId) => {
+    // Gast laden
+    let gast = null;
+    if (supabaseClient && isOnline) {
+        try {
+            const { data } = await supabaseClient.from('profiles').select('id, vorname, display_name, first_name, email, pin_hash, group_name').eq('id', gastId).single();
+            if (data) gast = { id: data.id, name: data.display_name || data.vorname || data.first_name, email: data.email, pin: data.pin_hash, gruppe: data.group_name };
+        } catch(e) {}
+    }
+    if (!gast) {
+        const local = await db.registeredGuests.toArray();
+        const found = local.find(g => String(g.id) === String(gastId));
+        if (found) gast = { id: found.id, name: found.nachname || found.firstName, email: found.email, pin: found.passwort || found.passwordHash, gruppe: found.gruppenname || found.group_name };
+    }
+    if (!gast) { Utils.showToast('Gast nicht gefunden', 'error'); return; }
+    
+    // Artikel laden
+    const kats = await db.kategorien.toArray();
+    const arts = await Artikel.getAll({ aktiv: true });
+    kats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0));
+    
+    // Warenkorb State
+    window._schnellWarenkorb = [];
+    window._schnellGast = gast;
+    window._schnellKats = kats;
+    window._schnellArts = arts;
+    window._schnellSelCat = kats.length > 0 ? kats[0].kategorie_id : 1;
+    
+    renderSchnellbuchenModal();
+};
+
+window.renderSchnellbuchenModal = () => {
+    const gast = window._schnellGast;
+    const kats = window._schnellKats;
+    const arts = window._schnellArts;
+    const selCat = window._schnellSelCat;
+    const warenkorb = window._schnellWarenkorb;
+    
+    const filtered = selCat === 'alle' ? arts : arts.filter(a => a.kategorie_id === selCat);
+    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#4A5859'})[id] || '#2C5F7C';
+    const wkSumme = warenkorb.reduce((s,w) => s + w.preis * w.menge, 0);
+    const wkAnzahl = warenkorb.reduce((s,w) => s + w.menge, 0);
+    
+    const existingModal = document.getElementById('schnellbuchen-modal');
+    if (existingModal) existingModal.remove();
+    
+    const modalHtml = `
+    <div id="schnellbuchen-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:2000;display:flex;flex-direction:column;overflow:hidden;">
+        <!-- HEADER -->
+        <div style="background:var(--color-alpine-green);color:white;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+            <div>
+                <div style="font-weight:700;font-size:1.1rem;">Schnellbuchen: ${gast.name}</div>
+                <div style="font-size:0.8rem;opacity:0.9;">${gast.gruppe || 'Keine Gruppe'}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                ${wkAnzahl > 0 ? `<div style="background:white;color:var(--color-alpine-green);padding:6px 14px;border-radius:8px;font-weight:700;font-size:0.95rem;">${wkAnzahl} Pos. | ${Utils.formatCurrency(wkSumme)}</div>` : ''}
+                <button onclick="schnellbuchenAbschliessen()" style="background:#27ae60;color:white;border:none;padding:10px 20px;border-radius:8px;font-weight:700;font-size:1rem;cursor:pointer;" ${wkAnzahl === 0 ? 'disabled style="background:#27ae60;color:white;border:none;padding:10px 20px;border-radius:8px;font-weight:700;font-size:1rem;opacity:0.5;cursor:not-allowed;"' : ''}>Alle buchen</button>
+                <button onclick="schnellbuchenSchliessen()" style="background:#e74c3c;color:white;border:none;padding:10px 16px;border-radius:8px;font-weight:700;font-size:1rem;cursor:pointer;">X</button>
+            </div>
+        </div>
+        
+        <!-- WARENKORB (wenn Artikel vorhanden) -->
+        ${wkAnzahl > 0 ? `
+        <div style="background:#fffde7;padding:8px 16px;max-height:120px;overflow-y:auto;flex-shrink:0;border-bottom:2px solid #f0c040;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                ${warenkorb.map((w,i) => `
+                    <div style="background:white;border:1px solid #ddd;border-radius:6px;padding:4px 10px;font-size:0.8rem;display:flex;align-items:center;gap:6px;">
+                        <span style="font-weight:600;">${w.menge}x</span> ${w.name} <span style="color:var(--color-alpine-green);font-weight:600;">${Utils.formatCurrency(w.preis * w.menge)}</span>
+                        <button onclick="schnellbuchenEntfernen(${i})" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:1rem;padding:0 2px;">x</button>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+        
+        <!-- KATEGORIEN TABS -->
+        <div style="background:#f8f9fa;padding:8px 16px;display:flex;gap:6px;overflow-x:auto;flex-shrink:0;border-bottom:1px solid #ddd;">
+            ${kats.map(k => `
+                <button onclick="schnellbuchenKat(${k.kategorie_id})" style="
+                    padding:8px 16px;border-radius:20px;border:2px solid ${catColor(k.kategorie_id)};
+                    background:${selCat === k.kategorie_id ? catColor(k.kategorie_id) : 'white'};
+                    color:${selCat === k.kategorie_id ? 'white' : '#333'};
+                    font-weight:600;font-size:0.85rem;white-space:nowrap;cursor:pointer;
+                ">${k.name}</button>
+            `).join('')}
+            <button onclick="schnellbuchenKat('alle')" style="padding:8px 16px;border-radius:20px;border:2px solid #666;background:${selCat === 'alle' ? '#666' : 'white'};color:${selCat === 'alle' ? 'white' : '#333'};font-weight:600;font-size:0.85rem;white-space:nowrap;cursor:pointer;">Alle</button>
+        </div>
+        
+        <!-- ARTIKEL GRID -->
+        <div style="flex:1;overflow-y:auto;padding:12px 16px;background:#fff;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:10px;">
+                ${filtered.map(a => `
+                    <div onclick="schnellbuchenArtikelWaehlen(${a.artikel_id})" style="
+                        background:white;border:2px solid ${catColor(a.kategorie_id)};border-radius:12px;
+                        padding:14px 10px;text-align:center;cursor:pointer;transition:all 0.15s;
+                        box-shadow:0 2px 6px rgba(0,0,0,0.08);
+                    " onmouseover="this.style.transform='scale(1.03)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 6px rgba(0,0,0,0.08)'">
+                        <div style="font-size:1.8rem;margin-bottom:4px;">${a.icon || ''}</div>
+                        <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">${a.name}</div>
+                        <div style="color:${catColor(a.kategorie_id)};font-weight:700;font-size:1rem;">${Utils.formatCurrency(a.preis)}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+};
+
+window.schnellbuchenKat = (katId) => {
+    window._schnellSelCat = katId;
+    renderSchnellbuchenModal();
+};
+
+window.schnellbuchenArtikelWaehlen = (artikelId) => {
+    const art = window._schnellArts.find(a => a.artikel_id === artikelId);
+    if (!art) return;
+    
+    // Mengenabfrage per prompt (schnell per Tastatur)
+    const menge = prompt(`${art.name} (${Utils.formatCurrency(art.preis)})\n\nAnzahl eingeben:`, '1');
+    if (!menge || isNaN(parseInt(menge)) || parseInt(menge) < 1) return;
+    
+    const anzahl = parseInt(menge);
+    
+    // Zum Warenkorb hinzufügen (gleiche Artikel zusammenfassen)
+    const existing = window._schnellWarenkorb.find(w => w.artikel_id === artikelId);
+    if (existing) {
+        existing.menge += anzahl;
+    } else {
+        window._schnellWarenkorb.push({
+            artikel_id: art.artikel_id,
+            name: art.name,
+            preis: art.preis,
+            menge: anzahl,
+            kategorie_id: art.kategorie_id,
+            icon: art.icon
+        });
+    }
+    
+    renderSchnellbuchenModal();
+};
+
+window.schnellbuchenEntfernen = (index) => {
+    window._schnellWarenkorb.splice(index, 1);
+    renderSchnellbuchenModal();
+};
+
+window.schnellbuchenSchliessen = () => {
+    const modal = document.getElementById('schnellbuchen-modal');
+    if (modal) modal.remove();
+    window._schnellWarenkorb = [];
+};
+
+window.schnellbuchenAbschliessen = async () => {
+    const gast = window._schnellGast;
+    const warenkorb = window._schnellWarenkorb;
+    if (!warenkorb || warenkorb.length === 0) { Utils.showToast('Warenkorb ist leer', 'warning'); return; }
+    
+    const wkSumme = warenkorb.reduce((s,w) => s + w.preis * w.menge, 0);
+    const wkAnzahl = warenkorb.reduce((s,w) => s + w.menge, 0);
+    const details = warenkorb.map(w => `  ${w.menge}x ${w.name} = ${Utils.formatCurrency(w.preis * w.menge)}`).join('\n');
+    
+    if (!confirm(`Buchung für ${gast.name}:\n\n${details}\n\n${wkAnzahl} Positionen | GESAMT: ${Utils.formatCurrency(wkSumme)}\n\nJetzt buchen?`)) return;
+    
+    // Auth-Session für Gast erstellen
+    let authOk = false;
+    if (supabaseClient && isOnline && gast.email && gast.pin) {
+        try {
+            const adminPw = sessionStorage.getItem('_admin_pw');
+            const { error } = await supabaseClient.auth.signInWithPassword({
+                email: gast.email,
+                password: 'PIN_' + gast.pin + '_KASSA'
+            });
+            if (!error) authOk = true;
+        } catch(e) {}
+    }
+    
+    // Buchungen erstellen
+    let erfolg = 0;
+    let fehler = 0;
+    
+    for (const item of warenkorb) {
+        try {
+            // Temporär den Gast als currentUser setzen
+            const prevUser = State.currentUser;
+            State.currentUser = { id: gast.id, firstName: gast.name, group_name: gast.gruppe };
+            State.selectedGroup = gast.gruppe || null;
+            
+            await Buchungen.create({ 
+                artikel_id: item.artikel_id, 
+                name: item.name, 
+                preis: item.preis, 
+                kategorie_id: item.kategorie_id,
+                icon: item.icon
+            }, item.menge);
+            
+            State.currentUser = prevUser;
+            erfolg += item.menge;
+        } catch(e) {
+            console.error('Buchung fehlgeschlagen:', item.name, e);
+            fehler++;
+        }
+    }
+    
+    // Admin-Session wiederherstellen
+    const adminPw = sessionStorage.getItem('_admin_pw');
+    if (adminPw) {
+        try {
+            await supabaseClient.auth.signInWithPassword({
+                email: 'admin@soellerhaus.local',
+                password: adminPw
+            });
+        } catch(e) {}
+    }
+    
+    // Modal schliessen
+    schnellbuchenSchliessen();
+    
+    if (fehler > 0) {
+        Utils.showToast(`${erfolg} gebucht, ${fehler} Fehler`, 'warning');
+    } else {
+        Utils.showToast(`${erfolg} Buchungen für ${gast.name} erstellt (${Utils.formatCurrency(wkSumme)})`, 'success');
+    }
+    
+    // Gästeliste neu laden
+    Router.navigate('admin-guests');
 };
 
 // Export für Access
