@@ -9205,11 +9205,9 @@ Router.register('buchen', async () => {
     
     const renderTileContent = (a) => {
         const icon = getSmartIcon(a) || a.icon || '';
-        if (a.bild && a.bild.startsWith('data:')) {
-            // Foto links, Icon+Name rechts
-            return `<div style="display:flex;align-items:center;gap:10px;width:100%;"><img src="${a.bild}" style="width:56px;height:72px;object-fit:cover;border-radius:8px;flex-shrink:0;"><div style="text-align:center;flex:1;"><div style="font-size:1.5rem;">${icon}</div></div></div>`;
-        }
-        return `<div class="artikel-icon">${icon}</div>`;
+        const hasPhoto = a.bild && a.bild.startsWith('data:');
+        const photoHtml = hasPhoto ? `<img src="${a.bild}" style="position:absolute;left:4px;top:50%;transform:translateY(-50%);width:40px;height:60px;object-fit:cover;border-radius:6px;">` : '';
+        return `${photoHtml}<div class="artikel-icon">${icon}</div>`;
     };
     
     const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
@@ -10195,9 +10193,9 @@ window.searchArtikel = Utils.debounce(async q => {
     const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
     const renderTile = (a) => {
         const icon = getSmartIcon(a) || a.icon || '';
-        const content = (a.bild && a.bild.startsWith('data:')) 
-            ? `<div style="display:flex;align-items:center;gap:10px;width:100%;"><img src="${a.bild}" style="width:56px;height:72px;object-fit:cover;border-radius:8px;flex-shrink:0;"><div style="text-align:center;flex:1;"><div style="font-size:1.5rem;">${icon}</div></div></div>`
-            : `<div class="artikel-icon">${icon}</div>`;
+        const hasPhoto = a.bild && a.bild.startsWith('data:');
+        const photoHtml = hasPhoto ? `<img src="${a.bild}" style="position:absolute;left:4px;top:50%;transform:translateY(-50%);width:40px;height:60px;object-fit:cover;border-radius:6px;">` : '';
+        const content = `${photoHtml}<div class="artikel-icon">${icon}</div>`;
         return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${content}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`;
     };
     if (grid) grid.innerHTML = arts.map(renderTile).join('') || '<p class="text-muted" style="grid-column:1/-1;text-align:center;">Keine Ergebnisse</p>';
