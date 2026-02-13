@@ -8096,6 +8096,79 @@ window.adminSchnellbuchen = async (gastId) => {
     renderSchnellbuchenModal();
 };
 
+// ============ SMART ARTIKEL ICONS ============
+window.getSmartIcon = (artikel) => {
+    // Wenn Artikel ein eigenes Bild hat, das verwenden
+    if (artikel.bild && artikel.bild.startsWith('data:')) return null; // null = Bild statt Emoji
+    // Wenn bereits ein gutes Icon gesetzt ist (nicht der generische Becher)
+    if (artikel.icon && artikel.icon.length > 0 && !['🥤','🍹'].includes(artikel.icon)) return artikel.icon;
+    
+    const name = (artikel.name || '').toLowerCase();
+    const katId = artikel.kategorie_id;
+    
+    // WEIN (Kat 3) - spezifische Unterscheidung
+    if (katId === 3 || name.includes('wein') || name.includes('prosecco') || name.includes('sekt') || name.includes('champagner')) {
+        if (name.includes('rot') || name.includes('zweigelt') || name.includes('blaufränk') || name.includes('merlot') || name.includes('cabernet') || name.includes('pinot noir') || name.includes('st. laurent') || name.includes('shiraz')) return '🍷';
+        if (name.includes('rosé') || name.includes('rose') || name.includes('rosa')) return '🌸';
+        if (name.includes('prosecco') || name.includes('sekt') || name.includes('champagner') || name.includes('frizzante') || name.includes('spumante') || name.includes('perlwein')) return '🍾';
+        if (name.includes('spritz') || name.includes('aperol')) return '🍹';
+        // Weißwein (Default für Wein-Kategorie)
+        return '🥂';
+    }
+    
+    // BIER (Kat 2)
+    if (katId === 2 || name.includes('bier') || name.includes('pils') || name.includes('märzen') || name.includes('weizen') || name.includes('radler') || name.includes('zipfer') || name.includes('stiegl') || name.includes('gösser') || name.includes('hirsch')) {
+        if (name.includes('weizen') || name.includes('hefe')) return '🍺';
+        if (name.includes('radler')) return '🍋';
+        return '🍺';
+    }
+    
+    // SCHNÄPSE & SPIRITUOSEN (Kat 4)
+    if (katId === 4 || name.includes('schnaps') || name.includes('obstler') || name.includes('williams') || name.includes('marille') || name.includes('vodka') || name.includes('gin') || name.includes('rum') || name.includes('whisky') || name.includes('whiskey') || name.includes('jägermeister') || name.includes('enzian') || name.includes('grappa')) {
+        if (name.includes('gin') && name.includes('tonic')) return '🍸';
+        if (name.includes('jagertee') || name.includes('jägertee') || name.includes('glühwein') || name.includes('punsch')) return '🫖';
+        return '🥃';
+    }
+    
+    // HEIßE GETRÄNKE (Kat 5)
+    if (katId === 5 || name.includes('kaffee') || name.includes('cappuccino') || name.includes('espresso') || name.includes('latte') || name.includes('kakao') || name.includes('tee') || name.includes('hot')) {
+        if (name.includes('kakao') || name.includes('schokolade')) return '🍫';
+        if (name.includes('tee') && !name.includes('jägertee') && !name.includes('jagertee')) return '🍵';
+        return '☕';
+    }
+    
+    // SÜSSES & SALZIGES (Kat 6)
+    if (katId === 6 || name.includes('chips') || name.includes('nüsse') || name.includes('schokolade') || name.includes('riegel') || name.includes('snack') || name.includes('erdnüsse')) {
+        if (name.includes('chips') || name.includes('salzig') || name.includes('erdnüsse') || name.includes('nüsse')) return '🥜';
+        if (name.includes('eis') || name.includes('gelato')) return '🍨';
+        return '🍫';
+    }
+    
+    // ALKOHOLFREIE GETRÄNKE (Kat 1)
+    if (katId === 1) {
+        if (name.includes('mineral') || name.includes('wasser')) return '💧';
+        if (name.includes('cola')) return '🥤';
+        if (name.includes('spezi') || name.includes('mezzo')) return '🥤';
+        if (name.includes('limo') || name.includes('zitrone')) return '🍋';
+        if (name.includes('orange') || name.includes('blutorange')) return '🍊';
+        if (name.includes('apfel')) return '🍏';
+        if (name.includes('red bull') || name.includes('energy')) return '⚡';
+        if (name.includes('tonic')) return '🫧';
+        if (name.includes('johannisbeer')) return '🫐';
+        if (name.includes('almdudler')) return '🏔️';
+        if (name.includes('seezüngle')) return '🐟';
+        return '🥤';
+    }
+    
+    // SONSTIGES (Kat 7)
+    if (katId === 7) {
+        if (name.includes('umlage')) return '💰';
+        return '📦';
+    }
+    
+    return '🍽️';
+};
+
 window.renderSchnellbuchenModal = () => {
     const gast = window._schnellGast;
     const kats = window._schnellKats;
@@ -8104,7 +8177,7 @@ window.renderSchnellbuchenModal = () => {
     const warenkorb = window._schnellWarenkorb;
     
     const filtered = selCat === 'alle' ? arts : arts.filter(a => a.kategorie_id === selCat);
-    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#4A5859'})[id] || '#2C5F7C';
+    const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
     const wkSumme = warenkorb.reduce((s,w) => s + w.preis * w.menge, 0);
     const wkAnzahl = warenkorb.reduce((s,w) => s + w.menge, 0);
     
@@ -8162,7 +8235,7 @@ window.renderSchnellbuchenModal = () => {
                         padding:14px 10px;text-align:center;cursor:pointer;transition:all 0.15s;
                         box-shadow:0 2px 6px rgba(0,0,0,0.08);
                     " onmouseover="this.style.transform='scale(1.03)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 6px rgba(0,0,0,0.08)'">
-                        <div style="font-size:1.8rem;margin-bottom:4px;">${a.icon || ''}</div>
+                        <div style="font-size:1.8rem;margin-bottom:4px;">${getSmartIcon(a) || a.icon || ''}</div>
                         <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">${a.name}</div>
                         <div style="color:${catColor(a.kategorie_id)};font-weight:700;font-size:1rem;">${Utils.formatCurrency(a.preis)}</div>
                     </div>
@@ -8225,49 +8298,122 @@ window.schnellbuchenAbschliessen = async () => {
     
     const wkSumme = warenkorb.reduce((s,w) => s + w.preis * w.menge, 0);
     const wkAnzahl = warenkorb.reduce((s,w) => s + w.menge, 0);
+    // Gesamtzahl Einzelbuchungen (jede Menge = separate Inserts)
+    const totalInserts = warenkorb.reduce((s,w) => s + w.menge, 0);
     const details = warenkorb.map(w => `  ${w.menge}x ${w.name} = ${Utils.formatCurrency(w.preis * w.menge)}`).join('\n');
     
-    if (!confirm(`Buchung für ${gast.name}:\n\n${details}\n\n${wkAnzahl} Positionen | GESAMT: ${Utils.formatCurrency(wkSumme)}\n\nJetzt buchen?`)) return;
+    if (!confirm(`Buchung für ${gast.name}:\n\n${details}\n\n${wkAnzahl} Positionen (${totalInserts} Einzelbuchungen)\nGESAMT: ${Utils.formatCurrency(wkSumme)}\n\nJetzt buchen?`)) return;
+    
+    // Progress-Overlay anzeigen
+    const modal = document.getElementById('schnellbuchen-modal');
+    const progressHtml = `
+    <div id="schnellbuchen-progress" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:3000;display:flex;justify-content:center;align-items:center;">
+        <div style="background:white;border-radius:16px;padding:32px 40px;max-width:450px;width:90%;text-align:center;">
+            <div style="font-size:2.5rem;margin-bottom:12px;">⏳</div>
+            <div style="font-weight:700;font-size:1.3rem;margin-bottom:4px;">Buchungen werden übertragen...</div>
+            <div style="color:#666;margin-bottom:16px;font-size:0.9rem;">Bitte nicht schließen oder zurück drücken!</div>
+            <div style="font-weight:700;font-size:1.1rem;margin-bottom:4px;" id="progress-gastname">${gast.name}</div>
+            <div style="background:#e0e0e0;border-radius:10px;height:28px;overflow:hidden;margin:16px 0;position:relative;">
+                <div id="progress-bar" style="background:linear-gradient(90deg,#27ae60,#2ecc71);height:100%;width:0%;transition:width 0.3s;border-radius:10px;"></div>
+                <div id="progress-percent" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem;color:#333;">0%</div>
+            </div>
+            <div id="progress-detail" style="font-size:0.9rem;color:#555;">0 / ${totalInserts} Buchungen</div>
+            <div id="progress-current" style="font-size:0.8rem;color:#888;margin-top:8px;"></div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', progressHtml);
+    
+    const updateProgress = (done, total, currentItem) => {
+        const pct = Math.round((done / total) * 100);
+        const bar = document.getElementById('progress-bar');
+        const pctEl = document.getElementById('progress-percent');
+        const detailEl = document.getElementById('progress-detail');
+        const currentEl = document.getElementById('progress-current');
+        if (bar) bar.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (detailEl) detailEl.textContent = `${done} / ${total} Buchungen`;
+        if (currentEl) currentEl.textContent = currentItem || '';
+    };
     
     // Auth-Session für Gast erstellen
-    let authOk = false;
     if (supabaseClient && isOnline && gast.email && gast.pin) {
         try {
-            const adminPw = sessionStorage.getItem('_admin_pw');
-            const { error } = await supabaseClient.auth.signInWithPassword({
+            await supabaseClient.auth.signInWithPassword({
                 email: gast.email,
                 password: 'PIN_' + gast.pin + '_KASSA'
             });
-            if (!error) authOk = true;
         } catch(e) {}
     }
     
-    // Buchungen erstellen
+    // Buchungen erstellen mit Fortschritt
     let erfolg = 0;
     let fehler = 0;
+    let insertsDone = 0;
     
     for (const item of warenkorb) {
         try {
-            // Temporär den Gast als currentUser setzen
             const prevUser = State.currentUser;
             State.currentUser = { id: gast.id, firstName: gast.name, group_name: gast.gruppe };
             State.selectedGroup = gast.gruppe || null;
             
-            await Buchungen.create({ 
-                artikel_id: item.artikel_id, 
-                name: item.name, 
-                preis: item.preis, 
-                kategorie_id: item.kategorie_id,
-                icon: item.icon
-            }, item.menge);
+            // Einzelbuchungen manuell erstellen (statt Buchungen.create) für besseren Fortschritt
+            const preis = item.preis;
+            for (let i = 0; i < item.menge; i++) {
+                updateProgress(insertsDone, totalInserts, `${item.name} (${i+1}/${item.menge})`);
+                
+                const b = {
+                    buchung_id: Utils.uuid(),
+                    user_id: String(gast.id),
+                    gast_id: String(gast.id),
+                    gast_vorname: gast.name || '',
+                    gast_nachname: '',
+                    gastgruppe: '',
+                    group_name: gast.gruppe || '',
+                    artikel_id: item.artikel_id,
+                    artikel_name: item.name,
+                    preis: parseFloat(preis),
+                    preis_modus: State.currentPreisModus || 'sv',
+                    steuer_prozent: 10,
+                    datum: Utils.getBuchungsDatum(),
+                    uhrzeit: Utils.formatTime(new Date()),
+                    menge: 1,
+                    exportiert: false,
+                    aufgefuellt: false,
+                    storniert: false,
+                    fix: false,
+                    aus_fehlend: false,
+                    ist_umlage: false,
+                    session_id: State.sessionId || Utils.uuid(),
+                    erstellt_am: new Date().toISOString()
+                };
+                
+                let ok = false;
+                for (let versuch = 1; versuch <= 3; versuch++) {
+                    const { error } = await supabaseClient.from('buchungen').insert(b);
+                    if (!error) { ok = true; break; }
+                    if (versuch < 3) await new Promise(r => setTimeout(r, 400 * versuch));
+                }
+                
+                if (ok) {
+                    erfolg++;
+                } else {
+                    fehler++;
+                }
+                insertsDone++;
+                updateProgress(insertsDone, totalInserts, `${item.name} (${i+1}/${item.menge})`);
+            }
             
             State.currentUser = prevUser;
-            erfolg += item.menge;
         } catch(e) {
             console.error('Buchung fehlgeschlagen:', item.name, e);
-            fehler++;
+            fehler += item.menge;
+            insertsDone += item.menge;
+            updateProgress(insertsDone, totalInserts, 'Fehler: ' + item.name);
         }
     }
+    
+    // Fortschritt auf 100%
+    updateProgress(totalInserts, totalInserts, 'Fertig!');
     
     // Admin-Session wiederherstellen
     const adminPw = sessionStorage.getItem('_admin_pw');
@@ -8280,7 +8426,12 @@ window.schnellbuchenAbschliessen = async () => {
         } catch(e) {}
     }
     
-    // Modal schliessen
+    // Kurz warten damit der Nutzer 100% sieht
+    await new Promise(r => setTimeout(r, 800));
+    
+    // Progress + Modal schliessen
+    const progressOverlay = document.getElementById('schnellbuchen-progress');
+    if (progressOverlay) progressOverlay.remove();
     schnellbuchenSchliessen();
     
     if (fehler > 0) {
@@ -8289,7 +8440,6 @@ window.schnellbuchenAbschliessen = async () => {
         Utils.showToast(`${erfolg} Buchungen für ${gast.name} erstellt (${Utils.formatCurrency(wkSumme)})`, 'success');
     }
     
-    // Gästeliste neu laden
     Router.navigate('admin-guests');
 };
 
@@ -8998,10 +9148,11 @@ Router.register('buchen', async () => {
         if (a.bild && a.bild.startsWith('data:')) {
             return `<img src="${a.bild}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">`;
         }
-        return `<div class="artikel-icon">${a.icon||''}</div>`;
+        const icon = getSmartIcon(a) || a.icon || '';
+        return `<div class="artikel-icon">${icon}</div>`;
     };
     
-    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#4A5859'})[id] || '#2C5F7C';
+    const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
     
     // Warenkorb-Button HTML (oben rechts, kompakt)
     const warenkorbBtnHtml = sessionBuchungen.length ? `
@@ -9025,7 +9176,13 @@ Router.register('buchen', async () => {
         </button>
     ` : '';
     
-    UI.render(`<div class="app-header">
+    UI.render(`<style>
+        .artikel-tile { border-left:4px solid var(--tile-color, #2C5F7C) !important; background:linear-gradient(135deg, color-mix(in srgb, var(--tile-color) 6%, white), white) !important; }
+        .artikel-tile::before { opacity:1 !important; height:5px !important; }
+        .artikel-tile:hover { border-color:var(--tile-color) !important; background:linear-gradient(135deg, color-mix(in srgb, var(--tile-color) 12%, white), white) !important; }
+        .artikel-price { color:var(--tile-color, #2C5F7C) !important; }
+    </style>
+    <div class="app-header">
         <div class="header-left">
             <div class="header-title"> ${name}</div>
             ${currentGroup ? `<div style="font-size:0.75rem;opacity:0.8;"> ${currentGroup}</div>` : ''}
@@ -9975,11 +10132,11 @@ window.getCategoryColor = id => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465
 window.searchArtikel = Utils.debounce(async q => {
     const arts = await Artikel.getAll({ aktiv: true, search: q });
     const grid = document.querySelector('.artikel-grid');
-    const catColor = (id) => ({1:'#FF6B6B',2:'#FFD93D',3:'#95E1D3',4:'#AA4465',5:'#F38181',6:'#6C5B7B',7:'#4A5859'})[id] || '#2C5F7C';
+    const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
     const renderTile = (a) => {
         const content = (a.bild && a.bild.startsWith('data:')) 
             ? `<img src="${a.bild}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">`
-            : `<div class="artikel-icon">${a.icon||''}</div>`;
+            : `<div class="artikel-icon">${getSmartIcon(a) || a.icon || ''}</div>`;
         return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${content}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`;
     };
     if (grid) grid.innerHTML = arts.map(renderTile).join('') || '<p class="text-muted" style="grid-column:1/-1;text-align:center;">Keine Ergebnisse</p>';
