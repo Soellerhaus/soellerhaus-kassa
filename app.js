@@ -5340,13 +5340,67 @@ window.printAuffuellliste = async () => {
 
 // Nur Auffüllliste zurücksetzen (NICHT Export!)
 window.resetAuffuelllisteOhneExport = async () => {
-    if (!confirm('Auffüllliste zurücksetzen?\n\nDie Getränke wurden aufgefuellt und die Liste wird auf 0 gesetzt.\n\n(Dies hat keinen Einfluss auf den Registrierkasse-Export)')) return;
+    if (!confirm('Auffüllliste zurücksetzen?\n\nDie Getränke wurden aufgefüllt und die Liste wird auf 0 gesetzt.\n\n(Dies hat keinen Einfluss auf den Registrierkasse-Export)')) return;
     
     try {
-        await Buchungen.markAsAufgefuellt();
-        Utils.showToast('✅ Auffüllliste zurückgesetzt', 'success');
+        if (!supabaseClient || !isOnline) {
+            throw new Error('Keine Internetverbindung.');
+        }
+        
+        // Buchungen laden die aufgefüllt werden müssen
+        const { data, error } = await supabaseClient
+            .from('buchungen')
+            .select('buchung_id')
+            .eq('storniert', false)
+            .or('aufgefuellt.is.null,aufgefuellt.eq.false');
+        
+        if (error) throw new Error('Fehler beim Laden: ' + error.message);
+        
+        const ids = (data || []).map(b => b.buchung_id);
+        if (ids.length === 0) {
+            Utils.showToast('Keine offenen Buchungen zum Zurücksetzen', 'info');
+            return;
+        }
+        
+        // Progress Overlay
+        document.body.insertAdjacentHTML('beforeend', `
+        <div id="auffuell-progress" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:3000;display:flex;justify-content:center;align-items:center;">
+            <div style="background:white;border-radius:16px;padding:32px 40px;max-width:450px;width:90%;text-align:center;">
+                <div style="font-size:2.5rem;margin-bottom:12px;">⏳</div>
+                <div style="font-weight:700;font-size:1.3rem;margin-bottom:4px;">Auffüllliste wird zurückgesetzt...</div>
+                <div style="color:#666;margin-bottom:16px;font-size:0.9rem;">Bitte nicht schließen oder zurück drücken!</div>
+                <div style="background:#e0e0e0;border-radius:10px;height:28px;overflow:hidden;margin:16px 0;position:relative;">
+                    <div id="auffuell-bar" style="background:linear-gradient(90deg,#27ae60,#2ecc71);height:100%;width:0%;transition:width 0.3s;border-radius:10px;"></div>
+                    <div id="auffuell-percent" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem;color:#333;">0%</div>
+                </div>
+                <div id="auffuell-detail" style="font-size:0.9rem;color:#555;">0 / ${ids.length} Buchungen</div>
+            </div>
+        </div>`);
+        
+        const update = { aufgefuellt: true, aufgefuellt_am: new Date().toISOString() };
+        let done = 0;
+        
+        for (const id of ids) {
+            await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
+            done++;
+            const pct = Math.round((done / ids.length) * 100);
+            const bar = document.getElementById('auffuell-bar');
+            const pctEl = document.getElementById('auffuell-percent');
+            const detailEl = document.getElementById('auffuell-detail');
+            if (bar) bar.style.width = pct + '%';
+            if (pctEl) pctEl.textContent = pct + '%';
+            if (detailEl) detailEl.textContent = `${done} / ${ids.length} Buchungen`;
+        }
+        
+        await new Promise(r => setTimeout(r, 600));
+        const overlay = document.getElementById('auffuell-progress');
+        if (overlay) overlay.remove();
+        
+        Utils.showToast(`✅ ${ids.length} Buchungen zurückgesetzt`, 'success');
         Router.navigate('admin-auffuellliste');
     } catch(e) {
+        const overlay = document.getElementById('auffuell-progress');
+        if (overlay) overlay.remove();
         Utils.showToast('Fehler: ' + e.message, 'error');
     }
 };
@@ -8479,6 +8533,7 @@ window.exportGästeExcel = async () => {
 Router.register('admin-articles', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
+    const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
     console.log('📋 admin-articles: Lade Artikel...');
     
     // DIREKT aus Supabase laden (nicht aus Cache!)
@@ -8530,9 +8585,12 @@ Router.register('admin-articles', async () => {
     });
     
     const renderArticleRow = (a, pos) => {
+        const smartIcon = getSmartIcon(a);
+        const currentIcon = a.icon || smartIcon || '';
         const img = (a.bild && a.bild.startsWith('data:')) 
-            ? `<img src="${a.bild}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;cursor:pointer;" onclick="triggerArtikelBildUpload(${a.artikel_id})">`
-            : `<button onclick="triggerArtikelBildUpload(${a.artikel_id})" style="width:40px;height:40px;border:2px dashed #ccc;border-radius:6px;background:#f8f9fa;cursor:pointer;font-size:1.2rem;color:#888;">+</button>`;
+            ? `<img src="${a.bild}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;cursor:pointer;" onclick="triggerArtikelBildUpload(${a.artikel_id})">`
+            : `<button onclick="triggerArtikelBildUpload(${a.artikel_id})" style="width:36px;height:36px;border:2px dashed #ccc;border-radius:6px;background:#f8f9fa;cursor:pointer;font-size:0.9rem;color:#888;">📷</button>`;
+        const iconBtn = `<button onclick="showIconPicker(${a.artikel_id}, '${(a.name||'').replace(/'/g, "\\'")}')" style="width:36px;height:36px;border:1px solid #ddd;border-radius:6px;background:#f8f9fa;cursor:pointer;font-size:1.4rem;" title="Icon ändern">${currentIcon || '?'}</button>`;
         
         // Kategorie-Dropdown erstellen
         const katOptions = kats.map(k => 
@@ -8568,7 +8626,7 @@ Router.register('admin-articles', async () => {
                 <span onclick="changeArtikelId(${a.artikel_id})" style="cursor:pointer;padding:4px 8px;background:#f0f0f0;border-radius:4px;border:1px solid #ddd;" title="Klicken zum Ändern der ID">${a.artikel_id}</span>
             </td>
             <td style="width:40px;text-align:center;font-weight:700;color:var(--color-alpine-green);">${pos}</td>
-            <td style="width:50px;text-align:center;">${img}</td>
+            <td style="width:80px;text-align:center;"><div style="display:flex;gap:3px;justify-content:center;">${iconBtn}${img}</div></td>
             <td><strong>${a.name}</strong>${a.sku?` <small style="color:var(--color-stone-dark);">(${a.sku})</small>`:''}</td>
             <td style="text-align:center;">
                 <div style="display:flex;flex-direction:column;gap:2px;">
@@ -8610,8 +8668,8 @@ Router.register('admin-articles', async () => {
                 </div>
             </td>
             <td style="text-align:right;white-space:nowrap;">
-                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:6px 12px;">✏️</button>
-                <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:6px 12px;">🗑️</button>
+                <button class="btn btn-secondary" onclick="showEditArticleModal(${a.artikel_id})" style="padding:4px 8px;font-size:0.75rem;">Edit</button>
+                <button class="btn btn-danger" onclick="handleDeleteArticle(${a.artikel_id})" style="padding:4px 8px;font-size:0.75rem;">X</button>
             </td>
         </tr>`;
     };
@@ -8623,7 +8681,8 @@ Router.register('admin-articles', async () => {
     sortedKats.forEach(katId => {
         const katName = katMap[katId] || 'Sonstiges';
         const artikelList = byCategory[katId];
-        tableContent += `<tr class="category-header"><td colspan="9" style="background:var(--color-alpine-green);color:white;padding:12px;font-weight:700;font-size:1.1rem;">${katName} (${artikelList.length})</td></tr>`;
+        const kColor = catColor(parseInt(katId));
+        tableContent += `<tr class="category-header"><td colspan="9" style="background:${kColor};color:white;padding:12px;font-weight:700;font-size:1.1rem;">${katName} (${artikelList.length})</td></tr>`;
         artikelList.forEach((a, idx) => {
             tableContent += renderArticleRow(a, idx + 1);
         });
@@ -9299,8 +9358,8 @@ Router.register('buchen', async () => {
         
         <div class="form-group" style="margin-bottom:12px;"><input type="text" class="form-input" placeholder=" ${t('search')}" oninput="searchArtikel(this.value)" style="padding:10px 14px;"></div>
         <div class="category-tabs" style="margin-bottom:14px;">
-            ${kats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0)).map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})">${k.name}</div>`).join('')}
-            <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')">${t('cat_all')}</div>
+            ${kats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0)).map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})" style="${State.selectedCategory===k.kategorie_id ? 'background:'+catColor(k.kategorie_id)+';color:white;border:2px solid '+catColor(k.kategorie_id) : 'border:2px solid '+catColor(k.kategorie_id)+';color:'+catColor(k.kategorie_id)+';background:white'}">${k.name}</div>`).join('')}
+            <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')" style="${State.selectedCategory==='alle' ? 'background:#555;color:white;border:2px solid #555' : 'border:2px solid #555;color:#555;background:white'}">${t('cat_all')}</div>
         </div>
         <div class="artikel-grid">
             ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${renderTileContent(a)}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
@@ -10187,6 +10246,73 @@ window.showAddArticleModal = () => {
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveNewArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = null;
 };
+// ============ ICON PICKER FÜR ARTIKEL ============
+window.showIconPicker = (artikelId, artikelName) => {
+    const icons = {
+        'Getränke - Alkoholfrei': ['💧','🥤','🧃','🥛','🫧','🧊','🍶'],
+        'Getränke - Frucht': ['🍋','🍊','🍏','🍎','🍇','🍓','🍑','🍒','🫐','🍌','🥝','🍍','🥭','🍈'],
+        'Bier': ['🍺','🍻'],
+        'Wein & Sekt': ['🍷','🥂','🌸','🍾','🫗','🍹','🍸','🥃'],
+        'Kaffee & Tee': ['☕','🍵','🫖','🍫','🥛','🧋'],
+        'Essen - Hauptgerichte': ['🍽️','🍕','🍔','🌭','🥪','🌮','🌯','🍝','🍜','🍲','🥘','🫕','🥩','🍗','🍖','🥓','🧆','🥙'],
+        'Essen - Beilagen': ['🍟','🥗','🥒','🌽','🥔','🧅','🥕','🍠','🥦','🫑','🥬','🍞','🥖','🥐','🧀'],
+        'Essen - Süßes': ['🍰','🧁','🍪','🍩','🍫','🍬','🍭','🎂','🥧','🍨','🍦','🧇','🥞'],
+        'Essen - Snacks': ['🥜','🌰','🥨','🧈','🫘','🍿'],
+        'Obst': ['🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍒','🍑','🥝','🥥','🍍','🥭'],
+        'Natur & Berg': ['🏔️','⛰️','🌲','🌿','🍂','❄️','☀️','🌅','🌙','⭐','🌈','🔥','💨','🌊'],
+        'Sport & Freizeit': ['⛷️','🎿','🛷','🏂','🧗','🚵','🏊','🧖','♨️','🎯','🎱','🎳','🎪'],
+        'Tiere': ['🐟','🐄','🐖','🐔','🐑','🦌','🐿️','🦅','🐝','🦋','🐞'],
+        'Musik & Unterhaltung': ['🎵','🎶','🎸','🎹','🥁','🎤','🎧','📻','🎬','📺','🎮'],
+        'Symbole': ['⚡','✨','💫','🌟','❤️','💛','💚','💙','💜','🖤','🤍','💰','💎','🏆','🥇','🎁','🎉','🎊','✅','❌','⭕','📦','🔑','🔒','🏷️','📋','📌','🔔'],
+        'Flaggen & Zeichen': ['🇦🇹','🇩🇪','🇮🇹','🇫🇷','🇪🇸','🏳️','🚩','♻️','⚠️','🚫','💲','€'],
+        'Gesichter': ['😊','😋','🤤','😍','🥳','😎','🤩','👍','👏','🙏','💪','🤝','👨‍🍳','🧑‍🍳']
+    };
+    
+    let pickerHtml = `
+    <div id="icon-picker-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:3000;display:flex;justify-content:center;align-items:center;" onclick="if(event.target===this)this.remove()">
+        <div style="background:white;border-radius:16px;padding:20px;max-width:600px;width:95%;max-height:85vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;position:sticky;top:0;background:white;padding:8px 0;z-index:1;">
+                <h3 style="margin:0;">Icon: ${artikelName}</h3>
+                <button onclick="document.getElementById('icon-picker-modal').remove()" style="background:#e74c3c;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:700;">Schließen</button>
+            </div>
+            <div style="margin-bottom:12px;padding:8px;background:#f0f0f0;border-radius:8px;text-align:center;">
+                <button onclick="setArtikelIcon(${artikelId},'')" style="padding:8px 16px;border:2px solid #e74c3c;border-radius:8px;background:white;cursor:pointer;font-size:0.9rem;color:#e74c3c;font-weight:600;">🔄 Kein Icon (Auto-Erkennung)</button>
+            </div>`;
+    
+    for (const [group, emojis] of Object.entries(icons)) {
+        pickerHtml += `<div style="margin-bottom:10px;">
+            <div style="font-weight:600;font-size:0.8rem;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">${group}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                ${emojis.map(e => `<button onclick="setArtikelIcon(${artikelId},'${e}')" style="width:44px;height:44px;border:1px solid #e0e0e0;border-radius:8px;background:white;cursor:pointer;font-size:1.5rem;transition:all 0.12s;" onmouseover="this.style.borderColor='#27ae60';this.style.background='#f0fff0';this.style.transform='scale(1.15)'" onmouseout="this.style.borderColor='#e0e0e0';this.style.background='white';this.style.transform=''">${e}</button>`).join('')}
+            </div>
+        </div>`;
+    }
+    
+    pickerHtml += `</div></div>`;
+    document.body.insertAdjacentHTML('beforeend', pickerHtml);
+};
+
+window.setArtikelIcon = async (artikelId, icon) => {
+    try {
+        // Lokal updaten
+        await db.artikel.update(artikelId, { icon: icon });
+        
+        // Supabase updaten
+        if (supabaseClient && isOnline) {
+            await supabaseClient.from('artikel').update({ icon: icon }).eq('artikel_id', artikelId);
+        }
+        
+        // Picker schliessen
+        const modal = document.getElementById('icon-picker-modal');
+        if (modal) modal.remove();
+        
+        Utils.showToast(icon ? `Icon ${icon} gesetzt` : 'Icon auf Auto gesetzt', 'success');
+        Router.navigate('admin-articles');
+    } catch(e) {
+        Utils.showToast('Fehler: ' + e.message, 'error');
+    }
+};
+
 window.showEditArticleModal = async id => {
     const a = await Artikel.getById(id);
     if (!a) return;
