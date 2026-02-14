@@ -3740,6 +3740,10 @@ const PreisModus = {
     // Beide Preise für Anzeige
     getBeidePreise(artikel) {
         return {
+            sv: artikel.preis ?? 0,
+            hp: artikel.preis_hp ?? artikel.preis ?? 0
+        };
+    },
 
     // ---- ZEITPLAN ----
     async getSchedule() {
@@ -3790,10 +3794,6 @@ const PreisModus = {
             }
         }
         return null;
-    },
-            sv: artikel.preis ?? 0,
-            hp: artikel.preis_hp ?? artikel.preis ?? 0
-        };
     }
 };
 
