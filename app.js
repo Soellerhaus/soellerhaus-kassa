@@ -2124,6 +2124,8 @@ const State = {
     selectedGroup: null, // Ausgewählte Gruppe für aktuelle Session
     currentPreisModus: 'sv', // 'sv' = Selbstversorger, 'hp' = Halbpension
     async loadPreisModus() {
+        // Zuerst Zeitplan prüfen
+        try { await PreisModus.checkSchedule(); } catch(e) { console.warn('Schedule check error:', e); }
         this.currentPreisModus = await PreisModus.getModus();
         console.log(' Preismodus geladen:', this.currentPreisModus === 'hp' ? 'Halbpension' : 'Selbstversorger');
     },
@@ -3738,6 +3740,57 @@ const PreisModus = {
     // Beide Preise für Anzeige
     getBeidePreise(artikel) {
         return {
+
+    // ---- ZEITPLAN ----
+    async getSchedule() {
+        let schedule = [];
+        if (supabaseClient && isOnline) {
+            try {
+                const { data } = await supabaseClient.from('settings').select('value').eq('key', 'preismodus_schedule').single();
+                if (data?.value) schedule = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+            } catch(e) {}
+        }
+        if (schedule.length === 0) {
+            try {
+                const setting = await db.settings.get('preismodus_schedule');
+                if (setting?.value) schedule = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
+            } catch(e) {}
+        }
+        // Sortieren: neueste zuerst
+        return (schedule || []).sort((a,b) => new Date(a.von) - new Date(b.von));
+    },
+    
+    async saveSchedule(schedule) {
+        const value = JSON.stringify(schedule);
+        await db.settings.put({ key: 'preismodus_schedule', value });
+        if (supabaseClient && isOnline) {
+            try {
+                const { data: existing } = await supabaseClient.from('settings').select('key').eq('key', 'preismodus_schedule').single();
+                if (existing) {
+                    await supabaseClient.from('settings').update({ value }).eq('key', 'preismodus_schedule');
+                } else {
+                    await supabaseClient.from('settings').insert({ key: 'preismodus_schedule', value });
+                }
+            } catch(e) { console.error('Schedule save error:', e); }
+        }
+    },
+    
+    // Automatische Prüfung: Ist ein Zeitplan gerade aktiv?
+    async checkSchedule() {
+        const schedule = await this.getSchedule();
+        const now = new Date();
+        const active = schedule.find(s => new Date(s.von) <= now && new Date(s.bis + 'T23:59:59') >= now);
+        if (active) {
+            const current = await this.getModus();
+            if (current !== active.modus) {
+                await this.setModus(active.modus);
+                State.currentPreisModus = active.modus;
+                console.log('📅 Preismodus automatisch gewechselt auf:', active.modus === 'hp' ? 'HP' : 'SV');
+                return active.modus;
+            }
+        }
+        return null;
+    },
             sv: artikel.preis ?? 0,
             hp: artikel.preis_hp ?? artikel.preis ?? 0
         };
@@ -6694,6 +6747,39 @@ Router.register('admin-preismodus', async () => {
     const currentModus = await PreisModus.getModus();
     const isHP = currentModus === PreisModus.HP;
     
+    // Zeitplan laden
+    const schedule = await PreisModus.getSchedule();
+    const now = new Date();
+    const activeEntry = schedule.find(s => new Date(s.von) <= now && new Date(s.bis) >= now);
+    
+    // Zeitplan-Einträge rendern
+    let scheduleRows = '';
+    if (schedule.length === 0) {
+        scheduleRows = '<p style="color:#999;text-align:center;padding:12px;">Noch keine Zeitpläne erstellt</p>';
+    } else {
+        scheduleRows = schedule.map((s, i) => {
+            const von = new Date(s.von);
+            const bis = new Date(s.bis);
+            const isActive = von <= now && bis >= now;
+            const isPast = bis < now;
+            const isFuture = von > now;
+            const statusColor = isActive ? '#27ae60' : isPast ? '#999' : '#3498db';
+            const statusText = isActive ? '⚡ AKTIV' : isPast ? '⏹ Abgelaufen' : '⏳ Geplant';
+            const modusLabel = s.modus === 'hp' ? 'HP' : 'SV';
+            const modusColor = s.modus === 'hp' ? '#9b59b6' : '#3498db';
+            return `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:${isActive ? '#f0fff4' : isPast ? '#f8f8f8' : '#f0f4ff'};border:2px solid ${statusColor};border-radius:10px;margin-bottom:8px;${isPast ? 'opacity:0.6;' : ''}">
+                <div style="flex:1;">
+                    <div style="font-weight:700;font-size:0.95rem;">
+                        <span style="background:${modusColor};color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem;">${modusLabel}</span>
+                        ${von.toLocaleDateString('de-AT')} → ${bis.toLocaleDateString('de-AT')}
+                    </div>
+                    <div style="font-size:0.8rem;color:${statusColor};font-weight:600;margin-top:4px;">${statusText}</div>
+                </div>
+                <button onclick="deletePreisSchedule(${i})" style="background:#e74c3c;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.85rem;">X</button>
+            </div>`;
+        }).join('');
+    }
+    
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title"> Preismodus</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
         
@@ -6707,46 +6793,84 @@ Router.register('admin-preismodus', async () => {
                 <div style="font-size:1rem;opacity:0.9;">
                     ${isHP ? 'HP-Preise werden für alle neuen Buchungen verwendet' : 'Standard-Preise werden für alle neuen Buchungen verwendet'}
                 </div>
+                ${activeEntry ? '<div style="margin-top:8px;background:rgba(255,255,255,0.2);padding:6px 12px;border-radius:8px;font-size:0.85rem;">📅 Automatisch per Zeitplan aktiv</div>' : ''}
             </div>
         </div>
         
-        <!-- UMSCHALTEN -->
+        <!-- ZEITPLAN -->
         <div class="card mb-3">
-            <div class="card-header"><h3 style="margin:0;">Preismodus wechseln</h3></div>
+            <div class="card-header"><h3 style="margin:0;">📅 Zeitplan</h3></div>
             <div class="card-body">
-                <p style="color:#666;margin-bottom:20px;">
-                    Waehle den Preismodus für neue Gäste-Logins. Bereits getätigte Buchungen sind davon nicht betroffen.
+                <p style="color:#666;margin-bottom:16px;font-size:0.9rem;">
+                    Preismodus automatisch wechseln lassen. Der Zeitplan wird bei jedem Gäste-Login geprüft.
+                </p>
+                
+                <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin-bottom:16px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                        <div>
+                            <label style="font-size:0.8rem;font-weight:600;color:#555;">Von:</label>
+                            <input type="date" id="schedule-von" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.8rem;font-weight:600;color:#555;">Bis:</label>
+                            <input type="date" id="schedule-bis" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
+                        </div>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-size:0.8rem;font-weight:600;color:#555;">Modus in diesem Zeitraum:</label>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
+                            <label style="display:flex;align-items:center;gap:8px;padding:10px;border:2px solid #3498db;border-radius:8px;cursor:pointer;background:white;">
+                                <input type="radio" name="schedule-modus" value="sv" checked> <span style="font-weight:600;">SV</span> <span style="font-size:0.8rem;color:#666;">Selbstversorger</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;padding:10px;border:2px solid #9b59b6;border-radius:8px;cursor:pointer;background:white;">
+                                <input type="radio" name="schedule-modus" value="hp"> <span style="font-weight:600;">HP</span> <span style="font-size:0.8rem;color:#666;">Halbpension</span>
+                            </label>
+                        </div>
+                    </div>
+                    <button onclick="addPreisSchedule()" style="width:100%;padding:12px;background:var(--color-alpine-green);color:white;border:none;border-radius:8px;font-weight:700;font-size:1rem;cursor:pointer;">+ Zeitplan hinzufügen</button>
+                </div>
+                
+                <div id="schedule-list">
+                    ${scheduleRows}
+                </div>
+            </div>
+        </div>
+        
+        <!-- MANUELL UMSCHALTEN -->
+        <div class="card mb-3">
+            <div class="card-header"><h3 style="margin:0;">Manuell wechseln</h3></div>
+            <div class="card-body">
+                <p style="color:#666;margin-bottom:16px;font-size:0.9rem;">
+                    Sofort wechseln (überschreibt aktiven Zeitplan nicht).
                 </p>
                 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                     <button onclick="setPreismodus('sv')" style="
-                        padding:24px;
+                        padding:20px;
                         border-radius:16px;
                         border:3px solid ${!isHP ? '#3498db' : '#ddd'};
                         background:${!isHP ? 'linear-gradient(135deg, #3498db, #2980b9)' : 'white'};
                         color:${!isHP ? 'white' : '#333'};
                         cursor:pointer;
-                        transition:all 0.2s;
                     ">
-                        <div style="font-size:2.5rem;margin-bottom:8px;">🍽️</div>
-                        <div style="font-weight:700;font-size:1.1rem;">Selbstversorger</div>
-                        <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">Standard-Preise</div>
-                        ${!isHP ? '<div style="margin-top:8px;font-weight:bold;"> AKTIV</div>' : ''}
+                        <div style="font-size:2rem;margin-bottom:4px;">🍽️</div>
+                        <div style="font-weight:700;">Selbstversorger</div>
+                        <div style="font-size:0.8rem;opacity:0.8;">Standard-Preise</div>
+                        ${!isHP ? '<div style="margin-top:6px;font-weight:bold;font-size:0.85rem;">✅ AKTIV</div>' : ''}
                     </button>
                     
                     <button onclick="setPreismodus('hp')" style="
-                        padding:24px;
+                        padding:20px;
                         border-radius:16px;
                         border:3px solid ${isHP ? '#9b59b6' : '#ddd'};
                         background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'white'};
                         color:${isHP ? 'white' : '#333'};
                         cursor:pointer;
-                        transition:all 0.2s;
                     ">
-                        <div style="font-size:2.5rem;margin-bottom:8px;"></div>
-                        <div style="font-weight:700;font-size:1.1rem;">Halbpension (HP)</div>
-                        <div style="font-size:0.85rem;opacity:0.8;margin-top:4px;">HP-Preise</div>
-                        ${isHP ? '<div style="margin-top:8px;font-weight:bold;"> AKTIV</div>' : ''}
+                        <div style="font-size:2rem;margin-bottom:4px;"></div>
+                        <div style="font-weight:700;">Halbpension</div>
+                        <div style="font-size:0.8rem;opacity:0.8;">HP-Preise</div>
+                        ${isHP ? '<div style="margin-top:6px;font-weight:bold;font-size:0.85rem;">✅ AKTIV</div>' : ''}
                     </button>
                 </div>
             </div>
@@ -6755,13 +6879,11 @@ Router.register('admin-preismodus', async () => {
         <!-- INFO -->
         <div class="card" style="background:#f8f9fa;">
             <div style="padding:16px;">
-                <h4 style="margin:0 0 12px 0;"> Hinweise</h4>
-                <ul style="margin:0;padding-left:20px;color:#666;font-size:0.9rem;">
-                    <li style="margin-bottom:8px;">Der Preismodus gilt für <strong>alle neuen Buchungen</strong> nach dem Wechsel</li>
-                    <li style="margin-bottom:8px;">Bereits getätigte Buchungen behalten ihren urspruenglichen Preis</li>
-                    <li style="margin-bottom:8px;">HP-Preise werden in der <strong>Artikelverwaltung</strong> gepflegt</li>
-                    <li>Der Export enthaelt immer den tatsaechlich gebuchten Preis</li>
-                </ul>
+                <h4 style="margin:0 0 12px 0;">Hinweise</h4>
+                <p style="margin:0;color:#666;font-size:0.85rem;line-height:1.6;">
+                    Der Preismodus gilt für alle neuen Buchungen nach dem Wechsel. Bereits getätigte Buchungen behalten ihren Preis.
+                    HP-Preise werden in der Artikelverwaltung gepflegt. Der Zeitplan wird automatisch bei jedem Gäste-Login geprüft.
+                </p>
             </div>
         </div>
     </div>`);
@@ -6774,6 +6896,44 @@ window.setPreismodus = async (modus) => {
     
     const name = modus === 'hp' ? 'Halbpension (HP)' : 'Selbstversorger';
     Utils.showToast(`Preismodus auf "${name}" geändert`, 'success');
+    Router.navigate('admin-preismodus');
+};
+
+// Zeitplan hinzufügen
+window.addPreisSchedule = async () => {
+    const vonEl = document.getElementById('schedule-von');
+    const bisEl = document.getElementById('schedule-bis');
+    const modusEl = document.querySelector('input[name="schedule-modus"]:checked');
+    
+    if (!vonEl?.value || !bisEl?.value) {
+        Utils.showToast('Bitte Von- und Bis-Datum angeben', 'warning');
+        return;
+    }
+    if (new Date(bisEl.value) < new Date(vonEl.value)) {
+        Utils.showToast('Bis-Datum muss nach Von-Datum liegen', 'warning');
+        return;
+    }
+    
+    const schedule = await PreisModus.getSchedule();
+    schedule.push({
+        von: vonEl.value,
+        bis: bisEl.value,
+        modus: modusEl?.value || 'sv',
+        erstellt: new Date().toISOString()
+    });
+    
+    await PreisModus.saveSchedule(schedule);
+    Utils.showToast('Zeitplan gespeichert', 'success');
+    Router.navigate('admin-preismodus');
+};
+
+// Zeitplan löschen
+window.deletePreisSchedule = async (index) => {
+    if (!confirm('Zeitplan-Eintrag löschen?')) return;
+    const schedule = await PreisModus.getSchedule();
+    schedule.splice(index, 1);
+    await PreisModus.saveSchedule(schedule);
+    Utils.showToast('Eintrag gelöscht', 'success');
     Router.navigate('admin-preismodus');
 };
 
@@ -9206,8 +9366,8 @@ Router.register('buchen', async () => {
     const renderTileContent = (a) => {
         const icon = getSmartIcon(a) || a.icon || '';
         const hasPhoto = a.bild && a.bild.startsWith('data:');
-        const photoHtml = hasPhoto ? `<img src="${a.bild}" style="position:absolute;left:4px;top:50%;transform:translateY(-50%);width:40px;height:60px;object-fit:cover;border-radius:6px;">` : '';
-        return `${photoHtml}<div class="artikel-icon">${icon}</div>`;
+        const photoHtml = hasPhoto ? `<img src="${a.bild}" style="position:absolute;left:0;top:0;width:48px;height:100%;object-fit:cover;border-radius:10px 0 0 10px;">` : '';
+        return `${photoHtml}<div class="artikel-icon" ${hasPhoto ? 'style="margin-left:20px;"' : ''}>${icon}</div>`;
     };
     
     const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
@@ -10194,8 +10354,8 @@ window.searchArtikel = Utils.debounce(async q => {
     const renderTile = (a) => {
         const icon = getSmartIcon(a) || a.icon || '';
         const hasPhoto = a.bild && a.bild.startsWith('data:');
-        const photoHtml = hasPhoto ? `<img src="${a.bild}" style="position:absolute;left:4px;top:50%;transform:translateY(-50%);width:40px;height:60px;object-fit:cover;border-radius:6px;">` : '';
-        const content = `${photoHtml}<div class="artikel-icon">${icon}</div>`;
+        const photoHtml = hasPhoto ? `<img src="${a.bild}" style="position:absolute;left:0;top:0;width:48px;height:100%;object-fit:cover;border-radius:10px 0 0 10px;">` : '';
+        const content = `${photoHtml}<div class="artikel-icon" ${hasPhoto ? 'style="margin-left:20px;"' : ''}>${icon}</div>`;
         return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${content}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`;
     };
     if (grid) grid.innerHTML = arts.map(renderTile).join('') || '<p class="text-muted" style="grid-column:1/-1;text-align:center;">Keine Ergebnisse</p>';
