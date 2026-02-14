@@ -3807,7 +3807,12 @@ const PreisModus = {
     async checkSchedule() {
         const schedule = await this.getSchedule();
         const now = new Date();
-        const active = schedule.find(s => new Date(s.von) <= now && new Date(s.bis + 'T23:59:59') >= now);
+        const active = schedule.find(s => {
+            const von = new Date(s.von);
+            // Bis: wenn schon datetime (enthält T), direkt nutzen; sonst Tagesende anhängen
+            const bis = s.bis.includes('T') ? new Date(s.bis) : new Date(s.bis + 'T23:59:59');
+            return von <= now && bis >= now;
+        });
         if (active) {
             const current = await this.getModus();
             if (current !== active.modus) {
@@ -9312,15 +9317,6 @@ Router.register('admin-articles', async () => {
         .switch input:checked + .slider:before { transform:translateX(24px); }
     </style>
     <div class="main-content">
-        <div class="card mb-3">
-            <div class="card-header"><h2 class="card-title"> CSV Import</h2></div>
-            <div class="card-body">
-                <p style="margin-bottom:16px;color:var(--color-stone-dark);">CSV: <code>ID,Artikelname,Preis,Warengruppe</code><br><small>Bei gleicher ID: Update</small></p>
-                <input type="file" id="artikel-import" accept=".csv" style="display:none" onchange="handleArtikelImport(event)">
-                <button class="btn btn-primary" onclick="document.getElementById('artikel-import').click()"> CSV auswählen</button>
-                <button class="btn btn-secondary" onclick="DataProtection.exportArticlesCSV()" style="margin-left:8px;"> Export</button>
-            </div>
-        </div>
         <div class="card">
             <div class="card-header">
                 <h2 class="card-title">Artikel (${articles.length})</h2>
@@ -9356,9 +9352,134 @@ Router.register('admin-articles', async () => {
                 </div>
             </div>
         </div>
+        
+        <!-- PREISLISTEN EXPORT -->
+        <div class="card mb-3" style="margin-top:16px;">
+            <div class="card-header"><h2 class="card-title">📄 Preisliste exportieren</h2></div>
+            <div class="card-body">
+                <p style="color:#666;margin-bottom:12px;font-size:0.9rem;">Aktuelle Preisliste als druckbares PDF im Söllerhaus-Stil generieren.</p>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="exportPreisliste('sv')" style="padding:12px 20px;">📋 SV-Preisliste</button>
+                    <button class="btn" onclick="exportPreisliste('hp')" style="padding:12px 20px;background:#9b59b6;color:white;border:none;border-radius:8px;">📋 HP-Preisliste</button>
+                    <button class="btn btn-secondary" onclick="exportPreisliste('beide')" style="padding:12px 20px;">📋 Beide Preise</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- CSV IMPORT / EXPORT -->
+        <div class="card" style="background:#f8f9fa;">
+            <div class="card-header"><h2 class="card-title">CSV Import / Export</h2></div>
+            <div class="card-body">
+                <p style="margin-bottom:12px;color:var(--color-stone-dark);font-size:0.9rem;">CSV: <code>ID,Artikelname,Preis,Warengruppe</code> · Bei gleicher ID: Update</p>
+                <input type="file" id="artikel-import" accept=".csv" style="display:none" onchange="handleArtikelImport(event)">
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-primary" onclick="document.getElementById('artikel-import').click()">CSV auswählen</button>
+                    <button class="btn btn-secondary" onclick="DataProtection.exportArticlesCSV()">Export CSV</button>
+                </div>
+            </div>
+        </div>
     </div>
     <div id="article-modal-container"></div>`);
 });
+
+// Preisliste als PDF exportieren im Söllerhaus-Stil
+window.exportPreisliste = async (modus) => {
+    // Alle aktiven Artikel aus Supabase laden
+    let articles = [];
+    if (supabaseClient && isOnline) {
+        const { data } = await supabaseClient.from('artikel').select('*').eq('aktiv', true).order('sortierung');
+        if (data) articles = data;
+    }
+    if (articles.length === 0) {
+        const all = await Artikel.getAll();
+        articles = all.filter(a => a.aktiv);
+    }
+    
+    const kats = await db.kategorien.toArray();
+    kats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0));
+    const katMap = {};
+    kats.forEach(k => katMap[k.kategorie_id] = k.name);
+    
+    // Kategorien gruppieren
+    const byKat = {};
+    kats.forEach(k => byKat[k.kategorie_id] = []);
+    articles.forEach(a => {
+        const kid = a.kategorie_id || 0;
+        if (!byKat[kid]) byKat[kid] = [];
+        byKat[kid].push(a);
+    });
+    Object.keys(byKat).forEach(k => byKat[k].sort((a,b) => (a.sortierung||0) - (b.sortierung||0)));
+    
+    const modusLabel = modus === 'sv' ? 'Selbstversorger' : modus === 'hp' ? 'Halbpension' : 'Selbstversorger & Halbpension';
+    const catColors = {1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'};
+    
+    let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+        @page { margin: 15mm 20mm; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #333; margin: 0; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; padding-bottom: 16px; border-bottom: 3px solid #2C5F7C; }
+        .header h1 { font-size: 28px; color: #2C5F7C; margin: 0 0 4px; letter-spacing: 2px; }
+        .header h2 { font-size: 18px; color: #666; font-weight: 400; margin: 0 0 8px; }
+        .header .datum { font-size: 11px; color: #999; }
+        .kategorie { margin-top: 24px; page-break-inside: avoid; }
+        .kategorie h3 { font-size: 18px; font-weight: 700; color: white; padding: 8px 16px; border-radius: 6px; margin: 0 0 8px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        tr { border-bottom: 1px solid #eee; }
+        td { padding: 6px 8px; vertical-align: middle; }
+        td:first-child { font-weight: 500; }
+        .preis { text-align: right; font-weight: 600; font-size: 14px; min-width: 60px; }
+        .preis-label { text-align: right; font-size: 10px; color: #888; min-width: 30px; }
+        .footer { margin-top: 30px; padding-top: 12px; border-top: 2px solid #2C5F7C; text-align: center; font-size: 11px; color: #888; }
+        .whatsapp { background: #25D366; color: white; padding: 6px 16px; border-radius: 20px; font-weight: 600; display: inline-block; margin-top: 12px; text-decoration: none; }
+        @media print { body { padding: 0; } .no-print { display: none; } }
+    </style></head><body>
+    <div class="header">
+        <h1>SÖLLERHAUS</h1>
+        <h2>Preisliste ${modusLabel}</h2>
+        <div class="datum">Stand: ${new Date().toLocaleDateString('de-AT', {day:'2-digit',month:'long',year:'numeric'})}</div>
+    </div>`;
+    
+    for (const kat of kats) {
+        const items = byKat[kat.kategorie_id] || [];
+        if (items.length === 0) continue;
+        // Bei SV: Schnäpse(4), Süßes(6), Sonstiges(7) ausblenden
+        if (modus === 'sv' && [4,6,7].includes(kat.kategorie_id)) continue;
+        
+        const color = catColors[kat.kategorie_id] || '#2C5F7C';
+        html += `<div class="kategorie"><h3 style="background:${color};">${katMap[kat.kategorie_id] || 'Sonstiges'}</h3><table>`;
+        
+        if (modus === 'beide') {
+            html += `<tr style="border-bottom:2px solid #ddd;"><td style="font-weight:700;font-size:12px;">Artikel</td><td class="preis" style="color:#3498db;">SV €</td><td class="preis" style="color:#9b59b6;">HP €</td></tr>`;
+        }
+        
+        items.forEach(a => {
+            const svPreis = (a.preis ?? 0).toFixed(2).replace('.', ',');
+            const hpPreis = (a.preis_hp ?? a.preis ?? 0).toFixed(2).replace('.', ',');
+            
+            if (modus === 'beide') {
+                html += `<tr><td>${a.name}</td><td class="preis">${svPreis}</td><td class="preis">${hpPreis}</td></tr>`;
+            } else {
+                const preis = modus === 'hp' ? hpPreis : svPreis;
+                html += `<tr><td>${a.name}</td><td class="preis">€ ${preis}</td></tr>`;
+            }
+        });
+        html += `</table></div>`;
+    }
+    
+    html += `<div class="footer">
+        <p>Bei Anreise gefüllte Kühlschränke mit gesamtem Getränkesortiment vorhanden</p>
+        <p>Nachbestellung per WhatsApp möglich:</p>
+        <a class="whatsapp" href="https://wa.me/436701818001">📱 0043 670 181 8001</a>
+        <p style="margin-top:12px;">Getränke können nur mit Gesamtrechnung bezahlt werden</p>
+    </div>
+    <div class="no-print" style="text-align:center;margin-top:20px;">
+        <button onclick="window.print()" style="padding:12px 30px;font-size:16px;background:#2C5F7C;color:white;border:none;border-radius:8px;cursor:pointer;">🖨️ Drucken / PDF speichern</button>
+    </div>
+    </body></html>`;
+    
+    const pw = window.open('', '_blank');
+    pw.document.write(html);
+    pw.document.close();
+};
 
 // Filter für Artikel-Tabelle
 window.filterArticleTable = (q) => {
