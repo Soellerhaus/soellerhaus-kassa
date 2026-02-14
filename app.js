@@ -9017,24 +9017,72 @@ window.exportSammelPDF = async () => {
     const selected = getSelectedGäste();
     if (selected.length === 0) { Utils.showToast('Bitte Gäste auswählen', 'warning'); return; }
     
+    // Datum-Auswahl Modal
+    document.body.insertAdjacentHTML('beforeend', `
+    <div id="pdf-datum-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:3000;display:flex;justify-content:center;align-items:center;" onclick="if(event.target===this)this.remove()">
+        <div style="background:white;border-radius:16px;padding:24px;max-width:450px;width:90%;">
+            <h3 style="margin:0 0 16px;">📄 PDF Zusammenfassung</h3>
+            <p style="color:#666;font-size:0.9rem;margin-bottom:16px;">${selected.length} Gäste: ${selected.map(s=>s.name).join(', ')}</p>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                <div>
+                    <label style="font-size:0.85rem;font-weight:600;">Von Datum:</label>
+                    <input type="date" id="pdf-von" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem;font-weight:600;">Bis Datum:</label>
+                    <input type="date" id="pdf-bis" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+            </div>
+            
+            <div style="margin-bottom:16px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="pdf-alle" checked>
+                    <span style="font-size:0.9rem;">Auch bereits bezahlte/exportierte Buchungen einschließen</span>
+                </label>
+            </div>
+            
+            <div style="display:flex;gap:8px;">
+                <button onclick="generateSammelPDF()" style="flex:1;padding:12px;background:var(--color-alpine-green);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;">PDF erstellen</button>
+                <button onclick="document.getElementById('pdf-datum-modal').remove()" style="padding:12px 20px;background:#eee;border:none;border-radius:8px;cursor:pointer;">Abbrechen</button>
+            </div>
+        </div>
+    </div>`);
+};
+
+window.generateSammelPDF = async () => {
+    const selected = getSelectedGäste();
+    const vonDatum = document.getElementById('pdf-von')?.value || '';
+    const bisDatum = document.getElementById('pdf-bis')?.value || '';
+    const inclBezahlt = document.getElementById('pdf-alle')?.checked ?? true;
+    
+    document.getElementById('pdf-datum-modal')?.remove();
     Utils.showToast('PDF wird erstellt...', 'info');
     
     let pdfContent = [];
     let gesamtSumme = 0;
     
     for (const gast of selected) {
-        const { data: buchungen } = await supabaseClient
+        let query = supabaseClient
             .from('buchungen')
             .select('*')
             .eq('user_id', gast.id)
             .eq('storniert', false)
             .order('datum', { ascending: true });
         
-        const gastBuchungen = (buchungen || []).filter(b => b.bezahlt !== true);
+        if (vonDatum) query = query.gte('datum', vonDatum);
+        if (bisDatum) query = query.lte('datum', bisDatum);
+        
+        const { data: buchungen } = await query;
+        
+        let gastBuchungen = buchungen || [];
+        if (!inclBezahlt) {
+            gastBuchungen = gastBuchungen.filter(b => b.bezahlt !== true);
+        }
+        
         const gastSumme = gastBuchungen.reduce((s, b) => s + (b.preis || 0) * (b.menge || 1), 0);
         gesamtSumme += gastSumme;
         
-        // Nach Datum gruppieren
         const nachDatum = {};
         gastBuchungen.forEach(b => {
             const d = b.datum || 'Unbekannt';
@@ -9045,7 +9093,11 @@ window.exportSammelPDF = async () => {
         pdfContent.push({ name: gast.name, buchungen: nachDatum, summe: gastSumme, anzahl: gastBuchungen.length });
     }
     
-    // HTML für PDF generieren
+    const zeitraumText = vonDatum && bisDatum ? `Zeitraum: ${new Date(vonDatum).toLocaleDateString('de-AT')} - ${new Date(bisDatum).toLocaleDateString('de-AT')}`
+        : vonDatum ? `Ab: ${new Date(vonDatum).toLocaleDateString('de-AT')}`
+        : bisDatum ? `Bis: ${new Date(bisDatum).toLocaleDateString('de-AT')}`
+        : 'Alle Buchungen';
+    
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
         body { font-family:Arial,sans-serif; font-size:12px; margin:20px; }
         h1 { font-size:18px; border-bottom:2px solid #333; padding-bottom:8px; }
@@ -9055,20 +9107,22 @@ window.exportSammelPDF = async () => {
         th { background:#f8f8f8; }
         .summe { font-weight:bold; text-align:right; padding:8px; background:#e8f5e9; }
         .gesamt { font-size:16px; font-weight:bold; text-align:right; padding:12px; background:#c8e6c9; margin-top:20px; }
+        .meta { color:#666; font-size:11px; }
         @media print { body { margin:10mm; } }
     </style></head><body>
     <h1>Sammelübersicht - ${selected.length} Gäste</h1>
-    <p>Erstellt: ${new Date().toLocaleString('de-AT')} | Söllerhaus Kassa</p>`;
+    <p class="meta">Erstellt: ${new Date().toLocaleString('de-AT')} | ${zeitraumText} | ${inclBezahlt ? 'Inkl. bezahlte' : 'Nur offene'} | Söllerhaus Kassa</p>`;
     
     for (const g of pdfContent) {
         html += `<h2>${g.name} (${g.anzahl} Buchungen - ${Utils.formatCurrency(g.summe)})</h2>`;
         for (const [datum, bs] of Object.entries(g.buchungen)) {
-            const tagSumme = bs.reduce((s, b) => s + (b.preis || 0) * (b.menge || 1), 0);
-            html += `<table><thead><tr><th>Artikel</th><th style="width:50px;text-align:center;">Menge</th><th style="width:80px;text-align:right;">Preis</th></tr></thead><tbody>`;
-            html += `<tr><td colspan="3" style="font-weight:bold;background:#fafafa;">${datum}</td></tr>`;
+            html += `<table><thead><tr><th>Artikel</th><th style="width:60px;text-align:center;">Menge</th><th style="width:70px;text-align:right;">Einzel</th><th style="width:70px;text-align:right;">Gesamt</th><th style="width:50px;text-align:center;">Uhrzeit</th></tr></thead><tbody>`;
+            html += `<tr><td colspan="5" style="font-weight:bold;background:#fafafa;">📅 ${datum}</td></tr>`;
             bs.forEach(b => {
-                html += `<tr><td>${b.artikel_name || '-'}</td><td style="text-align:center;">${b.menge || 1}</td><td style="text-align:right;">${Utils.formatCurrency((b.preis || 0) * (b.menge || 1))}</td></tr>`;
+                html += `<tr><td>${b.artikel_name || '-'}</td><td style="text-align:center;">${b.menge || 1}</td><td style="text-align:right;">${Utils.formatCurrency(b.preis || 0)}</td><td style="text-align:right;">${Utils.formatCurrency((b.preis || 0) * (b.menge || 1))}</td><td style="text-align:center;font-size:10px;">${b.uhrzeit || ''}</td></tr>`;
             });
+            const tagSumme = bs.reduce((s, b) => s + (b.preis || 0) * (b.menge || 1), 0);
+            html += `<tr><td colspan="3" style="text-align:right;font-weight:600;">Tag-Summe:</td><td style="text-align:right;font-weight:600;">${Utils.formatCurrency(tagSumme)}</td><td></td></tr>`;
             html += `</tbody></table>`;
         }
         html += `<div class="summe">Summe ${g.name}: ${Utils.formatCurrency(g.summe)}</div>`;
@@ -9076,7 +9130,6 @@ window.exportSammelPDF = async () => {
     
     html += `<div class="gesamt">GESAMTSUMME: ${Utils.formatCurrency(gesamtSumme)}</div></body></html>`;
     
-    // PDF öffnen (Print-Dialog)
     const printWin = window.open('', '_blank');
     printWin.document.write(html);
     printWin.document.close();
