@@ -7871,6 +7871,14 @@ window.openNeuerGastModal = async () => {
     document.getElementById('gast-gruppenname').value = 'keiner Gruppe zugehörig';
     document.getElementById('gast-passwort').value = '';
     
+    // Preismodus auf aktiven globalen Modus setzen
+    const preisEl = document.getElementById('gast-preismodus');
+    if (preisEl) preisEl.value = State.currentPreisModus || 'default';
+    const manualRow = document.getElementById('gast-manual-preis-row');
+    if (manualRow) manualRow.style.display = 'none';
+    const zeitRow = document.getElementById('gast-zeitpreis-row');
+    if (zeitRow) zeitRow.style.display = 'none';
+    
     document.getElementById('gast-modal').style.display = 'flex';
 };
 
@@ -8244,6 +8252,7 @@ window.saveGast = async () => {
                 console.log('✅ Supabase Auth User erstellt mit ID:', finalId);
                 
                 // 2. Profile aktualisieren mit zusätzlichen Daten
+                const newGastPreismodus = document.getElementById('gast-preismodus')?.value || State.currentPreisModus || 'default';
                 const { error: profileError } = await supabaseClient
                     .from('profiles')
                     .upsert({ 
@@ -8256,7 +8265,8 @@ window.saveGast = async () => {
                         group_name: gruppenname,
                         aktiv: true,
                         geloescht: false,
-                        created_at: now
+                        created_at: now,
+                        gast_preismodus: newGastPreismodus
                     }, { onConflict: 'id' });
                 
                 if (profileError) {
