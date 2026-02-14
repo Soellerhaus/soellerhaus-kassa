@@ -2695,7 +2695,20 @@ const Buchungen = {
         let gastModus = State.currentPreisModus;
         const gastProfile = State.currentUser;
         if (gastProfile?.gast_preismodus && gastProfile.gast_preismodus !== 'default') {
-            gastModus = gastProfile.gast_preismodus;
+            if (gastProfile.gast_preismodus === 'zeitabhaengig') {
+                // Zeitabhängig: Prüfe ob aktuelle Uhrzeit im HP-Fenster liegt
+                const jetzt = new Date();
+                const jetztMinuten = jetzt.getHours() * 60 + jetzt.getMinutes();
+                const hpVon = gastProfile.gast_hp_von || '12:00';
+                const hpBis = gastProfile.gast_hp_bis || '23:59';
+                const [vonH, vonM] = hpVon.split(':').map(Number);
+                const [bisH, bisM] = hpBis.split(':').map(Number);
+                const vonMinuten = vonH * 60 + vonM;
+                const bisMinuten = bisH * 60 + bisM;
+                gastModus = (jetztMinuten >= vonMinuten && jetztMinuten <= bisMinuten) ? 'hp' : 'sv';
+            } else {
+                gastModus = gastProfile.gast_preismodus;
+            }
         }
         let preis;
         if (gastModus === 'manual' && gastProfile?.gast_manual_prozent) {
@@ -7493,17 +7506,24 @@ Router.register('admin-guests', async () => {
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:120px;">Registriert</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:140px;">Letzter Login</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:100px;">Ausnahme Umlage</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:60px;">Preis</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:180px;">Aktionen</th>
                         </tr>
                     </thead>
                     <tbody id="gäste-tbody">
-                        ${guests.length === 0 ? '<tr><td colspan="8" style="padding:20px;text-align:center;color:#666;">Keine Gäste vorhanden</td></tr>' : guests.map(g => {
+                        ${guests.length === 0 ? '<tr><td colspan="9" style="padding:20px;text-align:center;color:#666;">Keine Gäste vorhanden</td></tr>' : guests.map(g => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
                             const pw = g.passwort || g.passwordHash || g.pin_hash;
                             const pwDisplay = pw ? '<span style="color:#27ae60;">🔒 PIN gesetzt</span>' : '<span style="color:#e74c3c;">⚠️ KEINE PIN</span>';
                             const pwStyle = '';
                             const ausnahme = g.ausnahmeumlage || false;
+                            const gastPM = g.gast_preismodus || 'default';
+                            const pmBadge = gastPM === 'hp' ? '<span style="background:#9b59b6;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">HP</span>'
+                                : gastPM === 'sv' ? '<span style="background:#3498db;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">SV</span>'
+                                : gastPM === 'manual' ? '<span style="background:#e67e22;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">MAN</span>'
+                                : gastPM === 'zeitabhaengig' ? '<span style="background:#16a085;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;" title="' + (g.gast_hp_von||'12:00') + '-' + (g.gast_hp_bis||'23:59') + ' HP">⏰</span>'
+                                : '<span style="background:#ccc;color:#666;padding:2px 6px;border-radius:4px;font-size:0.7rem;">STD</span>';
                             const createdAt = g.created_at || g.createdAt;
                             const createdFormatted = createdAt ? new Date(createdAt).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-';
                             const lastLogin = g.last_login_at || g.lastLoginAt;
@@ -7524,6 +7544,7 @@ Router.register('admin-guests', async () => {
                                         <span class="slider"></span>
                                     </label>
                                 </td>
+                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">${pmBadge}</td>
                                 <td style="padding:8px;border:1px solid #ddd;text-align:center;">
                                     <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;">
                                         <button class="btn btn-primary" onclick="adminSchnellbuchen('${g.id}')" style="padding:5px 8px;font-size:0.75rem;">Buchen</button>
@@ -7585,15 +7606,30 @@ Router.register('admin-guests', async () => {
                 </div>
                 <div>
                     <label style="font-weight:600;">Preismodus für diesen Gast:</label>
-                    <select id="gast-preismodus" class="form-input" style="font-size:1rem;">
+                    <select id="gast-preismodus" class="form-input" style="font-size:1rem;" onchange="document.getElementById('gast-manual-preis-row').style.display=this.value==='manual'?'block':'none';document.getElementById('gast-zeitpreis-row').style.display=this.value==='zeitabhaengig'?'block':'none';">
                         <option value="default">Standard (globaler Modus)</option>
-                        <option value="sv">Selbstversorger (SV)</option>
-                        <option value="hp">Halbpension (HP)</option>
+                        <option value="sv">Immer Selbstversorger (SV)</option>
+                        <option value="hp">Immer Halbpension (HP)</option>
+                        <option value="zeitabhaengig">Zeitabhängig (SV + HP Zeitfenster)</option>
                         <option value="manual">Manueller Preis</option>
                     </select>
                     <div id="gast-manual-preis-row" style="display:none;margin-top:8px;">
                         <label style="font-size:0.85rem;color:#666;">Manueller Aufschlag/Abschlag (%):</label>
                         <input type="number" id="gast-manual-prozent" class="form-input" value="0" step="5" style="width:100px;">
+                    </div>
+                    <div id="gast-zeitpreis-row" style="display:none;margin-top:8px;background:#f0f4ff;padding:12px;border-radius:8px;">
+                        <p style="font-size:0.85rem;color:#555;margin-bottom:8px;">Zeitfenster definieren. Außerhalb der HP-Zeit gilt SV.</p>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:600;">HP von (Uhrzeit):</label>
+                                <input type="time" id="gast-hp-von" class="form-input" value="12:00">
+                            </div>
+                            <div>
+                                <label style="font-size:0.8rem;font-weight:600;">HP bis (Uhrzeit):</label>
+                                <input type="time" id="gast-hp-bis" class="form-input" value="23:59">
+                            </div>
+                        </div>
+                        <small style="color:#888;">Beispiel: HP 12:00-23:59 → Vormittags SV, ab Mittag HP</small>
                     </div>
                     <small style="color:#666;">Überschreibt den globalen Preismodus nur für diesen Gast</small>
                 </div>
@@ -7873,10 +7909,16 @@ window.editGast = async (id) => {
     const preismodusEl = document.getElementById('gast-preismodus');
     const manualRow = document.getElementById('gast-manual-preis-row');
     const manualProzent = document.getElementById('gast-manual-prozent');
+    const zeitRow = document.getElementById('gast-zeitpreis-row');
     if (preismodusEl) {
         preismodusEl.value = gast.gast_preismodus || 'default';
         if (manualRow) manualRow.style.display = gast.gast_preismodus === 'manual' ? 'block' : 'none';
         if (manualProzent) manualProzent.value = gast.gast_manual_prozent || 0;
+        if (zeitRow) zeitRow.style.display = gast.gast_preismodus === 'zeitabhaengig' ? 'block' : 'none';
+        const hpVon = document.getElementById('gast-hp-von');
+        const hpBis = document.getElementById('gast-hp-bis');
+        if (hpVon) hpVon.value = gast.gast_hp_von || '12:00';
+        if (hpBis) hpBis.value = gast.gast_hp_bis || '23:59';
     }
     
     document.getElementById('gast-modal').style.display = 'flex';
@@ -7974,6 +8016,8 @@ window.saveGast = async () => {
                 // Update-Objekt vorbereiten - PIN nur wenn neue eingegeben
                 const preismodusVal = document.getElementById('gast-preismodus')?.value || 'default';
                 const manualProzentVal = parseInt(document.getElementById('gast-manual-prozent')?.value || '0');
+                const hpVonVal = document.getElementById('gast-hp-von')?.value || '12:00';
+                const hpBisVal = document.getElementById('gast-hp-bis')?.value || '23:59';
                 const updateData = { 
                     vorname: nachname,
                     display_name: nachname,
@@ -7982,7 +8026,9 @@ window.saveGast = async () => {
                     aktiv: true,
                     geloescht: false,
                     gast_preismodus: preismodusVal,
-                    gast_manual_prozent: manualProzentVal
+                    gast_manual_prozent: manualProzentVal,
+                    gast_hp_von: hpVonVal,
+                    gast_hp_bis: hpBisVal
                 };
                 
                 let altePIN = null;
@@ -9651,10 +9697,28 @@ Router.register('buchen', async () => {
     const name = State.currentUser.firstName || State.currentUser.vorname;
     const gastId = State.currentUser.id || State.currentUser.gast_id;
     
+    // Kategorien ausblenden für SV-Gäste (Schnäpse=4, Süßes=6, Sonstiges=7)
+    const gastProfile = State.currentUser;
+    let effektiverModus = State.currentPreisModus;
+    if (gastProfile?.gast_preismodus && gastProfile.gast_preismodus !== 'default') {
+        if (gastProfile.gast_preismodus === 'zeitabhaengig') {
+            const jetzt = new Date();
+            const jetztMin = jetzt.getHours() * 60 + jetzt.getMinutes();
+            const [vH,vM] = (gastProfile.gast_hp_von||'12:00').split(':').map(Number);
+            const [bH,bM] = (gastProfile.gast_hp_bis||'23:59').split(':').map(Number);
+            effektiverModus = (jetztMin >= vH*60+vM && jetztMin <= bH*60+bM) ? 'hp' : 'sv';
+        } else {
+            effektiverModus = gastProfile.gast_preismodus;
+        }
+    }
+    const hiddenKats = (effektiverModus === 'sv') ? [4, 6, 7] : [];
+    const sichtbareKats = kats.filter(k => !hiddenKats.includes(k.kategorie_id));
+    const sichtbareArts = arts.filter(a => !hiddenKats.includes(a.kategorie_id));
+    
     // Standard: Alkoholfrei (ID 1) beim ersten Mal
     if (State.selectedCategory === null) State.selectedCategory = 1;
     
-    const filtered = State.selectedCategory === 'alle' ? arts : arts.filter(a => a.kategorie_id === State.selectedCategory);
+    const filtered = State.selectedCategory === 'alle' ? sichtbareArts : sichtbareArts.filter(a => a.kategorie_id === State.selectedCategory);
     const sessionBuchungen = await Buchungen.getSessionBuchungen();
     const sessionTotal = sessionBuchungen.reduce((s,b) => s + b.preis * b.menge, 0);
     const sessionCount = sessionBuchungen.reduce((s,b) => s + b.menge, 0);
@@ -9860,7 +9924,7 @@ Router.register('buchen', async () => {
         
         <div class="form-group" style="margin-bottom:12px;"><input type="text" class="form-input" placeholder=" ${t('search')}" oninput="searchArtikel(this.value)" style="padding:10px 14px;"></div>
         <div class="category-tabs" style="margin-bottom:14px;">
-            ${kats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0)).map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})" style="${State.selectedCategory===k.kategorie_id ? 'background:'+catColor(k.kategorie_id)+';color:white;border:2px solid '+catColor(k.kategorie_id) : 'border:2px solid '+catColor(k.kategorie_id)+';color:'+catColor(k.kategorie_id)+';background:white'}">${k.name}</div>`).join('')}
+            ${sichtbareKats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0)).map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})" style="${State.selectedCategory===k.kategorie_id ? 'background:'+catColor(k.kategorie_id)+';color:white;border:2px solid '+catColor(k.kategorie_id) : 'border:2px solid '+catColor(k.kategorie_id)+';color:'+catColor(k.kategorie_id)+';background:white'}">${k.name}</div>`).join('')}
             <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')" style="${State.selectedCategory==='alle' ? 'background:#555;color:white;border:2px solid #555' : 'border:2px solid #555;color:#555;background:white'}">${t('cat_all')}</div>
         </div>
         <div class="artikel-grid">
