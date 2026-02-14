@@ -7536,11 +7536,12 @@ Router.register('admin-guests', async () => {
                             const pwStyle = '';
                             const ausnahme = g.ausnahmeumlage || false;
                             const gastPM = g.gast_preismodus || 'default';
-                            const pmBadge = gastPM === 'hp' ? '<span style="background:#9b59b6;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">HP</span>'
-                                : gastPM === 'sv' ? '<span style="background:#3498db;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">SV</span>'
+                            const effectivePM = gastPM === 'default' ? (State.currentPreisModus || 'sv') : gastPM;
+                            const pmBadge = effectivePM === 'hp' ? '<span style="background:#9b59b6;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">' + (gastPM === 'default' ? 'HP' : 'HP⚡') + '</span>'
+                                : effectivePM === 'sv' ? '<span style="background:#3498db;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">' + (gastPM === 'default' ? 'SV' : 'SV⚡') + '</span>'
                                 : gastPM === 'manual' ? '<span style="background:#e67e22;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">MAN</span>'
                                 : gastPM === 'zeitabhaengig' ? '<span style="background:#16a085;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;" title="' + (g.gast_hp_von||'12:00') + '-' + (g.gast_hp_bis||'23:59') + ' HP">⏰</span>'
-                                : '<span style="background:#ccc;color:#666;padding:2px 6px;border-radius:4px;font-size:0.7rem;">STD</span>';
+                                : '<span style="background:#3498db;color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">SV</span>';
                             const createdAt = g.created_at || g.createdAt;
                             const createdFormatted = createdAt ? new Date(createdAt).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-';
                             const lastLogin = g.last_login_at || g.lastLoginAt;
@@ -7871,9 +7872,9 @@ window.openNeuerGastModal = async () => {
     document.getElementById('gast-gruppenname').value = 'keiner Gruppe zugehörig';
     document.getElementById('gast-passwort').value = '';
     
-    // Preismodus auf aktiven globalen Modus setzen
+    // Preismodus auf default setzen (folgt globalem Modus)
     const preisEl = document.getElementById('gast-preismodus');
-    if (preisEl) preisEl.value = State.currentPreisModus || 'default';
+    if (preisEl) preisEl.value = 'default';
     const manualRow = document.getElementById('gast-manual-preis-row');
     if (manualRow) manualRow.style.display = 'none';
     const zeitRow = document.getElementById('gast-zeitpreis-row');
@@ -8659,7 +8660,7 @@ window.renderSchnellbuchenModal = () => {
                     " onmouseover="this.style.transform='scale(1.03)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 6px rgba(0,0,0,0.08)'">
                         <div style="font-size:1.8rem;margin-bottom:4px;">${getSmartIcon(a) || a.icon || ''}</div>
                         <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">${a.name}</div>
-                        <div style="color:${catColor(a.kategorie_id)};font-weight:700;font-size:1rem;">${Utils.formatCurrency(a.preis)}</div>
+                        <div style="color:${catColor(a.kategorie_id)};font-weight:700;font-size:1rem;">${Utils.formatCurrency(State.currentPreisModus === 'hp' ? (a.preis_hp ?? a.preis) : a.preis)}</div>
                     </div>
                 `).join('')}
             </div>
@@ -10203,7 +10204,10 @@ Router.register('buchen', async () => {
             <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')" style="${State.selectedCategory==='alle' ? 'background:#555;color:white;border:2px solid #555' : 'border:2px solid #555;color:#555;background:white'}">${t('cat_all')}</div>
         </div>
         <div class="artikel-grid">
-            ${filtered.map(a => `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${renderTileContent(a)}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(a.preis)}</div></div>`).join('')}
+            ${filtered.map(a => {
+                const tilePreis = effektiverModus === 'hp' ? (a.preis_hp ?? a.preis ?? 0) : (a.preis ?? 0);
+                return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${renderTileContent(a)}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(tilePreis)}</div></div>`;
+            }).join('')}
         </div>
     </div>`);
 });
