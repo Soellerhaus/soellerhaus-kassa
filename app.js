@@ -8961,12 +8961,23 @@ window.erstelleSammelrechnung = async () => {
         const sammelPin = String(Math.floor(1000 + Math.random() * 9000));
         
         // Auth-User erstellen
+        const adminPw = sessionStorage.getItem('_admin_pw');
         const { data: authData, error: authErr } = await supabaseClient.auth.signUp({
             email: sammelEmail,
             password: 'PIN_' + sammelPin + '_KASSA'
         });
         if (authErr) throw new Error('Auth Fehler: ' + authErr.message);
         const sammelId = authData.user.id;
+        
+        // WICHTIG: Admin-Session SOFORT wiederherstellen bevor wir weiterarbeiten!
+        // signUp wechselt die Session auf den neuen User → RLS blockiert dann alles
+        if (adminPw) {
+            await supabaseClient.auth.signInWithPassword({
+                email: 'admin@soellerhaus.local',
+                password: adminPw
+            });
+            console.log('✅ Admin-Session wiederhergestellt nach signUp');
+        }
         
         // Profil erstellen
         await supabaseClient.from('profiles').upsert({
@@ -9027,8 +9038,7 @@ window.erstelleSammelrechnung = async () => {
             }).eq('id', gast.id);
         }
         
-        // Admin-Session wiederherstellen
-        const adminPw = sessionStorage.getItem('_admin_pw');
+        // Admin-Session nochmals sicherstellen
         if (adminPw) {
             try { await supabaseClient.auth.signInWithPassword({ email: 'admin@soellerhaus.local', password: adminPw }); } catch(e) {}
         }
