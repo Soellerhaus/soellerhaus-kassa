@@ -6795,7 +6795,7 @@ Router.register('admin-preismodus', async () => {
                 <div style="flex:1;">
                     <div style="font-weight:700;font-size:0.95rem;">
                         <span style="background:${modusColor};color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem;">${modusLabel}</span>
-                        ${von.toLocaleDateString('de-AT')} → ${bis.toLocaleDateString('de-AT')}
+                        ${von.toLocaleDateString('de-AT')} ${von.getHours()>0||von.getMinutes()>0 ? von.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'}) : ''} → ${bis.toLocaleDateString('de-AT')} ${bis.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}
                     </div>
                     <div style="font-size:0.8rem;color:${statusColor};font-weight:600;margin-top:4px;">${statusText}</div>
                 </div>
@@ -6834,10 +6834,16 @@ Router.register('admin-preismodus', async () => {
                         <div>
                             <label style="font-size:0.8rem;font-weight:600;color:#555;">Von:</label>
                             <input type="date" id="schedule-von" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
+                            <select id="schedule-von-zeit" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;margin-top:4px;">
+                                ${Array.from({length:24}, (_,i) => `<option value="${String(i).padStart(2,'0')}:00" ${i===0?'selected':''}>${String(i).padStart(2,'0')}:00</option>`).join('')}
+                            </select>
                         </div>
                         <div>
                             <label style="font-size:0.8rem;font-weight:600;color:#555;">Bis:</label>
                             <input type="date" id="schedule-bis" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
+                            <select id="schedule-bis-zeit" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;margin-top:4px;">
+                                ${Array.from({length:24}, (_,i) => `<option value="${String(i).padStart(2,'0')}:00" ${i===23?'selected':''}>${String(i).padStart(2,'0')}:00</option>`).join('')}
+                            </select>
                         </div>
                     </div>
                     <div style="margin-bottom:12px;">
@@ -6927,21 +6933,27 @@ window.setPreismodus = async (modus) => {
 window.addPreisSchedule = async () => {
     const vonEl = document.getElementById('schedule-von');
     const bisEl = document.getElementById('schedule-bis');
+    const vonZeit = document.getElementById('schedule-von-zeit')?.value || '00:00';
+    const bisZeit = document.getElementById('schedule-bis-zeit')?.value || '23:00';
     const modusEl = document.querySelector('input[name="schedule-modus"]:checked');
     
     if (!vonEl?.value || !bisEl?.value) {
         Utils.showToast('Bitte Von- und Bis-Datum angeben', 'warning');
         return;
     }
-    if (new Date(bisEl.value) < new Date(vonEl.value)) {
-        Utils.showToast('Bis-Datum muss nach Von-Datum liegen', 'warning');
+    
+    const vonDateTime = vonEl.value + 'T' + vonZeit;
+    const bisDateTime = bisEl.value + 'T' + bisZeit;
+    
+    if (new Date(bisDateTime) < new Date(vonDateTime)) {
+        Utils.showToast('Bis-Zeitpunkt muss nach Von-Zeitpunkt liegen', 'warning');
         return;
     }
     
     const schedule = await PreisModus.getSchedule();
     schedule.push({
-        von: vonEl.value,
-        bis: bisEl.value,
+        von: vonDateTime,
+        bis: bisDateTime,
         modus: modusEl?.value || 'sv',
         erstellt: new Date().toISOString()
     });
