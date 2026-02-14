@@ -2691,8 +2691,19 @@ const Buchungen = {
         
         console.log(' Buchung erstellen für User:', userId, 'Menge:', menge);
         
-        // Preis basierend auf aktivem Preismodus
-        const preis = PreisModus.getPreis(artikel, State.currentPreisModus);
+        // Preis basierend auf aktivem Preismodus (Gast-spezifisch hat Vorrang!)
+        let gastModus = State.currentPreisModus;
+        const gastProfile = State.currentUser;
+        if (gastProfile?.gast_preismodus && gastProfile.gast_preismodus !== 'default') {
+            gastModus = gastProfile.gast_preismodus;
+        }
+        let preis;
+        if (gastModus === 'manual' && gastProfile?.gast_manual_prozent) {
+            const basis = artikel.preis ?? 0;
+            preis = Math.round(basis * (1 + (gastProfile.gast_manual_prozent || 0) / 100) * 100) / 100;
+        } else {
+            preis = PreisModus.getPreis(artikel, gastModus === 'manual' ? 'sv' : gastModus);
+        }
         
         // Basis-Daten für alle Buchungen
         const basisDaten = {
@@ -7475,6 +7486,7 @@ Router.register('admin-guests', async () => {
                 <table id="gäste-tabelle" style="width:100%;border-collapse:collapse;font-size:0.9rem;">
                     <thead>
                         <tr style="background:#fffde7;">
+                            <th style="padding:10px;border:1px solid #ddd;text-align:center;width:30px;"><input type="checkbox" onclick="toggleAllGäste(this.checked)" title="Alle auswählen"></th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:120px;">Nachname</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:150px;">Gruppenname</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:100px;">Passwort (PIN)</th>
@@ -7485,7 +7497,7 @@ Router.register('admin-guests', async () => {
                         </tr>
                     </thead>
                     <tbody id="gäste-tbody">
-                        ${guests.length === 0 ? '<tr><td colspan="7" style="padding:20px;text-align:center;color:#666;">Keine Gäste vorhanden</td></tr>' : guests.map(g => {
+                        ${guests.length === 0 ? '<tr><td colspan="8" style="padding:20px;text-align:center;color:#666;">Keine Gäste vorhanden</td></tr>' : guests.map(g => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
                             const pw = g.passwort || g.passwordHash || g.pin_hash;
@@ -7498,6 +7510,9 @@ Router.register('admin-guests', async () => {
                             const lastLoginFormatted = lastLogin ? new Date(lastLogin).toLocaleString('de-AT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-';
                             return `
                             <tr class="gäste-row" data-name="${name.toLowerCase()}" data-gruppe="${grpName.toLowerCase()}" data-id="${g.id}">
+                                <td style="padding:8px;border:1px solid #ddd;text-align:center;width:30px;">
+                                    <input type="checkbox" class="gast-select" value="${g.id}" data-name="${name}" onchange="updateSammelButtons()">
+                                </td>
                                 <td style="padding:10px;border:1px solid #ddd;font-weight:600;">${name}</td>
                                 <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:1.2rem;font-weight:bold;${pwStyle}">${pwDisplay}</td>
@@ -7526,6 +7541,14 @@ Router.register('admin-guests', async () => {
                 <div style="display:flex;gap:8px;">
                     ${inaktivCount > 0 ? `<button class="btn btn-secondary" onclick="Router.navigate('admin-guests-inaktiv')" style="padding:6px 12px;font-size:0.85rem;"> Inaktive (${inaktivCount})</button>` : ''}
                     <button class="btn btn-secondary" onclick="syncPinsToSupabase()" style="padding:6px 12px;font-size:0.85rem;"> Sync</button>
+                </div>
+            </div>
+            <!-- SAMMELRECHNUNG AKTIONSLEISTE -->
+            <div id="sammel-actions" style="display:none;padding:12px;background:#fff3cd;border-top:2px solid #f0c040;">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <strong id="sammel-count">0 Gäste ausgewählt</strong>
+                    <button class="btn btn-primary" onclick="erstelleSammelrechnung()" style="padding:8px 16px;font-size:0.9rem;">📋 Sammelrechnung erstellen</button>
+                    <button class="btn btn-secondary" onclick="exportSammelPDF()" style="padding:8px 16px;font-size:0.9rem;">📄 PDF Zusammenfassung</button>
                 </div>
             </div>
         </div>
@@ -7559,6 +7582,20 @@ Router.register('admin-guests', async () => {
                         <button type="button" class="btn btn-secondary" onclick="showNumpad('gast-passwort')" style="padding:12px 16px;font-size:1.3rem;" title="Numpad">🔢</button>
                     </div>
                     <small style="color:#666;">Der Gast meldet sich mit dieser PIN an</small>
+                </div>
+                <div>
+                    <label style="font-weight:600;">Preismodus für diesen Gast:</label>
+                    <select id="gast-preismodus" class="form-input" style="font-size:1rem;">
+                        <option value="default">Standard (globaler Modus)</option>
+                        <option value="sv">Selbstversorger (SV)</option>
+                        <option value="hp">Halbpension (HP)</option>
+                        <option value="manual">Manueller Preis</option>
+                    </select>
+                    <div id="gast-manual-preis-row" style="display:none;margin-top:8px;">
+                        <label style="font-size:0.85rem;color:#666;">Manueller Aufschlag/Abschlag (%):</label>
+                        <input type="number" id="gast-manual-prozent" class="form-input" value="0" step="5" style="width:100px;">
+                    </div>
+                    <small style="color:#666;">Überschreibt den globalen Preismodus nur für diesen Gast</small>
                 </div>
             </div>
             
@@ -7832,6 +7869,16 @@ window.editGast = async (id) => {
     document.getElementById('gast-gruppenname').value = gast.gruppenname || gast.group_name || 'keiner Gruppe zugehörig';
     document.getElementById('gast-passwort').value = ''; // PIN nie anzeigen - nur neue PIN eingeben wenn gewünscht
     
+    // Preismodus für Gast laden
+    const preismodusEl = document.getElementById('gast-preismodus');
+    const manualRow = document.getElementById('gast-manual-preis-row');
+    const manualProzent = document.getElementById('gast-manual-prozent');
+    if (preismodusEl) {
+        preismodusEl.value = gast.gast_preismodus || 'default';
+        if (manualRow) manualRow.style.display = gast.gast_preismodus === 'manual' ? 'block' : 'none';
+        if (manualProzent) manualProzent.value = gast.gast_manual_prozent || 0;
+    }
+    
     document.getElementById('gast-modal').style.display = 'flex';
 };
 
@@ -7925,13 +7972,17 @@ window.saveGast = async () => {
         if (supabaseClient && isOnline) {
             try {
                 // Update-Objekt vorbereiten - PIN nur wenn neue eingegeben
+                const preismodusVal = document.getElementById('gast-preismodus')?.value || 'default';
+                const manualProzentVal = parseInt(document.getElementById('gast-manual-prozent')?.value || '0');
                 const updateData = { 
                     vorname: nachname,
                     display_name: nachname,
                     first_name: nachname,
                     group_name: gruppenname,
                     aktiv: true,
-                    geloescht: false
+                    geloescht: false,
+                    gast_preismodus: preismodusVal,
+                    gast_manual_prozent: manualProzentVal
                 };
                 
                 let altePIN = null;
@@ -7961,6 +8012,64 @@ window.saveGast = async () => {
                     Utils.showToast('Supabase Fehler: ' + error.message, 'error');
                 } else {
                     console.log('✅ Gast in Supabase aktualisiert');
+                    
+                    // === BUCHUNGEN UMPREISEN wenn Preismodus geändert ===
+                    if (preismodusVal && preismodusVal !== 'default') {
+                        try {
+                            // Alle unbezahlten, nicht-stornierten Buchungen dieses Gastes laden
+                            const { data: gastBuchungen } = await supabaseClient
+                                .from('buchungen')
+                                .select('buchung_id, artikel_id, preis, preis_modus')
+                                .eq('user_id', editId)
+                                .eq('storniert', false)
+                                .eq('bezahlt', false);
+                            
+                            if (gastBuchungen && gastBuchungen.length > 0) {
+                                // Alle Artikel laden für Preisabfrage
+                                const artikelIds = [...new Set(gastBuchungen.map(b => b.artikel_id))];
+                                const { data: artikelDaten } = await supabaseClient
+                                    .from('artikel')
+                                    .select('artikel_id, preis, preis_hp')
+                                    .in('artikel_id', artikelIds);
+                                
+                                const artikelMap = {};
+                                (artikelDaten || []).forEach(a => { artikelMap[a.artikel_id] = a; });
+                                
+                                let updated = 0;
+                                for (const b of gastBuchungen) {
+                                    const art = artikelMap[b.artikel_id];
+                                    if (!art) continue;
+                                    
+                                    let neuerPreis = b.preis;
+                                    if (preismodusVal === 'sv') {
+                                        neuerPreis = art.preis ?? b.preis;
+                                    } else if (preismodusVal === 'hp') {
+                                        neuerPreis = art.preis_hp ?? art.preis ?? b.preis;
+                                    } else if (preismodusVal === 'manual') {
+                                        const basis = art.preis ?? b.preis;
+                                        neuerPreis = Math.round(basis * (1 + manualProzentVal / 100) * 100) / 100;
+                                    }
+                                    
+                                    if (neuerPreis !== b.preis) {
+                                        await supabaseClient.from('buchungen').update({
+                                            preis: neuerPreis,
+                                            preis_modus: preismodusVal,
+                                            preis_geaendert_am: new Date().toISOString(),
+                                            preis_alt: b.preis
+                                        }).eq('buchung_id', b.buchung_id);
+                                        updated++;
+                                    }
+                                }
+                                
+                                if (updated > 0) {
+                                    Utils.showToast(`💰 ${updated} Buchungen auf ${preismodusVal === 'sv' ? 'SV' : preismodusVal === 'hp' ? 'HP' : 'Manuell'}-Preise umgestellt`, 'success');
+                                }
+                            }
+                        } catch(preisErr) {
+                            console.error('Preis-Update Fehler:', preisErr);
+                            Utils.showToast('⚠️ Profil gespeichert, aber Buchungspreise konnten nicht aktualisiert werden', 'warning');
+                        }
+                    }
                     
                     // AUTH-PASSWORT SYNCHRONISIEREN wenn PIN geändert wurde
                     if (passwort && altePIN && altePIN !== passwort && gastEmail) {
@@ -8689,6 +8798,240 @@ window.exportGästeExcel = async () => {
     
     Utils.showToast(`${guests.length} Gäste exportiert`, 'success');
 };
+
+// ============ SAMMELRECHNUNG & GAST-AUSWAHL ============
+window.toggleAllGäste = (checked) => {
+    document.querySelectorAll('.gast-select').forEach(cb => { cb.checked = checked; });
+    updateSammelButtons();
+};
+
+window.updateSammelButtons = () => {
+    const selected = document.querySelectorAll('.gast-select:checked');
+    const bar = document.getElementById('sammel-actions');
+    const countEl = document.getElementById('sammel-count');
+    if (bar) bar.style.display = selected.length > 0 ? 'block' : 'none';
+    if (countEl) countEl.textContent = `${selected.length} Gäste ausgewählt`;
+};
+
+window.getSelectedGäste = () => {
+    return Array.from(document.querySelectorAll('.gast-select:checked')).map(cb => ({
+        id: cb.value,
+        name: cb.dataset.name
+    }));
+};
+
+window.erstelleSammelrechnung = async () => {
+    const selected = getSelectedGäste();
+    if (selected.length < 2) { Utils.showToast('Mindestens 2 Gäste auswählen', 'warning'); return; }
+    
+    const namen = selected.map(s => s.name).join(', ');
+    const sammelName = prompt(`Sammelrechnung für ${selected.length} Gäste:\n${namen}\n\nName der Sammelrechnung:`, 'SAMMELRECHNUNG');
+    if (!sammelName) return;
+    
+    if (!confirm(`Sammelrechnung "${sammelName}" erstellen?\n\n${selected.length} Gäste werden zusammengeführt:\n${namen}\n\nDie Buchungen werden auf den neuen Account übertragen.\nDie einzelnen Accounts werden deaktiviert (nicht gelöscht).`)) return;
+    
+    // Progress
+    document.body.insertAdjacentHTML('beforeend', `
+    <div id="sammel-progress" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:3000;display:flex;justify-content:center;align-items:center;">
+        <div style="background:white;border-radius:16px;padding:32px 40px;max-width:450px;width:90%;text-align:center;">
+            <div style="font-size:2.5rem;margin-bottom:12px;">📋</div>
+            <div style="font-weight:700;font-size:1.3rem;margin-bottom:4px;">Sammelrechnung wird erstellt...</div>
+            <div style="color:#666;margin-bottom:16px;font-size:0.9rem;">Bitte nicht schließen!</div>
+            <div style="background:#e0e0e0;border-radius:10px;height:28px;overflow:hidden;margin:16px 0;position:relative;">
+                <div id="sammel-bar" style="background:linear-gradient(90deg,#27ae60,#2ecc71);height:100%;width:0%;transition:width 0.3s;border-radius:10px;"></div>
+                <div id="sammel-percent" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem;">0%</div>
+            </div>
+            <div id="sammel-detail" style="font-size:0.9rem;color:#555;"></div>
+        </div>
+    </div>`);
+    
+    const updateProg = (pct, text) => {
+        const bar = document.getElementById('sammel-bar');
+        const pctEl = document.getElementById('sammel-percent');
+        const det = document.getElementById('sammel-detail');
+        if (bar) bar.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (det) det.textContent = text;
+    };
+    
+    try {
+        updateProg(10, 'Neuen Account anlegen...');
+        
+        // 1. Neuen Sammelrechnung-Account erstellen
+        const sammelEmail = sammelName.toLowerCase().replace(/[^a-z0-9]/g, '') + '_' + Date.now() + '@sammel.local';
+        const sammelPin = String(Math.floor(1000 + Math.random() * 9000));
+        
+        // Auth-User erstellen
+        const { data: authData, error: authErr } = await supabaseClient.auth.signUp({
+            email: sammelEmail,
+            password: 'PIN_' + sammelPin + '_KASSA'
+        });
+        if (authErr) throw new Error('Auth Fehler: ' + authErr.message);
+        const sammelId = authData.user.id;
+        
+        // Profil erstellen
+        await supabaseClient.from('profiles').upsert({
+            id: sammelId,
+            email: sammelEmail,
+            vorname: sammelName.toUpperCase(),
+            display_name: sammelName.toUpperCase(),
+            first_name: sammelName.toUpperCase(),
+            group_name: 'Sammelrechnung',
+            pin_hash: sammelPin,
+            aktiv: true,
+            geloescht: false,
+            is_sammelrechnung: true,
+            sammel_quell_ids: JSON.stringify(selected.map(s => s.id)),
+            sammel_quell_namen: JSON.stringify(selected.map(s => s.name))
+        });
+        
+        updateProg(30, 'Buchungen übertragen...');
+        
+        // 2. Alle Buchungen der ausgewählten Gäste auf Sammelaccount übertragen
+        let totalMoved = 0;
+        for (let i = 0; i < selected.length; i++) {
+            const gast = selected[i];
+            updateProg(30 + Math.round((i / selected.length) * 50), `Buchungen von ${gast.name}...`);
+            
+            // Buchungen dieses Gastes laden
+            const { data: buchungen } = await supabaseClient
+                .from('buchungen')
+                .select('buchung_id')
+                .eq('user_id', gast.id)
+                .eq('storniert', false)
+                .eq('bezahlt', false);
+            
+            if (buchungen && buchungen.length > 0) {
+                // Buchungen auf Sammelaccount umschreiben
+                // Originalname im Feld gast_vorname behalten für PDF-Zuordnung!
+                for (const b of buchungen) {
+                    await supabaseClient.from('buchungen').update({
+                        user_id: sammelId,
+                        gast_id: sammelId,
+                        group_name: 'Sammelrechnung',
+                        sammel_original_user: gast.id,
+                        sammel_original_name: gast.name
+                    }).eq('buchung_id', b.buchung_id);
+                }
+                totalMoved += buchungen.length;
+            }
+        }
+        
+        updateProg(85, 'Accounts deaktivieren...');
+        
+        // 3. Original-Accounts deaktivieren (NICHT löschen!)
+        for (const gast of selected) {
+            await supabaseClient.from('profiles').update({
+                aktiv: false,
+                sammel_deaktiviert_fuer: sammelId,
+                sammel_deaktiviert_am: new Date().toISOString()
+            }).eq('id', gast.id);
+        }
+        
+        // Admin-Session wiederherstellen
+        const adminPw = sessionStorage.getItem('_admin_pw');
+        if (adminPw) {
+            try { await supabaseClient.auth.signInWithPassword({ email: 'admin@soellerhaus.local', password: adminPw }); } catch(e) {}
+        }
+        
+        updateProg(100, 'Fertig!');
+        await new Promise(r => setTimeout(r, 800));
+        
+        const overlay = document.getElementById('sammel-progress');
+        if (overlay) overlay.remove();
+        
+        Utils.showToast(`Sammelrechnung "${sammelName}" erstellt: ${totalMoved} Buchungen von ${selected.length} Gästen zusammengeführt`, 'success');
+        Router.navigate('admin-guests');
+    } catch(e) {
+        const overlay = document.getElementById('sammel-progress');
+        if (overlay) overlay.remove();
+        Utils.showToast('Fehler: ' + e.message, 'error');
+        // Admin-Session wiederherstellen
+        const adminPw = sessionStorage.getItem('_admin_pw');
+        if (adminPw) {
+            try { await supabaseClient.auth.signInWithPassword({ email: 'admin@soellerhaus.local', password: adminPw }); } catch(e2) {}
+        }
+    }
+};
+
+// PDF Zusammenfassung der ausgewählten Gäste
+window.exportSammelPDF = async () => {
+    const selected = getSelectedGäste();
+    if (selected.length === 0) { Utils.showToast('Bitte Gäste auswählen', 'warning'); return; }
+    
+    Utils.showToast('PDF wird erstellt...', 'info');
+    
+    let pdfContent = [];
+    let gesamtSumme = 0;
+    
+    for (const gast of selected) {
+        const { data: buchungen } = await supabaseClient
+            .from('buchungen')
+            .select('*')
+            .eq('user_id', gast.id)
+            .eq('storniert', false)
+            .order('datum', { ascending: true });
+        
+        const gastBuchungen = (buchungen || []).filter(b => b.bezahlt !== true);
+        const gastSumme = gastBuchungen.reduce((s, b) => s + (b.preis || 0) * (b.menge || 1), 0);
+        gesamtSumme += gastSumme;
+        
+        // Nach Datum gruppieren
+        const nachDatum = {};
+        gastBuchungen.forEach(b => {
+            const d = b.datum || 'Unbekannt';
+            if (!nachDatum[d]) nachDatum[d] = [];
+            nachDatum[d].push(b);
+        });
+        
+        pdfContent.push({ name: gast.name, buchungen: nachDatum, summe: gastSumme, anzahl: gastBuchungen.length });
+    }
+    
+    // HTML für PDF generieren
+    let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+        body { font-family:Arial,sans-serif; font-size:12px; margin:20px; }
+        h1 { font-size:18px; border-bottom:2px solid #333; padding-bottom:8px; }
+        h2 { font-size:14px; background:#f0f0f0; padding:8px; margin-top:20px; }
+        table { width:100%; border-collapse:collapse; margin:8px 0; }
+        th, td { padding:4px 8px; border:1px solid #ddd; text-align:left; font-size:11px; }
+        th { background:#f8f8f8; }
+        .summe { font-weight:bold; text-align:right; padding:8px; background:#e8f5e9; }
+        .gesamt { font-size:16px; font-weight:bold; text-align:right; padding:12px; background:#c8e6c9; margin-top:20px; }
+        @media print { body { margin:10mm; } }
+    </style></head><body>
+    <h1>Sammelübersicht - ${selected.length} Gäste</h1>
+    <p>Erstellt: ${new Date().toLocaleString('de-AT')} | Söllerhaus Kassa</p>`;
+    
+    for (const g of pdfContent) {
+        html += `<h2>${g.name} (${g.anzahl} Buchungen - ${Utils.formatCurrency(g.summe)})</h2>`;
+        for (const [datum, bs] of Object.entries(g.buchungen)) {
+            const tagSumme = bs.reduce((s, b) => s + (b.preis || 0) * (b.menge || 1), 0);
+            html += `<table><thead><tr><th>Artikel</th><th style="width:50px;text-align:center;">Menge</th><th style="width:80px;text-align:right;">Preis</th></tr></thead><tbody>`;
+            html += `<tr><td colspan="3" style="font-weight:bold;background:#fafafa;">${datum}</td></tr>`;
+            bs.forEach(b => {
+                html += `<tr><td>${b.artikel_name || '-'}</td><td style="text-align:center;">${b.menge || 1}</td><td style="text-align:right;">${Utils.formatCurrency((b.preis || 0) * (b.menge || 1))}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+        }
+        html += `<div class="summe">Summe ${g.name}: ${Utils.formatCurrency(g.summe)}</div>`;
+    }
+    
+    html += `<div class="gesamt">GESAMTSUMME: ${Utils.formatCurrency(gesamtSumme)}</div></body></html>`;
+    
+    // PDF öffnen (Print-Dialog)
+    const printWin = window.open('', '_blank');
+    printWin.document.write(html);
+    printWin.document.close();
+    setTimeout(() => printWin.print(), 500);
+};
+
+// Preismodus Dropdown Toggle
+window.addEventListener('change', (e) => {
+    if (e.target && e.target.id === 'gast-preismodus') {
+        const row = document.getElementById('gast-manual-preis-row');
+        if (row) row.style.display = e.target.value === 'manual' ? 'block' : 'none';
+    }
+});
 
 Router.register('admin-articles', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
