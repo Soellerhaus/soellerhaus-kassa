@@ -8479,6 +8479,17 @@ window.adminSchnellbuchen = async (gastId) => {
     window._schnellArts = arts;
     window._schnellSelCat = kats.length > 0 ? kats[0].kategorie_id : 1;
     
+    // Bestehende Buchungen des Gastes laden
+    window._schnellBestehend = [];
+    if (supabaseClient && isOnline) {
+        try {
+            const { data } = await supabaseClient.from('buchungen').select('artikel_name, preis, menge, datum, uhrzeit, buchung_id')
+                .eq('user_id', gastId).eq('storniert', false).eq('bezahlt', false)
+                .order('erstellt_am', { ascending: false });
+            window._schnellBestehend = data || [];
+        } catch(e) {}
+    }
+    
     renderSchnellbuchenModal();
 };
 
@@ -8593,6 +8604,21 @@ window.renderSchnellbuchenModal = () => {
                     <div style="background:white;border:1px solid #ddd;border-radius:6px;padding:4px 10px;font-size:0.8rem;display:flex;align-items:center;gap:6px;">
                         <span style="font-weight:600;">${w.menge}x</span> ${w.name} <span style="color:var(--color-alpine-green);font-weight:600;">${Utils.formatCurrency(w.preis * w.menge)}</span>
                         <button onclick="schnellbuchenEntfernen(${i})" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:1rem;padding:0 2px;">x</button>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+        
+        <!-- BESTEHENDE BUCHUNGEN -->
+        ${(window._schnellBestehend || []).length > 0 ? `
+        <div style="background:#f0f4f8;padding:8px 16px;max-height:140px;overflow-y:auto;flex-shrink:0;border-bottom:1px solid #ccc;">
+            <div style="font-size:0.75rem;font-weight:700;color:#555;margin-bottom:4px;">📦 Auf Account (${window._schnellBestehend.length} Positionen | ${Utils.formatCurrency(window._schnellBestehend.reduce((s,b) => s + (b.preis||0)*(b.menge||1), 0))}):</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                ${window._schnellBestehend.map(b => `
+                    <div style="background:white;border:1px solid #ddd;border-radius:4px;padding:2px 8px;font-size:0.75rem;">
+                        ${b.menge||1}x ${b.artikel_name} <span style="color:#27ae60;font-weight:600;">${Utils.formatCurrency((b.preis||0)*(b.menge||1))}</span>
+                        <span style="color:#999;font-size:0.65rem;">${b.datum||''}</span>
                     </div>
                 `).join('')}
             </div>
@@ -9068,34 +9094,77 @@ window.generateSammelPDF = async () => {
     let gesamtSumme = 0;
     
     for (const gast of selected) {
-        let query = supabaseClient
+        // 1. Direkte Buchungen des Gastes
+        let query1 = supabaseClient
             .from('buchungen')
             .select('*')
             .eq('user_id', gast.id)
             .eq('storniert', false)
             .order('datum', { ascending: true });
+        if (vonDatum) query1 = query1.gte('datum', vonDatum);
+        if (bisDatum) query1 = query1.lte('datum', bisDatum);
+        const { data: direktBuchungen } = await query1;
         
-        if (vonDatum) query = query.gte('datum', vonDatum);
-        if (bisDatum) query = query.lte('datum', bisDatum);
+        // 2. Buchungen die zu diesem Gast gehören aber auf Sammelaccount verschoben wurden
+        let query2 = supabaseClient
+            .from('buchungen')
+            .select('*')
+            .eq('sammel_original_user', gast.id)
+            .eq('storniert', false)
+            .order('datum', { ascending: true });
+        if (vonDatum) query2 = query2.gte('datum', vonDatum);
+        if (bisDatum) query2 = query2.lte('datum', bisDatum);
+        const { data: verschobeneBuchungen } = await query2;
         
-        const { data: buchungen } = await query;
+        // Zusammenführen und Duplikate vermeiden
+        const alleIds = new Set();
+        let gastBuchungen = [];
+        [...(direktBuchungen || []), ...(verschobeneBuchungen || [])].forEach(b => {
+            if (!alleIds.has(b.buchung_id)) {
+                alleIds.add(b.buchung_id);
+                gastBuchungen.push(b);
+            }
+        });
         
-        let gastBuchungen = buchungen || [];
         if (!inclBezahlt) {
             gastBuchungen = gastBuchungen.filter(b => b.bezahlt !== true);
         }
         
-        const gastSumme = gastBuchungen.reduce((s, b) => s + (b.preis || 0) * (b.menge || 1), 0);
-        gesamtSumme += gastSumme;
+        // Wenn dieser Gast ein Sammelaccount ist: nach Original-Namen gruppieren
+        const profile = await supabaseClient.from('profiles').select('is_sammelrechnung, sammel_quell_namen').eq('id', gast.id).single();
+        const isSammel = profile?.data?.is_sammelrechnung;
         
-        const nachDatum = {};
-        gastBuchungen.forEach(b => {
-            const d = b.datum || 'Unbekannt';
-            if (!nachDatum[d]) nachDatum[d] = [];
-            nachDatum[d].push(b);
-        });
-        
-        pdfContent.push({ name: gast.name, buchungen: nachDatum, summe: gastSumme, anzahl: gastBuchungen.length });
+        if (isSammel && gastBuchungen.length > 0) {
+            // Gruppiere nach sammel_original_name
+            const nachPerson = {};
+            gastBuchungen.forEach(b => {
+                const person = b.sammel_original_name || gast.name;
+                if (!nachPerson[person]) nachPerson[person] = [];
+                nachPerson[person].push(b);
+            });
+            
+            for (const [personName, personBuchungen] of Object.entries(nachPerson)) {
+                const personSumme = personBuchungen.reduce((s, b) => s + (b.preis || 0) * (b.menge || 1), 0);
+                gesamtSumme += personSumme;
+                const nachDatum = {};
+                personBuchungen.forEach(b => {
+                    const d = b.datum || 'Unbekannt';
+                    if (!nachDatum[d]) nachDatum[d] = [];
+                    nachDatum[d].push(b);
+                });
+                pdfContent.push({ name: personName + ' (via ' + gast.name + ')', buchungen: nachDatum, summe: personSumme, anzahl: personBuchungen.length });
+            }
+        } else {
+            const gastSumme = gastBuchungen.reduce((s, b) => s + (b.preis || 0) * (b.menge || 1), 0);
+            gesamtSumme += gastSumme;
+            const nachDatum = {};
+            gastBuchungen.forEach(b => {
+                const d = b.datum || 'Unbekannt';
+                if (!nachDatum[d]) nachDatum[d] = [];
+                nachDatum[d].push(b);
+            });
+            pdfContent.push({ name: gast.name, buchungen: nachDatum, summe: gastSumme, anzahl: gastBuchungen.length });
+        }
     }
     
     const zeitraumText = vonDatum && bisDatum ? `Zeitraum: ${new Date(vonDatum).toLocaleDateString('de-AT')} - ${new Date(bisDatum).toLocaleDateString('de-AT')}`
