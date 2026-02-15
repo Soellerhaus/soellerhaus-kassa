@@ -4883,10 +4883,17 @@ Router.register('admin-dashboard', async () => {
     
     try {
         if (supabaseClient && isOnline) {
-            const { count } = await supabaseClient.from('artikel').select('*', { count: 'exact', head: true });
-            artCount = count || 0;
+            // Gesamtumsatz aller aktiven Gäste (unbezahlt, nicht storniert)
+            const activeIds = guests.map(g => g.id);
+            if (activeIds.length > 0) {
+                const { data: alleBuchungen } = await supabaseClient.from('buchungen').select('preis, menge')
+                    .in('user_id', activeIds).eq('storniert', false).eq('bezahlt', false);
+                window._gastGesamtUmsatz = (alleBuchungen || []).reduce((s, b) => s + (b.preis || 0) * (b.menge || 1), 0);
+            } else {
+                window._gastGesamtUmsatz = 0;
+            }
         }
-    } catch(e) { console.error('artCount error:', e); }
+    } catch(e) { console.error('gastUmsatz error:', e); window._gastGesamtUmsatz = 0; }
     
     try {
         bs = await Buchungen.getAll();
@@ -4956,7 +4963,7 @@ Router.register('admin-dashboard', async () => {
         
         <div class="stats-grid">
             <div class="stat-card"><div class="stat-value">${guests.length}</div><div class="stat-label">Gäste</div></div>
-            <div class="stat-card"><div class="stat-value">${artCount}</div><div class="stat-label">Artikel</div></div>
+            <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(window._gastGesamtUmsatz || 0)}</div><div class="stat-label">Offener Umsatz</div></div>
             <div class="stat-card"><div class="stat-value">${heuteB.length}</div><div class="stat-label">Buchungen heute</div></div>
             <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(heuteB.reduce((s,b) => s+b.preis*b.menge, 0))}</div><div class="stat-label">Umsatz heute</div></div>
         </div>
@@ -8868,13 +8875,31 @@ window.schnellbuchenAbschliessen = async () => {
 
 // Export für Access
 window.exportGästeExcel = async () => {
-    let guests = await db.registeredGuests.toArray();
-    guests = guests.filter(g => !g.gelöscht);
+    let guests = [];
+    
+    // Aus Supabase laden - NUR aktive, nicht gelöschte Gäste
+    if (supabaseClient && isOnline) {
+        try {
+            const { data } = await supabaseClient.from('profiles')
+                .select('id, vorname, display_name, first_name, group_name, pin_hash, ausnahmeumlage, aktiv, geloescht, sammel_deaktiviert_fuer')
+                .eq('aktiv', true)
+                .or('geloescht.is.null,geloescht.eq.false');
+            guests = (data || []).filter(g => !g.sammel_deaktiviert_fuer); // Keine deaktivierten Sammel-Quellen
+        } catch(e) {
+            console.error('Export Supabase error:', e);
+        }
+    }
+    
+    // Fallback: lokale DB
+    if (guests.length === 0) {
+        const local = await db.registeredGuests.toArray();
+        guests = local.filter(g => !g.gelöscht && g.aktiv !== false);
+    }
     
     const rows = guests.map((g, index) => ({
         'ID': index + 6700,
         'Vorname': '',
-        'Nachname': g.nachname || g.firstName || '',
+        'Nachname': g.display_name || g.vorname || g.first_name || g.nachname || g.firstName || '',
         'Adresse': '',
         'Ort': '',
         'Postleitzahl': '',
@@ -8882,9 +8907,9 @@ window.exportGästeExcel = async () => {
         'Email-Name': '',
         'Geburtsdatum': '',
         'Gruppennr': 0,
-        'Gruppenname': g.gruppenname || g.group_name || 'keiner Gruppe zugehörig',
+        'Gruppenname': g.group_name || g.gruppenname || 'keiner Gruppe zugehörig',
         'Aktiv': true,
-        'Passwort': g.passwort || g.passwordHash || '',
+        'Passwort': g.pin_hash || g.passwort || g.passwordHash || '',
         'Ausnahmeumlage': g.ausnahmeumlage || false
     }));
     
@@ -8896,7 +8921,7 @@ window.exportGästeExcel = async () => {
     const datumStr = `${heute.getDate().toString().padStart(2,'0')}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getFullYear()}`;
     XLSX.writeFile(wb, `Gäste_Export_${datumStr}.xlsx`);
     
-    Utils.showToast(`${guests.length} Gäste exportiert`, 'success');
+    Utils.showToast(`${rows.length} aktive Gäste exportiert`, 'success');
 };
 
 // ============ SAMMELRECHNUNG & GAST-AUSWAHL ============
