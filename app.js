@@ -5731,7 +5731,7 @@ window.executeIdeasExport = async () => {
         .order('uhrzeit', { ascending: true });
     
     if (nurUnbezahlt) {
-        query = query.eq('bezahlt', false);
+        query = query.or('bezahlt.eq.false,bezahlt.is.null');
     }
     
     const { data: buchungen, error } = await query;
