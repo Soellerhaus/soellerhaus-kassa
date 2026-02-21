@@ -3343,9 +3343,18 @@ const FehlendeGetränke = {
     },
     
     async löschen(id) {
-        try { await db.fehlendeGetraenke.delete(id); } catch(e) {}
+        // Soft-Delete: als übernommen markieren statt hart löschen (RLS-sicher)
+        try { await db.fehlendeGetraenke.update(id, { uebernommen: true, geloescht: true }); } catch(e) {}
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('fehlende_getraenke').delete().eq('id', id);
+            const { error } = await supabaseClient.from('fehlende_getraenke')
+                .update({ uebernommen: true, geloescht: true, uebernommen_am: new Date().toISOString() })
+                .eq('id', id);
+            if (error) {
+                console.error('❌ Löschen fehlgeschlagen:', error);
+                // Fallback: Hart löschen versuchen
+                const { error: delErr } = await supabaseClient.from('fehlende_getraenke').delete().eq('id', id);
+                if (delErr) console.error('❌ Auch delete fehlgeschlagen:', delErr);
+            }
         }
         await DataProtection.createBackup();
         Utils.showToast('Gelöscht', 'success');
@@ -10212,17 +10221,6 @@ Router.register('buchen', async () => {
     setTimeout(() => SyncManager.updateUI(), 100);
     
     UI.append(`
-        ${fehlendeOffen.length > 0 ? `
-        <div style="background:linear-gradient(135deg,#e74c3c,#c0392b);border-radius:16px;margin-bottom:16px;padding:14px 16px;color:white;cursor:pointer;" onclick="Router.navigate('fehlende-uebernehmen')">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <div style="font-weight:700;font-size:1rem;">🚨 ${fehlendeOffen.length} fehlende Getränke</div>
-                    <div style="font-size:0.85rem;opacity:0.9;">Nicht zugeordnet — tippe zum Übernehmen</div>
-                </div>
-                <div style="font-size:1.5rem;">→</div>
-            </div>
-        </div>
-        ` : ''}
         ${meineBuchungen.length ? `
         <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);border-radius:16px;margin-bottom:20px;overflow:hidden;">
             <div onclick="toggleBuchungsDetails()" style="padding:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
