@@ -5062,9 +5062,14 @@ Router.register('admin-dashboard', async () => {
             <small style="opacity:0.9;">(${bs.length} gesamt * bearbeiten/löschen)</small>
         </button>
         
-        <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;background:linear-gradient(135deg, #636e72, #2d3436);color:white;border:none;">
+        <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;background:linear-gradient(135deg, #636e72, #2d3436);color:white;border:none;">
             📋 Belege drucken (alle Gäste)<br>
             <small style="opacity:0.9;">(Aktive + ausgecheckte Gäste • Thermodrucker)</small>
+        </button>
+        
+        <button class="btn btn-block" onclick="Router.navigate('admin-ideas-export')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;background:linear-gradient(135deg, #2980b9, #3498db);color:white;border:none;">
+            📊 Manuell Export IDEAS<br>
+            <small style="opacity:0.9;">(Excel-Backup im IDEAS-Format • Zeitraum wählbar)</small>
         </button>
         
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
@@ -5647,6 +5652,190 @@ Router.register('admin-alle-buchungen', async () => {
         ` : ''}
     </div>`);
 });
+
+// ============ MANUELL EXPORT IDEAS ============
+Router.register('admin-ideas-export', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+    
+    const heute = new Date().toISOString().split('T')[0];
+    
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">📊 Manuell Export IDEAS</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3" style="background:linear-gradient(135deg, #2980b9, #3498db);color:white;">
+            <div style="padding:20px;text-align:center;">
+                <div style="font-size:1.5rem;font-weight:700;">📊 IDEAS Export</div>
+                <div style="opacity:0.9;">Buchungen im IDEAS-Format als Excel exportieren</div>
+            </div>
+        </div>
+        
+        <div class="card mb-3">
+            <div class="card-header"><h3>Zeitraum wählen</h3></div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                    <div>
+                        <label style="font-weight:600;font-size:0.9rem;">Von Datum:</label>
+                        <input type="date" id="ideas-von-datum" class="form-input" value="${heute}">
+                        <select id="ideas-von-zeit" class="form-input" style="margin-top:4px;">
+                            ${Array.from({length:24}, (_,i) => `<option value="${String(i).padStart(2,'0')}:00:00" ${i===0?'selected':''}>${String(i).padStart(2,'0')}:00</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-weight:600;font-size:0.9rem;">Bis Datum:</label>
+                        <input type="date" id="ideas-bis-datum" class="form-input" value="${heute}">
+                        <select id="ideas-bis-zeit" class="form-input" style="margin-top:4px;">
+                            ${Array.from({length:24}, (_,i) => `<option value="${String(i).padStart(2,'0')}:00:00" ${i===23?'selected':''}>${String(i).padStart(2,'0')}:00</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="ideas-nur-unbezahlt" checked>
+                        <span style="font-size:0.9rem;">Nur unbezahlte Buchungen (bezahlt = Nein)</span>
+                    </label>
+                </div>
+                <button class="btn btn-primary" onclick="executeIdeasExport()" style="width:100%;padding:16px;font-size:1.1rem;">📊 Export starten</button>
+            </div>
+        </div>
+        
+        <div class="card" style="background:#fffde7;">
+            <div class="card-body" style="font-size:0.85rem;color:#666;">
+                <strong>FORMAT:</strong> Exakt wie IDEAS Buchungdetail-Tabelle<br>
+                ID, Artikelnr, Artikel, Preis, Datum, Uhrzeit, Gastid, Gastname, Gastvorname, Gastgruppe, Gastgruppennr, bezahlt, buchung_id, Steuer, Anzahl, Rechdatum, Rechnummer, ZNummer, Warengruppe, Bar, Unbar, Artikelreihenfolge, Artikelgruppe2, Artikelreihenfolge2, Steuer1, Anfang2, Bestand2, Basisbestand2, Auffuellmenge2, Fehlbestand2, Warengruppe1
+            </div>
+        </div>
+    </div>`);
+});
+
+window.executeIdeasExport = async () => {
+    const vonDatum = document.getElementById('ideas-von-datum')?.value;
+    const bisDatum = document.getElementById('ideas-bis-datum')?.value;
+    const vonZeit = document.getElementById('ideas-von-zeit')?.value || '00:00:00';
+    const bisZeit = document.getElementById('ideas-bis-zeit')?.value || '23:00:00';
+    const nurUnbezahlt = document.getElementById('ideas-nur-unbezahlt')?.checked;
+    
+    if (!vonDatum || !bisDatum) {
+        Utils.showToast('Bitte Datum wählen', 'warning');
+        return;
+    }
+    
+    Utils.showToast('Lade Buchungen...', 'info');
+    
+    // Buchungen aus Supabase laden
+    let query = supabaseClient
+        .from('buchungen')
+        .select('*')
+        .eq('storniert', false)
+        .gte('datum', vonDatum)
+        .lte('datum', bisDatum)
+        .order('datum', { ascending: true })
+        .order('uhrzeit', { ascending: true });
+    
+    if (nurUnbezahlt) {
+        query = query.eq('bezahlt', false);
+    }
+    
+    const { data: buchungen, error } = await query;
+    
+    if (error) {
+        Utils.showToast('Fehler: ' + error.message, 'error');
+        return;
+    }
+    
+    if (!buchungen || buchungen.length === 0) {
+        Utils.showToast('Keine Buchungen im gewählten Zeitraum', 'warning');
+        return;
+    }
+    
+    // Zeitfilter auf Uhrzeit anwenden
+    const filtered = buchungen.filter(b => {
+        const bZeit = b.uhrzeit || '00:00:00';
+        if (b.datum === vonDatum && bZeit < vonZeit) return false;
+        if (b.datum === bisDatum && bZeit > bisZeit) return false;
+        return true;
+    });
+    
+    if (filtered.length === 0) {
+        Utils.showToast('Keine Buchungen im gewählten Zeitraum/Uhrzeit', 'warning');
+        return;
+    }
+    
+    // Gast-Profile laden für Namen
+    const gastIds = [...new Set(filtered.map(b => b.user_id))];
+    const { data: profiles } = await supabaseClient.from('profiles')
+        .select('id, vorname, display_name, first_name, group_name')
+        .in('id', gastIds);
+    const profileMap = {};
+    (profiles || []).forEach(p => { profileMap[p.id] = p; });
+    
+    // Artikel laden für Artikelnr
+    const artIds = [...new Set(filtered.map(b => b.artikel_id))];
+    const { data: artikelData } = await supabaseClient.from('artikel')
+        .select('artikel_id, name, kategorie_id, sortierung')
+        .in('artikel_id', artIds);
+    const artMap = {};
+    (artikelData || []).forEach(a => { artMap[a.artikel_id] = a; });
+    
+    // Excel-Rows im IDEAS-Format erstellen
+    let idCounter = 20000;
+    const rows = filtered.map(b => {
+        const profil = profileMap[b.user_id] || {};
+        const art = artMap[b.artikel_id] || {};
+        const gastName = b.gast_vorname || profil.display_name || profil.vorname || profil.first_name || '';
+        const gastGruppe = b.gastgruppe || b.group_name || profil.group_name || '';
+        
+        return {
+            'ID': idCounter++,
+            'Artikelnr': b.artikel_id || 0,
+            'Artikel': b.artikel_name || '',
+            'Preis': b.preis || 0,
+            'Datum': b.datum || '',
+            'Uhrzeit': b.uhrzeit || '',
+            'Gastid': 0,
+            'Gastname': gastName,
+            'Gastvorname': '',
+            'Gastgruppe': gastGruppe,
+            'Gastgruppennr': 0,
+            'bezahlt': 'Nein',
+            'buchung_id': b.buchung_id || '',
+            'Steuer': b.steuer_prozent || 19,
+            'Anzahl': b.menge || 1,
+            'Rechdatum': 0,
+            'Rechnummer': 0,
+            'ZNummer': 1,
+            'Warengruppe': '',
+            'Bar': 'Nein',
+            'Unbar': 'Nein',
+            'Artikelreihenfolge': art.sortierung || 0,
+            'Artikelgruppe2': '',
+            'Artikelreihenfolge2': 0,
+            'Steuer1': 0,
+            'Anfang2': 0,
+            'Bestand2': 0,
+            'Basisbestand2': 0,
+            'Auffuellmenge2': 0,
+            'Fehlbestand2': 0,
+            'Warengruppe1': art.kategorie_id || 0
+        };
+    });
+    
+    // Excel erstellen
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    
+    // Spaltenbreiten setzen
+    ws['!cols'] = [
+        {wch:6}, {wch:8}, {wch:25}, {wch:10}, {wch:12}, {wch:10}, {wch:6}, {wch:20}, {wch:15}, {wch:20},
+        {wch:10}, {wch:7}, {wch:38}, {wch:6}, {wch:6}, {wch:10}, {wch:10}, {wch:6}, {wch:12}, {wch:5},
+        {wch:5}, {wch:12}, {wch:12}, {wch:12}, {wch:6}, {wch:6}, {wch:6}, {wch:10}, {wch:10}, {wch:10}, {wch:10}
+    ];
+    
+    XLSX.utils.book_append_sheet(wb, ws, 'Buchungdetail');
+    
+    const datumStr = `${vonDatum}_${bisDatum}`.replace(/-/g, '');
+    XLSX.writeFile(wb, `IDEAS_Export_${datumStr}.xlsx`);
+    
+    Utils.showToast(`${filtered.length} Buchungen exportiert (${vonDatum} ${vonZeit} - ${bisDatum} ${bisZeit})`, 'success');
+};
 
 // ============ ALTE BELEGE (alle Gäste - aktiv + ausgecheckt) ============
 Router.register('admin-alte-belege', async () => {
