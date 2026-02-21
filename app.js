@@ -3211,6 +3211,9 @@ const FehlendeGetränke = {
         const artikel = await Artikel.getById(artikel_id);
         if (!artikel) throw new Error('Artikel nicht gefunden');
         
+        // Aktiven Preismodus berücksichtigen
+        const aktiverPreis = PreisModus.getPreis(artikel, State.currentPreisModus);
+        
         // Vortag relativ zum aktuellen Buchungstag (7:00-7:00 Periode)
         const datumVortag = Utils.getVortagBuchungsDatum();
         
@@ -3219,7 +3222,7 @@ const FehlendeGetränke = {
             items.push({
                 artikel_id: artikel.artikel_id,
                 artikel_name: artikel.name,
-                artikel_preis: artikel.preis,
+                artikel_preis: aktiverPreis,
                 kategorie_id: artikel.kategorie_id,
                 icon: artikel.icon || '',
                 datum: datumVortag,
@@ -5972,7 +5975,7 @@ Router.register('admin-fehlende', async () => {
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span style="font-weight:600;">${Utils.formatCurrency(f.artikel_preis)}</span>
-                        <button class="btn btn-danger" onclick="deleteFehlendes(${f.id})" style="padding:4px 10px;"></button>
+                        <button class="btn btn-danger" onclick="deleteFehlendes(${f.id})" style="padding:4px 10px;font-size:0.9rem;">🗑️</button>
                     </div>
                 </div>
                 `).join('')}
@@ -5999,7 +6002,7 @@ Router.register('admin-fehlende', async () => {
                             <button class="btn btn-secondary" onclick="addFehlendesGetraenk(${a.artikel_id})" style="padding:12px 8px;text-align:center;">
                                 <div style="font-size:1.5rem;">${a.icon||''}</div>
                                 <div style="font-size:0.85rem;font-weight:500;">${a.name}</div>
-                                <div style="font-size:0.8rem;color:var(--color-stone-dark);">${Utils.formatCurrency(a.preis)}</div>
+                                <div style="font-size:0.8rem;color:var(--color-stone-dark);">${Utils.formatCurrency(PreisModus.getPreis(a, State.currentPreisModus))}</div>
                             </button>
                             `).join('')}
                         </div>
@@ -8881,10 +8884,31 @@ window.exportGästeExcel = async () => {
     if (supabaseClient && isOnline) {
         try {
             const { data } = await supabaseClient.from('profiles')
-                .select('id, vorname, display_name, first_name, group_name, pin_hash, ausnahmeumlage, aktiv, geloescht, sammel_deaktiviert_fuer')
+                .select('id, vorname, display_name, first_name, group_name, pin_hash, ausnahmeumlage, aktiv, geloescht, sammel_deaktiviert_fuer, is_sammelrechnung, sammel_quell_ids')
                 .eq('aktiv', true)
                 .or('geloescht.is.null,geloescht.eq.false');
-            guests = (data || []).filter(g => !g.sammel_deaktiviert_fuer); // Keine deaktivierten Sammel-Quellen
+            
+            if (data) {
+                // Zusätzlich: Lade alle Sammelrechnungen um deren Quell-IDs zu kennen
+                const sammelAccounts = data.filter(g => g.is_sammelrechnung);
+                const deaktivierteQuellIds = new Set();
+                
+                for (const sa of sammelAccounts) {
+                    try {
+                        const quellIds = JSON.parse(sa.sammel_quell_ids || '[]');
+                        quellIds.forEach(id => deaktivierteQuellIds.add(id));
+                    } catch(e) {}
+                }
+                
+                // Filtere: Keine Quell-Accounts deren Buchungen auf Sammelrechnung verschoben wurden
+                guests = data.filter(g => {
+                    // Explizit als deaktiviert markiert
+                    if (g.sammel_deaktiviert_fuer) return false;
+                    // Ist Quell-Account einer Sammelrechnung (auch wenn aktiv-Flag nicht richtig gesetzt)
+                    if (deaktivierteQuellIds.has(g.id)) return false;
+                    return true;
+                });
+            }
         } catch(e) {
             console.error('Export Supabase error:', e);
         }
@@ -8921,7 +8945,7 @@ window.exportGästeExcel = async () => {
     const datumStr = `${heute.getDate().toString().padStart(2,'0')}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getFullYear()}`;
     XLSX.writeFile(wb, `Gäste_Export_${datumStr}.xlsx`);
     
-    Utils.showToast(`${rows.length} aktive Gäste exportiert`, 'success');
+    Utils.showToast(`${rows.length} aktive Gäste exportiert (${guests.filter(g=>g.is_sammelrechnung).length} Sammelrechnungen)`, 'success');
 };
 
 // ============ SAMMELRECHNUNG & GAST-AUSWAHL ============
@@ -9056,12 +9080,30 @@ window.erstelleSammelrechnung = async () => {
         updateProg(85, 'Accounts deaktivieren...');
         
         // 3. Original-Accounts deaktivieren (NICHT löschen!)
+        let deaktiviert = 0;
         for (const gast of selected) {
-            await supabaseClient.from('profiles').update({
+            const { error: deaktErr } = await supabaseClient.from('profiles').update({
                 aktiv: false,
                 sammel_deaktiviert_fuer: sammelId,
                 sammel_deaktiviert_am: new Date().toISOString()
             }).eq('id', gast.id);
+            
+            if (deaktErr) {
+                console.error('❌ Deaktivierung fehlgeschlagen für', gast.name, deaktErr);
+                // Fallback: Versuche nochmal mit direkter RPC oder anderem Ansatz
+                try {
+                    await supabaseClient.rpc('deactivate_profile', { profile_id: gast.id, sammel_id: sammelId });
+                } catch(e2) {
+                    console.error('RPC Fallback auch fehlgeschlagen:', e2);
+                }
+            } else {
+                deaktiviert++;
+                console.log('✅ Deaktiviert:', gast.name);
+            }
+        }
+        
+        if (deaktiviert < selected.length) {
+            console.warn('⚠️ Nicht alle Accounts deaktiviert:', deaktiviert, '/', selected.length);
         }
         
         // Admin-Session nochmals sicherstellen
@@ -10170,6 +10212,17 @@ Router.register('buchen', async () => {
     setTimeout(() => SyncManager.updateUI(), 100);
     
     UI.append(`
+        ${fehlendeOffen.length > 0 ? `
+        <div style="background:linear-gradient(135deg,#e74c3c,#c0392b);border-radius:16px;margin-bottom:16px;padding:14px 16px;color:white;cursor:pointer;" onclick="Router.navigate('fehlende-uebernehmen')">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-weight:700;font-size:1rem;">🚨 ${fehlendeOffen.length} fehlende Getränke</div>
+                    <div style="font-size:0.85rem;opacity:0.9;">Nicht zugeordnet — tippe zum Übernehmen</div>
+                </div>
+                <div style="font-size:1.5rem;">→</div>
+            </div>
+        </div>
+        ` : ''}
         ${meineBuchungen.length ? `
         <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);border-radius:16px;margin-bottom:20px;overflow:hidden;">
             <div onclick="toggleBuchungsDetails()" style="padding:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
