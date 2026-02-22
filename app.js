@@ -5718,30 +5718,54 @@ window.executeIdeasExport = async () => {
         return;
     }
     
+    // Datum von ISO (2026-02-21) zu deutschem Format (21.02.2026) konvertieren
+    const isoToDE = (iso) => {
+        const [y, m, d] = iso.split('-');
+        return `${d}.${m}.${y}`;
+    };
+    const vonDE = isoToDE(vonDatum);
+    const bisDE = isoToDE(bisDatum);
+    
     Utils.showToast('Lade Buchungen...', 'info');
     
-    // Buchungen aus Supabase laden
+    // Buchungen aus Supabase laden - ALLE im Zeitraum, dann clientseitig filtern
+    // (da datum als Text im Format DD.MM.YYYY gespeichert ist, funktioniert gte/lte nicht korrekt)
     let query = supabaseClient
         .from('buchungen')
         .select('*')
         .eq('storniert', false)
-        .gte('datum', vonDatum)
-        .lte('datum', bisDatum)
-        .order('datum', { ascending: true })
-        .order('uhrzeit', { ascending: true });
+        .order('erstellt_am', { ascending: true });
     
     if (nurUnbezahlt) {
         query = query.or('bezahlt.eq.false,bezahlt.is.null');
     }
     
-    const { data: buchungen, error } = await query;
+    const { data: alleBuchungen, error } = await query;
     
     if (error) {
         Utils.showToast('Fehler: ' + error.message, 'error');
         return;
     }
     
-    if (!buchungen || buchungen.length === 0) {
+    if (!alleBuchungen || alleBuchungen.length === 0) {
+        Utils.showToast('Keine Buchungen gefunden', 'warning');
+        return;
+    }
+    
+    // Clientseitig nach Datum filtern (DD.MM.YYYY Format)
+    const deToSortable = (de) => {
+        if (!de) return '';
+        const parts = de.split('.');
+        if (parts.length !== 3) return de; // Falls schon ISO
+        return `${parts[2]}-${parts[1]}-${parts[0]}`; // YYYY-MM-DD
+    };
+    
+    const buchungen = alleBuchungen.filter(b => {
+        const bDatumSort = deToSortable(b.datum);
+        return bDatumSort >= vonDatum && bDatumSort <= bisDatum;
+    });
+    
+    if (buchungen.length === 0) {
         Utils.showToast('Keine Buchungen im gewählten Zeitraum', 'warning');
         return;
     }
@@ -5749,8 +5773,9 @@ window.executeIdeasExport = async () => {
     // Zeitfilter auf Uhrzeit anwenden
     const filtered = buchungen.filter(b => {
         const bZeit = b.uhrzeit || '00:00:00';
-        if (b.datum === vonDatum && bZeit < vonZeit) return false;
-        if (b.datum === bisDatum && bZeit > bisZeit) return false;
+        const bDatumSort = deToSortable(b.datum);
+        if (bDatumSort === vonDatum && bZeit < vonZeit) return false;
+        if (bDatumSort === bisDatum && bZeit > bisZeit) return false;
         return true;
     });
     
