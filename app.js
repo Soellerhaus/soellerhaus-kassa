@@ -5784,13 +5784,19 @@ window.executeIdeasExport = async () => {
         return;
     }
     
-    // Gast-Profile laden für Namen
+    // Gast-Profile laden für Namen und IDs
     const gastIds = [...new Set(filtered.map(b => b.user_id))];
     const { data: profiles } = await supabaseClient.from('profiles')
-        .select('id, vorname, display_name, first_name, group_name')
+        .select('id, vorname, display_name, first_name, group_name, pin_hash')
         .in('id', gastIds);
     const profileMap = {};
-    (profiles || []).forEach(p => { profileMap[p.id] = p; });
+    // Gast-ID Zuordnung: fortlaufende Nummer ab 200
+    let gastIdCounter = 200;
+    const gastIdMap = {};
+    (profiles || []).forEach(p => {
+        profileMap[p.id] = p;
+        gastIdMap[p.id] = gastIdCounter++;
+    });
     
     // Artikel laden für Artikelnr
     const artIds = [...new Set(filtered.map(b => b.artikel_id))];
@@ -5800,6 +5806,11 @@ window.executeIdeasExport = async () => {
     const artMap = {};
     (artikelData || []).forEach(a => { artMap[a.artikel_id] = a; });
     
+    // Preis formatieren: 2.30 → "2,30 €"
+    const preisFormat = (p) => {
+        return Number(p || 0).toFixed(2).replace('.', ',') + ' €';
+    };
+    
     // Excel-Rows im IDEAS-Format erstellen
     let idCounter = 20000;
     const rows = filtered.map(b => {
@@ -5807,20 +5818,21 @@ window.executeIdeasExport = async () => {
         const art = artMap[b.artikel_id] || {};
         const gastName = b.gast_vorname || profil.display_name || profil.vorname || profil.first_name || '';
         const gastGruppe = b.gastgruppe || b.group_name || profil.group_name || '';
+        const numGastId = gastIdMap[b.user_id] || 0;
         
         return {
             'ID': idCounter++,
             'Artikelnr': b.artikel_id || 0,
             'Artikel': b.artikel_name || '',
-            'Preis': b.preis || 0,
+            'Preis': preisFormat(b.preis),
             'Datum': b.datum || '',
             'Uhrzeit': b.uhrzeit || '',
-            'Gastid': 0,
+            'Gastid': numGastId,
             'Gastname': gastName,
             'Gastvorname': '',
             'Gastgruppe': gastGruppe,
             'Gastgruppennr': 0,
-            'bezahlt': 'Nein',
+            'bezahlt': false,
             'buchung_id': b.buchung_id || '',
             'Steuer': b.steuer_prozent || 19,
             'Anzahl': b.menge || 1,
@@ -5828,8 +5840,8 @@ window.executeIdeasExport = async () => {
             'Rechnummer': 0,
             'ZNummer': 1,
             'Warengruppe': '',
-            'Bar': 'Nein',
-            'Unbar': 'Nein',
+            'Bar': false,
+            'Unbar': false,
             'Artikelreihenfolge': art.sortierung || 0,
             'Artikelgruppe2': '',
             'Artikelreihenfolge2': 0,
@@ -5840,6 +5852,19 @@ window.executeIdeasExport = async () => {
             'Auffuellmenge2': 0,
             'Fehlbestand2': 0,
             'Warengruppe1': art.kategorie_id || 0
+        };
+    });
+    
+    // Gäste-Tabelle (2. Sheet) erstellen
+    const gaesteRows = Object.entries(gastIdMap).map(([supaId, numId]) => {
+        const p = profileMap[supaId] || {};
+        return {
+            'Gastid': numId,
+            'Nachname': p.display_name || p.vorname || p.first_name || '',
+            'Vorname': '',
+            'Gruppenname': p.group_name || '',
+            'Passwort': p.pin_hash || '',
+            'Aktiv': true
         };
     });
     
@@ -5856,10 +5881,15 @@ window.executeIdeasExport = async () => {
     
     XLSX.utils.book_append_sheet(wb, ws, 'Buchungdetail');
     
+    // Gäste-Sheet hinzufügen
+    const wsGaeste = XLSX.utils.json_to_sheet(gaesteRows);
+    wsGaeste['!cols'] = [{wch:8}, {wch:20}, {wch:15}, {wch:20}, {wch:10}, {wch:6}];
+    XLSX.utils.book_append_sheet(wb, wsGaeste, 'Gaeste');
+    
     const datumStr = `${vonDatum}_${bisDatum}`.replace(/-/g, '');
     XLSX.writeFile(wb, `IDEAS_Export_${datumStr}.xlsx`);
     
-    Utils.showToast(`${filtered.length} Buchungen exportiert (${vonDatum} ${vonZeit} - ${bisDatum} ${bisZeit})`, 'success');
+    Utils.showToast(`${filtered.length} Buchungen + ${gaesteRows.length} Gäste exportiert`, 'success');
 };
 
 // ============ ALTE BELEGE (alle Gäste - aktiv + ausgecheckt) ============
