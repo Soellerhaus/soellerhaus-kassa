@@ -5851,7 +5851,7 @@ window.executeIdeasExport = async () => {
             'Basisbestand2': 0,
             'Auffuellmenge2': 0,
             'Fehlbestand2': 0,
-            'Warengruppe1': art.kategorie_id || 0
+            'Warengruppe1': art.kategorie_id || 1
         };
     });
     
@@ -12269,3 +12269,4 @@ const KioskRefresh = {
 // Starten wenn App geladen
 document.addEventListener('DOMContentLoaded', () => KioskRefresh.init());
 if (document.readyState !== 'loading') KioskRefresh.init();
+            
