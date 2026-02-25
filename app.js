@@ -1,7 +1,28 @@
 // ================================
-// SEOLLERHAUS KASSA - MAIN APP v3.5
+// SEOLLERHAUS KASSA - MAIN APP v3.6
 // Supabase Multi-Device Version
 // ================================
+
+// ================================
+// KONFIGURATION FALLBACK
+// Falls config.js nicht eingebunden ist, werden Standardwerte verwendet
+// ================================
+if (typeof APP_CONFIG === 'undefined') {
+    var APP_CONFIG = {
+        betrieb: { name: 'Söllerhaus', kurzname: 'Kassa', vollname: 'SÖLLERHAUS', backup_prefix: 'Söllerhaus', untertitel: 'Bergkäse vom Söllerhaus', copyright: 'Entwickelt von: Claudio', version: 'v3.6' },
+        supabase: { url: 'https://lslpyelpzakqrmrjznsc.supabase.co', anon_key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzbHB5ZWxwemFrcXJtcmp6bnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1ODQ3MjIsImV4cCI6MjA4MzE2MDcyMn0.ITXPK3CAXGO9p-hJqjOKqdQOh-TbH-WDMaYamxDgeqc' },
+        admin: { email: 'admin@soellerhaus.local' },
+        kontakt: { whatsapp_nummer: '436701818001', whatsapp_anzeige: '0043 670 181 8001', whatsapp_aktiv: true },
+        preise: { waehrung: '€', waehrung_format: 'de-AT', standard_steuer: 10, ideas_steuer: 19 },
+        kategorien: { sv_versteckt: [4, 6, 7] },
+        buchung: { tageswechsel_stunde: 7 },
+        preisliste: { fussnote: '', whatsapp_hinweis: 'Nachbestellung per WhatsApp möglich:', zahlungshinweis: '' },
+        ideas: { start_id: 20000, gast_start_id: 200 },
+        zugriff: { geo_beschraenkung_aktiv: true, erlaubte_laender: ['AT'], fehlermeldung: 'Diese Anwendung ist ausschließlich vor Ort im {betrieb} verfügbar.' },
+        sammelrechnung: { default_name: 'SAMMELRECHNUNG', gruppen_name: 'Sammelrechnung' },
+        logo: null
+    };
+}
 
 // ================================
 // SUPABASE KONFIGURATION
