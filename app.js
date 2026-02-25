@@ -6,8 +6,8 @@
 // ================================
 // SUPABASE KONFIGURATION
 // ================================
-const SUPABASE_URL = 'https://lslpyelpzakqrmrjznsc.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzbHB5ZWxwemFrcXJtcmp6bnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1ODQ3MjIsImV4cCI6MjA4MzE2MDcyMn0.ITXPK3CAXGO9p-hJqjOKqdQOh-TbH-WDMaYamxDgeqc';
+const SUPABASE_URL = APP_CONFIG.supabase.url;
+const SUPABASE_ANON_KEY = APP_CONFIG.supabase.anon_key;
 
 // Supabase Client (wird beim Laden der Seite initialisiert)
 let supabaseClient = null;
@@ -322,7 +322,7 @@ const DataProtection = {
             
             const heute = new Date();
             const datumStr = `${heute.getFullYear()}-${(heute.getMonth()+1).toString().padStart(2,'0')}-${heute.getDate().toString().padStart(2,'0')}`;
-            a.download = `Söllerhaus_Backup_${datumStr}.json`;
+            a.download = `${APP_CONFIG.betrieb.backup_prefix}_Backup_${datumStr}.json`;
             a.click();
             
             // Backup-Datum speichern
@@ -1402,7 +1402,7 @@ const CheeseOrders = {
                             <span style="font-size:2.5rem;"></span>
                             <div>
                                 <h2 style="margin:0;font-size:1.4rem;font-weight:700;">Käse zur Abreise</h2>
-                                <p style="margin:4px 0 0;font-size:0.9rem;opacity:0.8;">Bergkäse vom Söllerhaus</p>
+                                <p style="margin:4px 0 0;font-size:0.9rem;opacity:0.8;">${APP_CONFIG.betrieb.untertitel}</p>
                             </div>
                         </div>
                         <button onclick="CheeseOrders.closeModal()" style="
@@ -2609,7 +2609,7 @@ const Auth = {
         
         try {
             const { data, error } = await supabaseClient.auth.signInWithPassword({
-                email: 'admin@soellerhaus.local',
+                email: APP_CONFIG.admin.email,
                 password: pw
             });
             
@@ -2619,7 +2619,7 @@ const Auth = {
                 return false;
             }
             
-            if (data.user && data.user.email === 'admin@soellerhaus.local') {
+            if (data.user && data.user.email === APP_CONFIG.admin.email) {
                 State.isAdmin = true;
                 State.adminUser = data.user;
                 // Admin-Passwort merken für Auth-Sync bei PIN-Änderungen
@@ -4630,7 +4630,7 @@ Router.register('login', async () => {
     // Sprachauswahl Button mit WhatsApp (nur auf Startseite)
     const langBtn = i18n.renderLangButtonWithWhatsApp();
     
-    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">⚙️</a><span style="color:#bbb;font-size:0.65rem;">v3.5 © 2026 • Entwickelt von: Claudio • App: ${new Date().toLocaleString('de-AT')}</span></div></div></div></div>`);
+    UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">⚙️</a><span style="color:#bbb;font-size:0.65rem;">${APP_CONFIG.betrieb.version} © 2026 • ${APP_CONFIG.betrieb.copyright} • App: ${new Date().toLocaleString('de-AT')}</span></div></div></div></div>`);
 });
 
 Router.register('register', () => {
@@ -5426,7 +5426,7 @@ window.printAuffuellliste = async () => {
             <div class="total">GESAMT: ${total} STUeCK</div>
             
             <div class="footer">
-                Söllerhaus Kassa
+                ${APP_CONFIG.betrieb.name} Kassa
             </div>
         </body>
         </html>
@@ -5791,7 +5791,7 @@ window.executeIdeasExport = async () => {
         .in('id', gastIds);
     const profileMap = {};
     // Gast-ID Zuordnung: fortlaufende Nummer ab 200
-    let gastIdCounter = 200;
+    let gastIdCounter = APP_CONFIG.ideas.gast_start_id;
     const gastIdMap = {};
     (profiles || []).forEach(p => {
         profileMap[p.id] = p;
@@ -5812,7 +5812,7 @@ window.executeIdeasExport = async () => {
     };
     
     // Excel-Rows im IDEAS-Format erstellen
-    let idCounter = 20000;
+    let idCounter = APP_CONFIG.ideas.start_id;
     const rows = filtered.map(b => {
         const profil = profileMap[b.user_id] || {};
         const art = artMap[b.artikel_id] || {};
@@ -6216,25 +6216,52 @@ Router.register('admin-fehlende', async () => {
             </div>
         </div>
         
-        ${fehlendeOffen.length ? `
+        ${fehlendeOffen.length ? (() => {
+            const wt = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+            const nachDat = {};
+            fehlendeOffen.forEach(f => {
+                const d = f.datum || 'Unbekannt';
+                if (!nachDat[d]) nachDat[d] = [];
+                nachDat[d].push(f);
+            });
+            const datSort = (d) => { const p = d.split('.'); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : d; };
+            const keys = Object.keys(nachDat).sort((a,b) => datSort(b).localeCompare(datSort(a)));
+            
+            return `
         <div class="card mb-3">
             <div class="card-header"><h3>Offene fehlende Getränke</h3></div>
             <div class="card-body">
-                ${fehlendeOffen.map(f => `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--color-stone-light);border-radius:8px;margin-bottom:6px;">
-                    <div>
-                        <strong>${f.artikel_name}</strong>
-                        <small style="color:var(--color-stone-dark);margin-left:8px;">${f.datum}</small>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <span style="font-weight:600;">${Utils.formatCurrency(f.artikel_preis)}</span>
-                        <button class="btn btn-danger" onclick="deleteFehlendes(${f.id})" style="padding:4px 10px;font-size:0.9rem;">🗑️</button>
-                    </div>
-                </div>
-                `).join('')}
+                ${keys.map(datum => {
+                    const items = nachDat[datum];
+                    const parts = datum.split('.');
+                    let tagName = '';
+                    if (parts.length === 3) {
+                        const dt = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
+                        tagName = wt[dt.getDay()];
+                    }
+                    return `
+                    <div style="margin-bottom:12px;">
+                        <div style="font-weight:700;color:#e67e22;font-size:0.9rem;padding:6px 0;border-bottom:2px solid #f39c12;margin-bottom:6px;">
+                            📅 ${tagName}, ${datum}
+                            <span style="font-weight:400;color:#888;margin-left:8px;">(${items.length} Positionen)</span>
+                        </div>
+                        ${items.map(f => `
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--color-stone-light);border-radius:8px;margin-bottom:4px;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:1.2rem;">${f.icon || '📦'}</span>
+                                <strong>${f.artikel_name}</strong>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-weight:600;">${Utils.formatCurrency(f.artikel_preis)}</span>
+                                <button class="btn btn-danger" onclick="deleteFehlendes(${f.id})" style="padding:4px 10px;font-size:0.9rem;">🗑️</button>
+                            </div>
+                        </div>
+                        `).join('')}
+                    </div>`;
+                }).join('')}
             </div>
-        </div>
-        ` : ''}
+        </div>`;
+        })() : ''}
         
         <div class="card">
             <div class="card-header"><h3>Neues fehlendes Getraenk hinzufügen</h3></div>
@@ -8436,7 +8463,7 @@ window.saveGast = async () => {
                             
                             if (adminPw) {
                                 await supabaseClient.auth.signInWithPassword({
-                                    email: 'admin@soellerhaus.local',
+                                    email: APP_CONFIG.admin.email,
                                     password: adminPw
                                 });
                             }
@@ -9106,7 +9133,7 @@ window.schnellbuchenAbschliessen = async () => {
     if (adminPw) {
         try {
             await supabaseClient.auth.signInWithPassword({
-                email: 'admin@soellerhaus.local',
+                email: APP_CONFIG.admin.email,
                 password: adminPw
             });
         } catch(e) {}
@@ -9276,7 +9303,7 @@ window.erstelleSammelrechnung = async () => {
         // signUp wechselt die Session auf den neuen User → RLS blockiert dann alles
         if (adminPw) {
             await supabaseClient.auth.signInWithPassword({
-                email: 'admin@soellerhaus.local',
+                email: APP_CONFIG.admin.email,
                 password: adminPw
             });
             console.log('✅ Admin-Session wiederhergestellt nach signUp');
@@ -9361,7 +9388,7 @@ window.erstelleSammelrechnung = async () => {
         
         // Admin-Session nochmals sicherstellen
         if (adminPw) {
-            try { await supabaseClient.auth.signInWithPassword({ email: 'admin@soellerhaus.local', password: adminPw }); } catch(e) {}
+            try { await supabaseClient.auth.signInWithPassword({ email: APP_CONFIG.admin.email, password: adminPw }); } catch(e) {}
         }
         
         updateProg(100, 'Fertig!');
@@ -9379,7 +9406,7 @@ window.erstelleSammelrechnung = async () => {
         // Admin-Session wiederherstellen
         const adminPw = sessionStorage.getItem('_admin_pw');
         if (adminPw) {
-            try { await supabaseClient.auth.signInWithPassword({ email: 'admin@soellerhaus.local', password: adminPw }); } catch(e2) {}
+            try { await supabaseClient.auth.signInWithPassword({ email: APP_CONFIG.admin.email, password: adminPw }); } catch(e2) {}
         }
     }
 };
@@ -9526,7 +9553,7 @@ window.generateSammelPDF = async () => {
         @media print { body { margin:10mm; } }
     </style></head><body>
     <h1>Sammelübersicht - ${selected.length} Gäste</h1>
-    <p class="meta">Erstellt: ${new Date().toLocaleString('de-AT')} | ${zeitraumText} | ${inclBezahlt ? 'Inkl. bezahlte' : 'Nur offene'} | Söllerhaus Kassa</p>`;
+    <p class="meta">Erstellt: ${new Date().toLocaleString('de-AT')} | ${zeitraumText} | ${inclBezahlt ? 'Inkl. bezahlte' : 'Nur offene'} | ${APP_CONFIG.betrieb.name} Kassa</p>`;
     
     for (const g of pdfContent) {
         html += `<h2>${g.name} (${g.anzahl} Buchungen - ${Utils.formatCurrency(g.summe)})</h2>`;
@@ -9767,7 +9794,7 @@ Router.register('admin-articles', async () => {
         <div class="card mb-3" style="margin-top:16px;">
             <div class="card-header"><h2 class="card-title">📄 Preisliste exportieren</h2></div>
             <div class="card-body">
-                <p style="color:#666;margin-bottom:12px;font-size:0.9rem;">Aktuelle Preisliste als druckbares PDF im Söllerhaus-Stil generieren.</p>
+                <p style="color:#666;margin-bottom:12px;font-size:0.9rem;">Aktuelle Preisliste als druckbares PDF im Betriebsstil generieren.</p>
                 <div style="display:flex;gap:12px;flex-wrap:wrap;">
                     <button class="btn btn-primary" onclick="exportPreisliste('sv')" style="padding:12px 20px;">📋 SV-Preisliste</button>
                     <button class="btn" onclick="exportPreisliste('hp')" style="padding:12px 20px;background:#9b59b6;color:white;border:none;border-radius:8px;">📋 HP-Preisliste</button>
@@ -9792,7 +9819,7 @@ Router.register('admin-articles', async () => {
     <div id="article-modal-container"></div>`);
 });
 
-// Preisliste als PDF exportieren im Söllerhaus-Stil
+// Preisliste als PDF exportieren im Betriebsstil
 window.exportPreisliste = async (modus) => {
     // Alle aktiven Artikel aus Supabase laden
     let articles = [];
@@ -9843,7 +9870,7 @@ window.exportPreisliste = async (modus) => {
         @media print { body { padding: 0; } .no-print { display: none; } }
     </style></head><body>
     <div class="header">
-        <h1>SÖLLERHAUS</h1>
+        <h1>${APP_CONFIG.betrieb.vollname}</h1>
         <h2>Preisliste ${modusLabel}</h2>
         <div class="datum">Stand: ${new Date().toLocaleDateString('de-AT', {day:'2-digit',month:'long',year:'numeric'})}</div>
     </div>`;
@@ -9877,8 +9904,8 @@ window.exportPreisliste = async (modus) => {
     
     html += `<div class="footer">
         <p>Bei Anreise gefüllte Kühlschränke mit gesamtem Getränkesortiment vorhanden</p>
-        <p>Nachbestellung per WhatsApp möglich:</p>
-        <a class="whatsapp" href="https://wa.me/436701818001">📱 0043 670 181 8001</a>
+        <p>${APP_CONFIG.preisliste.whatsapp_hinweis}</p>
+        <a class="whatsapp" href="https://wa.me/${APP_CONFIG.kontakt.whatsapp_nummer}">📱 ${APP_CONFIG.kontakt.whatsapp_anzeige}</a>
         <p style="margin-top:12px;">Getränke können nur mit Gesamtrechnung bezahlt werden</p>
     </div>
     <div class="no-print" style="text-align:center;margin-top:20px;">
@@ -10307,7 +10334,7 @@ Router.register('buchen', async () => {
             effektiverModus = gastProfile.gast_preismodus;
         }
     }
-    const hiddenKats = (effektiverModus === 'sv') ? [4, 6, 7] : [];
+    const hiddenKats = (effektiverModus === 'sv') ? APP_CONFIG.kategorien.sv_versteckt : [];
     const sichtbareKats = kats.filter(k => !hiddenKats.includes(k.kategorie_id));
     const sichtbareArts = arts.filter(a => !hiddenKats.includes(a.kategorie_id));
     
@@ -10498,25 +10525,67 @@ Router.register('buchen', async () => {
         </div>
         ` : ''}
         
-        ${fehlendeOffen.length ? `
-        <div style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:14px;padding:14px;margin-bottom:16px;color:white;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-                <span style="font-size:1.3rem;">⚠</span>
+        ${fehlendeOffen.length ? (() => {
+            // Nach Datum gruppieren und sortieren
+            const nachDatumFehlend = {};
+            fehlendeOffen.forEach(f => {
+                const d = f.datum || 'Unbekannt';
+                if (!nachDatumFehlend[d]) nachDatumFehlend[d] = [];
+                nachDatumFehlend[d].push(f);
+            });
+            // Sortiert: neuestes Datum zuerst
+            const wochentage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+            const datumToSort = (d) => {
+                const p = d.split('.');
+                return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : d;
+            };
+            const sortDaten = Object.keys(nachDatumFehlend).sort((a,b) => datumToSort(b).localeCompare(datumToSort(a)));
+            
+            return `
+        <div style="background:linear-gradient(135deg, #e67e22, #d35400);border-radius:14px;margin-bottom:16px;overflow:hidden;">
+            <div style="padding:14px 16px;color:white;display:flex;align-items:center;gap:10px;">
+                <span style="font-size:1.4rem;">⚠️</span>
                 <div>
-                    <div style="font-weight:700;font-size:1rem;">${t('missing_drinks_yesterday')}</div>
-                    <div style="font-size:0.85rem;opacity:0.9;">${t('please_take_if_forgot')}</div>
+                    <div style="font-weight:700;font-size:1.05rem;">Fehlende Getränke (${fehlendeOffen.length})</div>
+                    <div style="font-size:0.8rem;opacity:0.85;">Bitte übernehmen, falls Sie diese vergessen haben zu buchen</div>
                 </div>
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                ${fehlendeOffen.map(f => `
-                <button onclick="uebernehmeFehlend(${f.id})" style="background:white;color:#333;border:none;border-radius:10px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:0.85rem;">
-                    <span>${f.icon || ''}</span>
-                    <span style="font-weight:600;">${f.artikel_name}</span>
-                </button>
-                `).join('')}
-            </div>
-        </div>
-        ` : ''}
+            ${sortDaten.map(datum => {
+                const items = nachDatumFehlend[datum];
+                // Wochentag berechnen
+                const parts = datum.split('.');
+                let tagName = '';
+                if (parts.length === 3) {
+                    const d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
+                    tagName = wochentage[d.getDay()];
+                }
+                // Artikel zusammenfassen (gleiche gruppieren, aber alle IDs behalten)
+                const grouped = {};
+                items.forEach(f => {
+                    const key = f.artikel_name;
+                    if (!grouped[key]) grouped[key] = { ...f, count: 0, ids: [] };
+                    grouped[key].count++;
+                    grouped[key].ids.push(f.id);
+                });
+                
+                return `
+                <div style="background:rgba(255,255,255,0.95);padding:10px 16px;border-top:1px solid rgba(0,0,0,0.08);">
+                    <div style="font-weight:700;color:#d35400;font-size:0.85rem;margin-bottom:8px;">
+                        📅 ${tagName}, ${datum}
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                        ${Object.values(grouped).map(g => `
+                        <button onclick="uebernehmeFehlend(${g.ids[0]})" id="fehlend-btn-${g.ids[0]}" data-ids='${JSON.stringify(g.ids)}' data-count="${g.count}" style="background:#fff3e0;color:#333;border:1px solid #e67e22;border-radius:10px;padding:7px 12px;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.85rem;transition:all 0.15s;" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'">
+                            <span>${g.icon || '📦'}</span>
+                            <span style="font-weight:600;">${g.count > 1 ? '<span style="background:#e67e22;color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:0.75rem;margin-right:2px;">' + g.count + '</span>' : ''}${g.artikel_name}</span>
+                            <span style="color:#e67e22;font-size:0.8rem;">${Utils.formatCurrency(g.artikel_preis)}</span>
+                        </button>
+                        `).join('')}
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>`;
+        })() : ''}
         
         <div class="form-group" style="margin-bottom:12px;"><input type="text" class="form-input" placeholder=" ${t('search')}" oninput="searchArtikel(this.value)" style="padding:10px 14px;"></div>
         <div class="category-tabs" style="margin-bottom:14px;">
@@ -11651,7 +11720,7 @@ window.saveEditArticle = async () => {
                     <div style="text-align:center;padding:60px 40px;background:white;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,0.3);max-width:500px;">
                         <div style="font-size:4rem;margin-bottom:20px;">🔒</div>
                         <h1 style="color:#2C5F7C;margin-bottom:20px;font-size:1.8rem;">Zugriff verweigert</h1>
-                        <p style="color:#666;font-size:1.1rem;line-height:1.6;">Diese Anwendung ist ausschließlich vor Ort im Söllerhaus verfügbar.</p>
+                        <p style="color:#666;font-size:1.1rem;line-height:1.6;">${APP_CONFIG.zugriff.fehlermeldung.replace('{betrieb}', APP_CONFIG.betrieb.name)}</p>
                         <p style="color:#999;font-size:0.9rem;margin-top:30px;">Bei Fragen wenden Sie sich bitte an die Rezeption.</p>
                     </div>
                 </div>
@@ -11801,7 +11870,7 @@ window.saveEditArticle = async () => {
 // WHATSAPP SUPPORT (nur auf Startseite)
 // ===========================================
 window.openWhatsAppSupport = () => {
-    const whatsappNummer = '436701818001';
+    const whatsappNummer = APP_CONFIG.kontakt.whatsapp_nummer;
     const datum = new Date().toLocaleDateString('de-AT');
     const userName = State.currentUser?.firstName || State.currentUser?.vorname || '';
     
@@ -12269,4 +12338,3 @@ const KioskRefresh = {
 // Starten wenn App geladen
 document.addEventListener('DOMContentLoaded', () => KioskRefresh.init());
 if (document.readyState !== 'loading') KioskRefresh.init();
-            
