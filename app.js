@@ -10578,7 +10578,7 @@ Router.register('buchen', async () => {
                         <div style="display:flex;flex-wrap:wrap;gap:5px;">
                             ${Object.values(grouped).map(g => `
                             <button onclick="uebernehmeFehlend(${g.ids[0]})" style="background:#fff3e0;color:#333;border:1px solid #e67e22;border-radius:8px;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:0.8rem;" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'">
-                                <span style="font-size:0.9rem;">${g.icon || '📦'}</span>
+                                <span style="font-size:0.9rem;">${getSmartIcon({name: g.artikel_name, icon: g.icon}) || g.icon || '📦'}</span>
                                 ${g.count > 1 ? '<span style="background:#e67e22;color:white;border-radius:50%;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;">' + g.count + '</span>' : ''}
                                 <span style="font-weight:600;">${g.artikel_name}</span>
                                 <span style="color:#999;font-size:0.75rem;">${Utils.formatCurrency(g.artikel_preis)}</span>
