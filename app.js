@@ -3357,7 +3357,7 @@ const FehlendeGetränke = {
             sync_status: isOnline ? 'synced' : 'pending',
             session_id: State.sessionId,
             storniert: false,
-            fix: true,
+            fix: false,
             aus_fehlend: true,
             aufgefuellt: true  // WICHTIG: Fehlende Getränke NICHT auf Auffüllliste!
         };
@@ -10637,6 +10637,15 @@ Router.register('buchen', async () => {
             }).join('')}
         </div>
     </div>`);
+    
+    // Akkordeon-Zustand wiederherstellen
+    if (sessionStorage.getItem('_fehlende_open') === '1') {
+        const acc = document.getElementById('fehlende-accordion');
+        const arrow = document.getElementById('fehlende-arrow');
+        if (acc) { acc.style.display = 'block'; }
+        if (arrow) { arrow.textContent = '▲'; }
+        sessionStorage.removeItem('_fehlende_open');
+    }
 });
 
 // Warenkorb Dropdown toggle
@@ -10679,8 +10688,13 @@ window.uebernehmeFehlend = async (id) => {
     if (!gastId) return;
     
     try {
+        // Akkordeon-Zustand merken
+        const acc = document.getElementById('fehlende-accordion');
+        if (acc && acc.style.display !== 'none') {
+            sessionStorage.setItem('_fehlende_open', '1');
+        }
         await FehlendeGetränke.uebernehmen(id, gastId, gastName);
-        Router.navigate('buchen'); // Seite neu laden - Artikel verschwindet
+        Router.navigate('buchen');
     } catch (e) {
         Utils.showToast(e.message || 'Fehler', 'error');
     }
