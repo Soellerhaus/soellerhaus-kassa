@@ -2908,6 +2908,36 @@ const Buchungen = {
             console.log('ℹ️ Buchung war noch nicht exportiert - keine Gegenbuchung nötig');
         }
         
+        // =====================================================
+        // FEHLENDE GETRÄNKE: Bei Storno wieder freigeben
+        // =====================================================
+        if (b.aus_fehlend === true) {
+            try {
+                const { data: fehlende } = await supabaseClient
+                    .from('fehlende_getraenke')
+                    .select('id')
+                    .eq('uebernommen', true)
+                    .eq('uebernommen_von', b.user_id)
+                    .eq('artikel_name', b.artikel_name)
+                    .order('uebernommen_am', { ascending: false })
+                    .limit(1);
+                
+                if (fehlende && fehlende.length > 0) {
+                    await supabaseClient
+                        .from('fehlende_getraenke')
+                        .update({ 
+                            uebernommen: false, 
+                            uebernommen_von: null, 
+                            uebernommen_von_name: null, 
+                            uebernommen_am: null 
+                        })
+                        .eq('id', fehlende[0].id);
+                }
+            } catch(e) {
+                console.error('Fehlendes Getränk Freigabe-Fehler:', e);
+            }
+        }
+        
         Utils.showToast('Buchung storniert', 'success');
     },
     
