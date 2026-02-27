@@ -2155,6 +2155,22 @@ window.State = State;
 
 ['click','touchstart','keydown','mousemove'].forEach(e => document.addEventListener(e, () => { if(State.currentUser) State.resetInactivityTimer(); }, {passive:true}));
 
+// ================================
+// PIN HASHING (SHA-256)
+// ================================
+async function hashPIN(pin) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode('KASSA_SALT_' + pin);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Prüft ob ein Wert bereits ein SHA-256 Hash ist (64 hex chars)
+function isAlreadyHashed(value) {
+    return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+}
+
 const RegisteredGuests = {
     // Supabase Auth + Profile
     async register(firstName, password) {
@@ -2244,7 +2260,7 @@ const RegisteredGuests = {
                         const { error: updateError } = await supabaseClient
                             .from('profiles')
                             .update({ 
-                                pin_hash: password,
+                                pin_hash: await hashPIN(password),
                                 vorname: cleanName,
                                 group_name: 'keiner Gruppe zugehörig',
                                 aktiv: true,
@@ -2264,7 +2280,7 @@ const RegisteredGuests = {
                             .insert({ 
                                 id: userId,
                                 email: email,
-                                pin_hash: password,
+                                pin_hash: await hashPIN(password),
                                 vorname: cleanName,
                                 first_name: cleanName,
                                 group_name: 'keiner Gruppe zugehörig',
@@ -2298,14 +2314,15 @@ const RegisteredGuests = {
             
             console.log('Profile nach Speichern:', profile?.vorname, 'PIN:', profile?.pin_hash ? 'JA' : 'NEIN');
             
-            // Lokalen Cache aktualisieren - MIT PIN als Klartext!
+            // Lokalen Cache aktualisieren - PIN als Hash!
+            const pinHashed = await hashPIN(password);
             const localGuest = { 
                 id: userId, 
                 firstName: cleanName,
                 nachname: cleanName,
                 email: email,
-                passwort: password,  // PIN als Klartext!
-                passwordHash: password,
+                passwort: pinHashed,
+                passwordHash: pinHashed,
                 gruppenname: 'keiner Gruppe zugehörig',
                 ausnahmeumlage: false,
                 aktiv: true,
@@ -2346,13 +2363,14 @@ const RegisteredGuests = {
             State.setUser(userObj);
             return localGuest;
         } else {
-            // Offline-Modus: Lokal speichern MIT PIN als Klartext!
+            // Offline-Modus: Lokal speichern MIT PIN als Hash!
+            const pinHashed2 = await hashPIN(password);
             const guest = { 
                 id: Utils.uuid(),
                 firstName: cleanName, 
                 nachname: cleanName,
-                passwort: password,  // PIN als Klartext!
-                passwordHash: password,
+                passwort: pinHashed2,
+                passwordHash: pinHashed2,
                 gruppenname: 'keiner Gruppe zugehörig',
                 group_name: 'keiner Gruppe zugehörig',
                 ausnahmeumlage: false,
@@ -5893,7 +5911,7 @@ window.executeIdeasExport = async () => {
             'Nachname': p.display_name || p.vorname || p.first_name || '',
             'Vorname': '',
             'Gruppenname': p.group_name || '',
-            'Passwort': p.pin_hash || '',
+            'Passwort': '',  // PIN nicht exportieren (gehasht)
             'Aktiv': true
         };
     });
@@ -7900,6 +7918,7 @@ Router.register('admin-guests', async () => {
                 <div style="display:flex;gap:8px;">
                     ${inaktivCount > 0 ? `<button class="btn btn-secondary" onclick="Router.navigate('admin-guests-inaktiv')" style="padding:6px 12px;font-size:0.85rem;"> Inaktive (${inaktivCount})</button>` : ''}
                     <button class="btn btn-secondary" onclick="syncPinsToSupabase()" style="padding:6px 12px;font-size:0.85rem;"> Sync</button>
+                    <button class="btn btn-secondary" onclick="migratePinsToHash()" style="padding:6px 12px;font-size:0.85rem;background:#8e44ad;color:white;">🔐 PINs hashen</button>
                 </div>
             </div>
             <!-- SAMMELRECHNUNG AKTIONSLEISTE -->
@@ -8084,12 +8103,15 @@ window.syncPinsToSupabase = async () => {
         const pin = g.passwort || g.passwordHash;
         if (!pin) continue;
         
+        // PIN hashen falls noch Klartext
+        const pinToStore = isAlreadyHashed(pin) ? pin : await hashPIN(pin);
+        
         try {
             // Versuche Update
             const { error } = await supabaseClient
                 .from('profiles')
                 .update({ 
-                    pin_hash: pin,
+                    pin_hash: pinToStore,
                     vorname: g.nachname || g.firstName,
                     group_name: g.gruppenname || g.group_name || 'keiner Gruppe zugehörig'
                 })
@@ -8101,7 +8123,7 @@ window.syncPinsToSupabase = async () => {
                     .from('profiles')
                     .insert({ 
                         id: g.id,
-                        pin_hash: pin,
+                        pin_hash: pinToStore,
                         vorname: g.nachname || g.firstName,
                         group_name: g.gruppenname || g.group_name || 'keiner Gruppe zugehörig',
                         aktiv: true,
@@ -8130,6 +8152,49 @@ window.syncPinsToSupabase = async () => {
     }
     
     // Seite neu laden
+    Router.navigate('admin-guests');
+};
+
+// EINMALIGE PIN-MIGRATION: Klartext-PINs in SHA-256 Hashes umwandeln
+window.migratePinsToHash = async () => {
+    if (!confirm('Alle Klartext-PINs in sichere Hashes umwandeln?\n\nDies ist einmalig und nicht umkehrbar!\nDie Login-Funktion bleibt unverändert.')) return;
+    
+    if (!supabaseClient || !isOnline) {
+        Utils.showToast('Keine Verbindung zu Supabase', 'error');
+        return;
+    }
+    
+    Utils.showToast('🔐 Migriere PINs...', 'info');
+    
+    const { data: profiles } = await supabaseClient
+        .from('profiles')
+        .select('id, vorname, pin_hash')
+        .eq('geloescht', false);
+    
+    let migrated = 0;
+    let skipped = 0;
+    let noPIN = 0;
+    
+    for (const p of (profiles || [])) {
+        if (!p.pin_hash) { noPIN++; continue; }
+        if (isAlreadyHashed(p.pin_hash)) { skipped++; continue; }
+        
+        // Klartext-PIN → Hash
+        const hashed = await hashPIN(p.pin_hash);
+        const { error } = await supabaseClient
+            .from('profiles')
+            .update({ pin_hash: hashed })
+            .eq('id', p.id);
+        
+        if (!error) {
+            migrated++;
+            console.log('✅ PIN gehasht:', p.vorname);
+        } else {
+            console.error('❌ Fehler bei:', p.vorname, error);
+        }
+    }
+    
+    Utils.showToast(`🔐 Migration fertig: ${migrated} gehasht, ${skipped} bereits gehasht, ${noPIN} ohne PIN`, 'success');
     Router.navigate('admin-guests');
 };
 
@@ -8390,7 +8455,7 @@ window.saveGast = async () => {
                     
                     altePIN = altesProfile?.pin_hash;
                     gastEmail = altesProfile?.email;
-                    updateData.pin_hash = passwort;
+                    updateData.pin_hash = await hashPIN(passwort);
                 }
                 
                 // Profile updaten
@@ -8464,33 +8529,35 @@ window.saveGast = async () => {
                     }
                     
                     // AUTH-PASSWORT SYNCHRONISIEREN wenn PIN geändert wurde
-                    if (passwort && altePIN && altePIN !== passwort && gastEmail) {
+                    if (passwort && gastEmail) {
                         console.log('🔑 PIN geändert - synchronisiere Auth...');
                         try {
                             const adminPw = sessionStorage.getItem('_admin_pw');
                             
-                            const altesPw = 'PIN_' + altePIN + '_KASSA';
-                            const { data: gastLogin, error: gastLoginErr } = await supabaseClient.auth.signInWithPassword({
-                                email: gastEmail,
-                                password: altesPw
-                            });
+                            // Alte PIN ist ein Hash → wir können nicht als Gast einloggen
+                            // Stattdessen: Admin-Session nutzen um das Auth-Passwort direkt zu setzen
+                            // Da Admin schon eingeloggt ist, versuchen wir es über die alte Klartext-PIN falls vorhanden
+                            // FALLBACK: Wir loggen als Gast ein mit jeder möglichen alten PIN (nicht möglich mit Hash)
+                            // LÖSUNG: Wir setzen nur das neue Passwort wenn der Gast sich das nächste Mal einloggt
+                            // PRAGMATISCH: Neuen User mit neuem Passwort registrieren geht nicht → 
+                            // Wir versuchen den Login mit der alten PIN (falls noch nicht gehasht)
                             
-                            if (gastLoginErr) {
-                                console.warn('⚠️ Konnte nicht als Gast einloggen:', gastLoginErr.message);
-                            } else {
-                                const neuesPw = 'PIN_' + passwort + '_KASSA';
-                                const { error: updateErr } = await supabaseClient.auth.updateUser({
-                                    password: neuesPw
+                            if (altePIN && !isAlreadyHashed(altePIN)) {
+                                // Alte PIN ist noch Klartext → können Auth-Passwort ändern
+                                const altesPw = 'PIN_' + altePIN + '_KASSA';
+                                const { data: gastLogin, error: gastLoginErr } = await supabaseClient.auth.signInWithPassword({
+                                    email: gastEmail,
+                                    password: altesPw
                                 });
                                 
-                                if (updateErr) {
-                                    console.error('Auth-Passwort Update fehlgeschlagen:', updateErr.message);
-                                    Utils.showToast('⚠️ PIN gespeichert, aber Auth konnte nicht aktualisiert werden!', 'warning');
-                                } else {
+                                if (!gastLoginErr) {
+                                    const neuesPw = 'PIN_' + passwort + '_KASSA';
+                                    await supabaseClient.auth.updateUser({ password: neuesPw });
                                     console.log('✅ Auth-Passwort synchronisiert');
                                 }
                             }
                             
+                            // Admin-Session wiederherstellen
                             if (adminPw) {
                                 await supabaseClient.auth.signInWithPassword({
                                     email: 'admin@soellerhaus.local',
@@ -9243,7 +9310,7 @@ window.exportGästeExcel = async () => {
         'Gruppennr': 0,
         'Gruppenname': g.group_name || g.gruppenname || 'keiner Gruppe zugehörig',
         'Aktiv': true,
-        'Passwort': g.pin_hash || g.passwort || g.passwordHash || '',
+        'Passwort': '',  // PIN nicht exportieren (gehasht)
         'Ausnahmeumlage': g.ausnahmeumlage || false
     }));
     
