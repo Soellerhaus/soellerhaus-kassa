@@ -2171,17 +2171,39 @@ function isAlreadyHashed(value) {
     return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 }
 
+// ================================
+// NAME BEREINIGUNG (Umlaute → ae/oe/ue, Sonderzeichen entfernen)
+// ================================
+function sanitizeName(name) {
+    if (!name) return '';
+    let s = name.trim();
+    // Umlaute ersetzen
+    s = s.replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss');
+    s = s.replace(/Ä/g, 'AE').replace(/Ö/g, 'OE').replace(/Ü/g, 'UE');
+    // Großbuchstaben
+    s = s.toUpperCase();
+    // Nur A-Z, Leerzeichen, Bindestrich behalten
+    s = s.replace(/[^A-Z\s\-]/g, '');
+    // Mehrfache Leerzeichen bereinigen
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+}
+
 const RegisteredGuests = {
     // Supabase Auth + Profile
     async register(firstName, password) {
         if (!firstName?.trim()) throw new Error('Name erforderlich');
         if (!password || password.length < 4) throw new Error('PIN muss mind. 4 Zeichen haben');
         
-        // Name bereinigen und validieren
-        const cleanName = firstName.trim().toUpperCase();
+        // Name bereinigen: Umlaute ersetzen, Großbuchstaben, Sonderzeichen entfernen
+        const cleanName = sanitizeName(firstName);
+        
+        if (!cleanName || cleanName.length < 2) {
+            throw new Error('Name muss mindestens 2 Buchstaben haben!');
+        }
         
         // Nur Buchstaben, Leerzeichen und Bindestrich erlaubt
-        if (!/^[A-ZÄÖÜa-zäöü][A-ZÄÖÜa-zäöü\s\-]*$/i.test(cleanName)) {
+        if (!/^[A-Z][A-Z\s\-]*$/.test(cleanName)) {
             throw new Error('Name darf nur Buchstaben und Bindestriche enthalten!');
         }
         
@@ -4692,7 +4714,7 @@ Router.register('register', () => {
             <div class="form-group">
                 <label class="form-label">${t('first_name')} *</label>
                 <div style="display:flex;gap:8px;">
-                    <input type="text" id="register-vorname" class="form-input" placeholder="${placeholder}" autofocus style="font-size:1.2rem;padding:16px;flex:1;text-transform:uppercase;">
+                    <input type="text" id="register-vorname" class="form-input" placeholder="${placeholder}" autofocus style="font-size:1.2rem;padding:16px;flex:1;text-transform:uppercase;" oninput="this.value=sanitizeName(this.value)">
                     <button type="button" class="btn btn-secondary" onclick="showKeyboard('register-vorname')" style="padding:16px 20px;font-size:1.5rem;" title="Virtuelle Tastatur">⌨️</button>
                 </div>
             </div>
@@ -7942,7 +7964,7 @@ Router.register('admin-guests', async () => {
                 <div>
                     <label style="font-weight:600;">Nachname: *</label>
                     <div style="display:flex;gap:8px;">
-                        <input type="text" id="gast-nachname" class="form-input" placeholder="z.B. MUELLER" style="text-transform:uppercase;font-size:1.1rem;flex:1;">
+                        <input type="text" id="gast-nachname" class="form-input" placeholder="z.B. MUELLER" style="text-transform:uppercase;font-size:1.1rem;flex:1;" oninput="this.value=sanitizeName(this.value)">
                         <button type="button" class="btn btn-secondary" onclick="showKeyboard('gast-nachname')" style="padding:12px 16px;font-size:1.3rem;" title="Virtuelle Tastatur">⌨️</button>
                     </div>
                 </div>
@@ -8368,17 +8390,17 @@ window.toggleAusnahme = async (id, checked) => {
 
 window.saveGast = async () => {
     const editId = document.getElementById('gast-edit-id').value;
-    const nachname = document.getElementById('gast-nachname').value.trim().toUpperCase();
+    const nachname = sanitizeName(document.getElementById('gast-nachname').value);
     const gruppenname = document.getElementById('gast-gruppenname').value;
     const passwort = document.getElementById('gast-passwort').value.trim();
     
-    if (!nachname) {
-        Utils.showToast('Nachname erforderlich!', 'error');
+    if (!nachname || nachname.length < 2) {
+        Utils.showToast('Name muss mindestens 2 Buchstaben haben!', 'error');
         return;
     }
     
     // Nur Buchstaben, Leerzeichen und Bindestrich erlaubt
-    if (!/^[A-ZAeOeUe][A-ZAeOeUe\s\-]*$/.test(nachname)) {
+    if (!/^[A-Z][A-Z\s\-]*$/.test(nachname)) {
         Utils.showToast('Name darf nur Buchstaben und Bindestriche enthalten!', 'error');
         return;
     }
