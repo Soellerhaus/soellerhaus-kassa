@@ -8551,40 +8551,21 @@ window.saveGast = async () => {
                     }
                     
                     // AUTH-PASSWORT SYNCHRONISIEREN wenn PIN geändert wurde
-                    if (passwort && gastEmail) {
+                    if (passwort) {
                         console.log('🔑 PIN geändert - synchronisiere Auth...');
                         try {
-                            const adminPw = sessionStorage.getItem('_admin_pw');
+                            const neuesPw = 'PIN_' + passwort + '_KASSA';
+                            const { error: rpcErr } = await supabaseClient.rpc('update_user_password', {
+                                user_id: editId,
+                                new_password: neuesPw
+                            });
                             
-                            // Alte PIN ist ein Hash → wir können nicht als Gast einloggen
-                            // Stattdessen: Admin-Session nutzen um das Auth-Passwort direkt zu setzen
-                            // Da Admin schon eingeloggt ist, versuchen wir es über die alte Klartext-PIN falls vorhanden
-                            // FALLBACK: Wir loggen als Gast ein mit jeder möglichen alten PIN (nicht möglich mit Hash)
-                            // LÖSUNG: Wir setzen nur das neue Passwort wenn der Gast sich das nächste Mal einloggt
-                            // PRAGMATISCH: Neuen User mit neuem Passwort registrieren geht nicht → 
-                            // Wir versuchen den Login mit der alten PIN (falls noch nicht gehasht)
-                            
-                            if (altePIN && !isAlreadyHashed(altePIN)) {
-                                // Alte PIN ist noch Klartext → können Auth-Passwort ändern
-                                const altesPw = 'PIN_' + altePIN + '_KASSA';
-                                const { data: gastLogin, error: gastLoginErr } = await supabaseClient.auth.signInWithPassword({
-                                    email: gastEmail,
-                                    password: altesPw
-                                });
-                                
-                                if (!gastLoginErr) {
-                                    const neuesPw = 'PIN_' + passwort + '_KASSA';
-                                    await supabaseClient.auth.updateUser({ password: neuesPw });
-                                    console.log('✅ Auth-Passwort synchronisiert');
-                                }
-                            }
-                            
-                            // Admin-Session wiederherstellen
-                            if (adminPw) {
-                                await supabaseClient.auth.signInWithPassword({
-                                    email: 'admin@soellerhaus.local',
-                                    password: adminPw
-                                });
+                            if (rpcErr) {
+                                console.error('Auth-Passwort Update fehlgeschlagen:', rpcErr);
+                                Utils.showToast('⚠️ PIN gespeichert, aber Login-Passwort konnte nicht aktualisiert werden', 'warning');
+                            } else {
+                                console.log('✅ Auth-Passwort synchronisiert');
+                                Utils.showToast('✅ PIN und Login-Passwort aktualisiert', 'success');
                             }
                         } catch(authSyncErr) {
                             console.error('Auth-Sync Fehler:', authSyncErr);
