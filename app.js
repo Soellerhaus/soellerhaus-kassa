@@ -2290,14 +2290,18 @@ const RegisteredGuests = {
                             })
                             .eq('id', userId);
                         
-                        if (!updateError) {
+                        if (updateError) {
+                            if (updateError.code === '23505' || updateError.message?.includes('unique') || updateError.message?.includes('duplicate')) {
+                                throw new Error('Dieser Name existiert bereits. Bitte anderen Namen wählen.');
+                            }
+                        } else {
                             console.log('✅ PIN in Profile gespeichert (Update)');
                             pinSaved = true;
                             break;
                         }
                     } else {
                         // Insert falls Profile noch nicht existiert
-                        const { error: insertError } = await supabaseClient
+                        const { data: insertedProfile, error: insertError } = await supabaseClient
                             .from('profiles')
                             .insert({ 
                                 id: userId,
@@ -2309,10 +2313,15 @@ const RegisteredGuests = {
                                 aktiv: true,
                                 geloescht: false,
                                 created_at: new Date().toISOString()
-                            });
+                            })
+                            .select();
                         
-                        if (!insertError) {
-                            console.log('✅ PIN in Profile gespeichert (Insert)');
+                        if (insertError) {
+                            if (insertError.code === '23505' || insertError.message?.includes('unique') || insertError.message?.includes('duplicate')) {
+                                throw new Error('Dieser Name existiert bereits. Bitte anderen Namen wählen.');
+                            }
+                        } else {
+                            console.log('✅ PIN in Profile gespeichert (Insert)', insertedProfile?.[0]?.gast_nummer ? 'Gast-Nr: ' + insertedProfile[0].gast_nummer : '');
                             pinSaved = true;
                             break;
                         }
@@ -8150,7 +8159,8 @@ window.syncPinsToSupabase = async () => {
                         group_name: g.gruppenname || g.group_name || 'keiner Gruppe zugehörig',
                         aktiv: true,
                         geloescht: false
-                    });
+                    })
+                    .select();
                 
                 if (insertError) {
                     console.error('Sync Fehler für', g.id, insertError);
@@ -8644,7 +8654,7 @@ window.saveGast = async () => {
                 
                 // 2. Profile aktualisieren mit zusätzlichen Daten
                 const newGastPreismodus = document.getElementById('gast-preismodus')?.value || State.currentPreisModus || 'default';
-                const { error: profileError } = await supabaseClient
+                const { data: upsertedProfile, error: profileError } = await supabaseClient
                     .from('profiles')
                     .upsert({ 
                         id: finalId,
@@ -8652,18 +8662,23 @@ window.saveGast = async () => {
                         vorname: nachname,
                         first_name: nachname,
                         display_name: nachname,
-                        pin_hash: passwort,
+                        pin_hash: await hashPIN(passwort),
                         group_name: gruppenname,
                         aktiv: true,
                         geloescht: false,
                         created_at: now,
                         gast_preismodus: newGastPreismodus
-                    }, { onConflict: 'id' });
+                    }, { onConflict: 'id' })
+                    .select();
                 
                 if (profileError) {
+                    if (profileError.code === '23505' || profileError.message?.includes('unique') || profileError.message?.includes('duplicate')) {
+                        Utils.showToast('Dieser Name existiert bereits. Bitte anderen Namen wählen.', 'error');
+                        return;
+                    }
                     console.error('Supabase Profile Update Fehler:', profileError);
                 } else {
-                    console.log('✅ Gast-Profil in Supabase aktualisiert');
+                    console.log('✅ Gast-Profil in Supabase aktualisiert', upsertedProfile?.[0]?.gast_nummer ? 'Gast-Nr: ' + upsertedProfile[0].gast_nummer : '');
                 }
                 
             } catch (e) {
