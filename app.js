@@ -5025,31 +5025,16 @@ Router.register('admin-dashboard', async () => {
     
     UI.render(`<div class="app-header"><div class="header-left"><div class="header-title"> Admin Dashboard</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
-        <!-- PREISMODUS SWITCH - PROMINENT -->
-        <div onclick="Router.navigate('admin-preismodus')" style="
-            background: ${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 16px;
-            color: white;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 2rem;">${isHP ? '🍽️' : '🍽️'}</span>
-                    <div>
-                        <div style="font-weight: 700; font-size: 1.2rem;">
-                            Preismodus: ${isHP ? 'HALBPENSION (HP)' : 'SELBSTVERSORGER'}
-                        </div>
-                        <div style="font-size: 0.9rem; opacity: 0.9;">
-                            ${isHP ? 'HP-Preise werden für neue Buchungen verwendet' : 'Standard-Preise werden für neue Buchungen verwendet'}
-                        </div>
-                    </div>
+        <!-- PREISMODUS SWITCH -->
+        <div onclick="Router.navigate('admin-preismodus')" style="background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};border-radius:12px;padding:14px 16px;margin-bottom:12px;color:white;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:1.5rem;">🍽️</span>
+                <div>
+                    <div style="font-weight:700;font-size:1rem;">Preismodus: ${isHP ? 'HALBPENSION' : 'SELBSTVERSORGER'}</div>
+                    <div style="font-size:0.8rem;opacity:0.85;">${isHP ? 'HP-Preise aktiv' : 'Standard-Preise aktiv'}</div>
                 </div>
-                <span style="font-size: 1.5rem;">⚙️</span>
             </div>
+            <span>⚙️</span>
         </div>
         
         <div class="stats-grid">
@@ -5059,75 +5044,38 @@ Router.register('admin-dashboard', async () => {
             <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(heuteB.reduce((s,b) => s+b.preis*b.menge, 0))}</div><div class="stat-label">Umsatz heute</div></div>
         </div>
         
-        <!-- GAeSTE-NACHRICHT/ANKUeNDIGUNG -->
-        <div onclick="Router.navigate('admin-nachricht')" style="
-            background: ${aktiveNachricht ? 'linear-gradient(135deg, #e74c3c, #c0392b)' : 'linear-gradient(135deg, #95a5a6, #7f8c8d)'};
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 16px;
-            color: white;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 2rem;">${aktiveNachricht ? '📢' : '📢'}</span>
-                    <div>
-                        <div style="font-weight: 700; font-size: 1.2rem;">
-                            ${aktiveNachricht ? ' Nachricht aktiv!' : 'Gäste-Nachricht'}
-                        </div>
-                        <div style="font-size: 0.9rem; opacity: 0.9;">
-                            ${aktiveNachricht 
-                                ? `"${aktiveNachricht.text.substring(0, 40)}${aktiveNachricht.text.length > 40 ? '...' : ''} * Noch ${verbleibendeZeit}`
-                                : 'Wichtige Info an alle Gäste senden'}
-                        </div>
-                    </div>
-                </div>
-                <span style="font-size: 1.5rem;">→</span>
+        <!-- NACHRICHT + TAGESMENUe NEBENEINANDER -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div onclick="Router.navigate('admin-nachricht')" style="background:${aktiveNachricht ? 'linear-gradient(135deg, #e74c3c, #c0392b)' : 'linear-gradient(135deg, #95a5a6, #7f8c8d)'};border-radius:12px;padding:14px;color:white;cursor:pointer;">
+                <div style="font-weight:700;font-size:0.95rem;">📢 ${aktiveNachricht ? 'Nachricht aktiv!' : 'Nachricht'}</div>
+                <div style="font-size:0.75rem;opacity:0.85;margin-top:4px;">${aktiveNachricht ? `"${aktiveNachricht.text.substring(0, 30)}${aktiveNachricht.text.length > 30 ? '...' : ''}" • ${verbleibendeZeit}` : 'Info an alle Gäste senden'}</div>
             </div>
-        </div>
-        
-        <!-- TAGESMENUe -->
-        <div onclick="Router.navigate('admin-tagesmenu')" style="
-            background: ${aktivesMenu ? 'linear-gradient(135deg, #8B4513, #D2691E)' : 'linear-gradient(135deg, #95a5a6, #7f8c8d)'};
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 16px;
-            color: white;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 2rem;"></span>
-                    <div>
-                        <div style="font-weight: 700; font-size: 1.2rem;">
-                            ${aktivesMenu ? 'Tagesmenü aktiv!' : 'Tagesmenü'}
-                        </div>
-                        <div style="font-size: 0.9rem; opacity: 0.9;">
-                            ${aktivesMenu 
-                                ? `"${menuPreview.substring(0, 40)}${menuPreview.length > 40 ? '...' : ''}"`
-                                : 'Menü für Gäste auf Startseite anzeigen'}
-                        </div>
-                    </div>
-                </div>
-                <span style="font-size: 1.5rem;">→</span>
+            <div onclick="Router.navigate('admin-tagesmenu')" style="background:${aktivesMenu ? 'linear-gradient(135deg, #8B4513, #D2691E)' : 'linear-gradient(135deg, #95a5a6, #7f8c8d)'};border-radius:12px;padding:14px;color:white;cursor:pointer;">
+                <div style="font-weight:700;font-size:0.95rem;"> ${aktivesMenu ? 'Tagesmenü aktiv!' : 'Tagesmenü'}</div>
+                <div style="font-size:0.75rem;opacity:0.85;margin-top:4px;">${aktivesMenu ? `"${menuPreview.substring(0, 30)}${menuPreview.length > 30 ? '...' : ''}"` : 'Menü auf Startseite anzeigen'}</div>
             </div>
         </div>
         
         <!-- AUFFUeLLLISTE -->
-        <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;">
-             Auffüllliste drucken<br>
-            <small style="opacity:0.9;">(${auffüllAnzahl} Getränke zum Auffüllen)</small>
+        <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:16px;font-size:1.1rem;margin-bottom:10px;">
+             Auffüllliste drucken <small style="opacity:0.9;">(${auffüllAnzahl} Getränke)</small>
         </button>
         
-        <!-- KAeSE-BESTELLUNGEN -->
-        <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;background:linear-gradient(135deg, #f4d03f, #f39c12);color:#5d4e37;border:none;${cheeseCount > 0 ? 'animation:cheesePulse 1.5s ease-in-out infinite;box-shadow:0 0 20px rgba(243,156,18,0.6);' : ''}">
-            🧀 Käse-Bestellungen ${cheeseCount > 0 ? '<span style="background:#e74c3c;color:white;padding:4px 12px;border-radius:20px;font-size:0.85rem;margin-left:8px;font-weight:700;">' + cheeseCount + ' NEU!</span>' : ''}<br>
-            <small style="opacity:0.9;">(Vorbestellungen verwalten)</small>
-        </button>
+        <!-- KAeSE / BUCHUNGEN / BELEGE / EXPORT - KOMPAKT -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #f4d03f, #f39c12);color:#5d4e37;border:none;border-radius:10px;${cheeseCount > 0 ? 'animation:cheesePulse 1.5s ease-in-out infinite;' : ''}">
+                🧀 Käse-Bestellungen ${cheeseCount > 0 ? '<span style="background:#e74c3c;color:white;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-left:4px;">' + cheeseCount + '</span>' : ''}
+            </button>
+            <button class="btn btn-block" onclick="Router.navigate('admin-alle-buchungen')" style="padding:12px;font-size:0.9rem;background:#6c5ce7;color:white;border:none;border-radius:10px;">
+                 Alle Buchungen <small>(${bs.length})</small>
+            </button>
+            <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #636e72, #2d3436);color:white;border:none;border-radius:10px;">
+                📋 Belege drucken
+            </button>
+            <button class="btn btn-block" onclick="Router.navigate('admin-ideas-export')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #2980b9, #3498db);color:white;border:none;border-radius:10px;">
+                📊 Export IDEAS
+            </button>
+        </div>
         <style>
             @keyframes cheesePulse {
                 0%, 100% { transform: scale(1); box-shadow: 0 4px 15px rgba(243,156,18,0.4); }
@@ -5135,65 +5083,43 @@ Router.register('admin-dashboard', async () => {
             }
         </style>
         
-        <!-- ALLE BUCHUNGEN ANSEHEN -->
-        <button class="btn btn-block" onclick="Router.navigate('admin-alle-buchungen')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;background:#6c5ce7;color:white;border:none;">
-             Alle Buchungen ansehen<br>
-            <small style="opacity:0.9;">(${bs.length} gesamt * bearbeiten/löschen)</small>
-        </button>
-        
-        <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:20px;font-size:1.2rem;margin-bottom:12px;background:linear-gradient(135deg, #636e72, #2d3436);color:white;border:none;">
-            📋 Belege drucken (alle Gäste)<br>
-            <small style="opacity:0.9;">(Aktive + ausgecheckte Gäste • Thermodrucker)</small>
-        </button>
-        
-        <button class="btn btn-block" onclick="Router.navigate('admin-ideas-export')" style="padding:20px;font-size:1.2rem;margin-bottom:24px;background:linear-gradient(135deg, #2980b9, #3498db);color:white;border:none;">
-            📊 Manuell Export IDEAS<br>
-            <small style="opacity:0.9;">(Excel-Backup im IDEAS-Format • Zeitraum wählbar)</small>
-        </button>
-        
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
-            <button class="btn btn-warning" onclick="Router.navigate('admin-fehlende')" style="padding:16px;background:#f39c12;color:white;">
-                🚨 Fehlende Getränke<br><small>(${fehlendeOffen.length} offen)</small>
+        <!-- FEHLENDE + UMLAGE -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+            <button class="btn" onclick="Router.navigate('admin-fehlende')" style="padding:12px;background:#f39c12;color:white;border:none;border-radius:10px;font-size:0.9rem;">
+                🚨 Fehlende Getränke <small>(${fehlendeOffen.length})</small>
             </button>
-            <button class="btn btn-danger" onclick="Router.navigate('admin-umlage')" style="padding:16px;">
-                 Umlage buchen<br><small>(auf alle Gäste)</small>
+            <button class="btn btn-danger" onclick="Router.navigate('admin-umlage')" style="padding:12px;border-radius:10px;font-size:0.9rem;">
+                 Umlage buchen
             </button>
         </div>
         
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
-            <button class="btn btn-primary" onclick="Router.navigate('admin-guests')" style="padding:24px;"> Gästeverwaltung</button>
-            <button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:24px;"> Artikelverwaltung</button>
-            <button class="btn btn-primary" onclick="Router.navigate('admin-artikel-sortierung')" style="padding:24px;"> Artikel sortieren</button>
-            <button class="btn btn-primary" onclick="Router.navigate('admin-gruppen')" style="padding:24px;"> Gruppenverwaltung</button>
+        <!-- VERWALTUNG -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+            <button class="btn btn-primary" onclick="Router.navigate('admin-guests')" style="padding:14px;font-size:0.85rem;"> Gäste</button>
+            <button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:14px;font-size:0.85rem;"> Artikel</button>
+            <button class="btn btn-primary" onclick="Router.navigate('admin-artikel-sortierung')" style="padding:14px;font-size:0.85rem;"> Sortieren</button>
+            <button class="btn btn-primary" onclick="Router.navigate('admin-gruppen')" style="padding:14px;font-size:0.85rem;"> Gruppen</button>
         </div>
         
-        <div class="card">
-            <div class="card-header"><h2 class="card-title"> Daten-Management</h2></div>
-            <div class="card-body">
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
-                    <div style="padding:16px;background:linear-gradient(135deg, #27ae60, #2ecc71);border-radius:var(--radius-md);color:white;">
-                        <h3 style="font-weight:600;margin-bottom:8px;"> Backup erstellen</h3>
-                        <div style="font-size:0.8rem;opacity:0.9;margin-bottom:8px;">Letztes: ${DataProtection.getLastBackupText()}</div>
-                        <button class="btn" onclick="DataProtection.createFullBackup()" style="background:white;color:#27ae60;border:none;padding:8px 16px;"> Jetzt sichern</button>
-                    </div>
-                    <div style="padding:16px;background:linear-gradient(135deg, #e74c3c, #c0392b);border-radius:var(--radius-md);color:white;">
-                        <h3 style="font-weight:600;margin-bottom:8px;"> Backup laden</h3>
-                        <div style="font-size:0.8rem;opacity:0.9;margin-bottom:8px;">Daten aus JSON wiederherstellen</div>
-                        <button class="btn" onclick="DataProtection.selectRestoreFile()" style="background:white;color:#e74c3c;border:none;padding:8px 16px;"> Datei wählen</button>
-                    </div>
-                    <div style="padding:16px;background:linear-gradient(135deg, #9b59b6, #8e44ad);border-radius:var(--radius-md);color:white;">
-                        <h3 style="font-weight:600;margin-bottom:8px;">🔄 Lokale → Supabase</h3>
-                        <div style="font-size:0.8rem;opacity:0.9;margin-bottom:8px;">Lokale Buchungen hochladen</div>
-                        <button class="btn" onclick="migrateLocalToSupabase()" style="background:white;color:#9b59b6;border:none;padding:8px 16px;">🔄 Migrieren</button>
-                    </div>
-                    
-                </div>
+        <!-- DATEN-MANAGEMENT -->
+        <div style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:12px;">
+            <div style="font-weight:700;margin-bottom:10px;font-size:0.9rem;"> Daten-Management</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                <button class="btn" onclick="DataProtection.createFullBackup()" style="padding:10px;background:#27ae60;color:white;border:none;border-radius:8px;font-size:0.8rem;">
+                     Backup<br><small style="opacity:0.8;">${DataProtection.getLastBackupText()}</small>
+                </button>
+                <button class="btn" onclick="DataProtection.selectRestoreFile()" style="padding:10px;background:#e74c3c;color:white;border:none;border-radius:8px;font-size:0.8rem;">
+                     Backup laden
+                </button>
+                <button class="btn" onclick="migrateLocalToSupabase()" style="padding:10px;background:#9b59b6;color:white;border:none;border-radius:8px;font-size:0.8rem;">
+                    🔄 Lokal → Supabase
+                </button>
             </div>
         </div>
         
-        <!-- NOTFALL - klein und unauffällig -->
-        <div style="text-align:center;margin-top:24px;padding-top:16px;border-top:1px dashed #ccc;">
-            <a href="#" onclick="Router.navigate('admin-notfall-export');return false;" style="color:#888;font-size:0.85rem;text-decoration:none;">
+        <!-- NOTFALL -->
+        <div style="text-align:center;padding-top:8px;">
+            <a href="#" onclick="Router.navigate('admin-notfall-export');return false;" style="color:#888;font-size:0.8rem;text-decoration:none;">
                  Notfall: Buchungen nach Datum exportieren
             </a>
         </div>
