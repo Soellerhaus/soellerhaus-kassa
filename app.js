@@ -7448,9 +7448,10 @@ Router.register('admin-tagesmenu', async () => {
                 const istAktiv = tagM?.abend?.aktiv || tagM?.mittag?.aktiv;
                 const isSelected = tagKey === selectedTag;
                 const isHeuteTag = tagKey === TagesMenu.getHeuteName().toLowerCase();
-                return `<button onclick="selectMenuTag('${tagKey}')" style="padding:10px 14px;border:2px solid ${isSelected ? '#8B4513' : istAktiv ? '#27ae60' : '#ddd'};border-radius:10px;background:${isSelected ? 'linear-gradient(135deg,#8B4513,#D2691E)' : istAktiv ? '#e8f5e9' : '#f8f9fa'};color:${isSelected ? 'white' : '#333'};font-weight:${isSelected || isHeuteTag ? '700' : '400'};font-size:0.85rem;white-space:nowrap;cursor:pointer;">${tag.substring(0,2)}${isHeuteTag ? ' 📌' : ''}${hatText ? ' ✓' : ''}</button>`;
+                return `<button draggable="true" ondragstart="menuDragStart(event,'${tagKey}')" ondragover="event.preventDefault();this.style.outline='3px solid #8B4513'" ondragleave="this.style.outline=''" ondrop="menuDrop(event,'${tagKey}');this.style.outline=''" onclick="selectMenuTag('${tagKey}')" style="padding:10px 14px;border:2px solid ${isSelected ? '#8B4513' : istAktiv ? '#27ae60' : '#ddd'};border-radius:10px;background:${isSelected ? 'linear-gradient(135deg,#8B4513,#D2691E)' : istAktiv ? '#e8f5e9' : '#f8f9fa'};color:${isSelected ? 'white' : '#333'};font-weight:${isSelected || isHeuteTag ? '700' : '400'};font-size:0.85rem;white-space:nowrap;cursor:grab;">${tag.substring(0,2)}${isHeuteTag ? ' 📌' : ''}${hatText ? ' ✓' : ''}</button>`;
             }).join('')}
         </div>
+        <div style="text-align:center;margin-bottom:8px;color:#888;font-size:0.75rem;">💡 Tage per Drag & Drop verschieben oder tauschen</div>
         
         <div style="text-align:center;margin-bottom:16px;"><h2 style="margin:0;font-size:1.3rem;">${tagName}${isHeute ? ' (heute)' : ''}</h2></div>
         
@@ -7463,6 +7464,35 @@ Router.register('admin-tagesmenu', async () => {
 });
 
 window.selectMenuTag = (tag) => { State.selectedMenuTag = tag; Router.navigate('admin-tagesmenu'); };
+
+// Drag & Drop für Menü-Tausch zwischen Wochentagen
+window._menuDragTag = null;
+window.menuDragStart = (e, tag) => {
+    window._menuDragTag = tag;
+    e.dataTransfer.effectAllowed = 'move';
+    e.target.style.opacity = '0.5';
+    setTimeout(() => { if (e.target) e.target.style.opacity = '1'; }, 300);
+};
+window.menuDrop = async (e, targetTag) => {
+    e.preventDefault();
+    const sourceTag = window._menuDragTag;
+    if (!sourceTag || sourceTag === targetTag) return;
+    
+    const menuData = await TagesMenu.getAlleMenus();
+    const sourceMenu = JSON.parse(JSON.stringify(menuData.wochentage[sourceTag] || { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } }));
+    const targetMenu = JSON.parse(JSON.stringify(menuData.wochentage[targetTag] || { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } }));
+    
+    // Tauschen
+    menuData.wochentage[targetTag] = sourceMenu;
+    menuData.wochentage[sourceTag] = targetMenu;
+    
+    await TagesMenu.speichern(menuData);
+    
+    const tageNamen = { montag: 'Mo', dienstag: 'Di', mittwoch: 'Mi', donnerstag: 'Do', freitag: 'Fr', samstag: 'Sa', sonntag: 'So' };
+    Utils.showToast(`🔄 ${tageNamen[sourceTag]} ↔ ${tageNamen[targetTag]} getauscht`, 'success');
+    State.selectedMenuTag = targetTag;
+    Router.navigate('admin-tagesmenu');
+};
 
 window.toggleWochentagMenu = async (typ) => {
     const menuData = await TagesMenu.getAlleMenus();
