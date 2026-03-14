@@ -5043,20 +5043,20 @@ Router.register('admin-dashboard', async () => {
             <div style="font-size:0.8rem;opacity:0.85;margin-top:4px;">${aktivesMenu ? `"${menuPreview.substring(0, 40)}${menuPreview.length > 40 ? '...' : ''}"` : 'Menü auf Startseite anzeigen'}</div>
         </div>
 
-        <!-- TOP-ROW: Gäste, Alle Buchungen, Auffüllliste, Nachricht -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <!-- TOP-ROW: Gäste, Letzte Buchungen, Auffüllliste, Nachricht -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <button onclick="Router.navigate('admin-guests')" style="padding:14px;font-size:1rem;font-weight:700;background:linear-gradient(135deg, #00b894, #00cec9);color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 10px rgba(0,184,148,0.3);">
                 👥 Gäste <span style="background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:10px;font-size:0.8rem;margin-left:4px;">${guests.length}</span>
             </button>
             <button onclick="Router.navigate('admin-alle-buchungen')" style="padding:14px;font-size:1rem;font-weight:700;background:linear-gradient(135deg, #6c5ce7, #a29bfe);color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 10px rgba(108,92,231,0.3);">
-                📖 Buchungen <span style="background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:10px;font-size:0.8rem;margin-left:4px;">${bs.length}</span>
+                📖 Letzte Buchungen
             </button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
             <button onclick="Router.navigate('admin-auffuellliste')" style="padding:14px;font-size:1rem;font-weight:700;background:linear-gradient(135deg, #0984e3, #74b9ff);color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 10px rgba(9,132,227,0.3);">
                 🖨️ Auffüllliste <span style="background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:10px;font-size:0.8rem;margin-left:4px;">${auffüllAnzahl}</span>
             </button>
-            <div onclick="Router.navigate('admin-nachricht')" style="padding:14px;font-size:1rem;font-weight:700;background:${aktiveNachricht ? 'linear-gradient(135deg, #e74c3c, #ff6b6b)' : 'linear-gradient(135deg, #e17055, #fab1a0)'};color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 10px rgba(231,76,60,0.3);${aktiveNachricht ? 'border:2px solid #ff0;' : ''}">
+            <div onclick="Router.navigate('admin-nachricht')" style="padding:14px;font-size:1rem;font-weight:700;background:${aktiveNachricht ? 'linear-gradient(135deg, #e74c3c, #ff6b6b)' : 'linear-gradient(135deg, #e17055, #fab1a0)'};color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 10px rgba(231,76,60,0.3);text-align:center;${aktiveNachricht ? 'border:2px solid #ff0;' : ''}">
                 <div>📢 ${aktiveNachricht ? 'Nachricht aktiv!' : 'Nachricht'}</div>
                 ${aktiveNachricht ? `<div style="font-size:0.7rem;opacity:0.9;margin-top:2px;">${verbleibendeZeit}</div>` : ''}
             </div>
@@ -5082,26 +5082,23 @@ Router.register('admin-dashboard', async () => {
             </div>
         </div>
 
-        <!-- ===== WEITERE AKTIONEN ===== -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-            <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #f4d03f, #f39c12);color:#5d4e37;border:none;border-radius:10px;${cheeseCount > 0 ? 'animation:cheesePulse 1.5s ease-in-out infinite;' : ''}">
+        <!-- ===== WEITERE AKTIONEN (DEZENT) ===== -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:10px;font-size:0.85rem;background:#e8e0d0;color:#7a6b55;border:1px solid #d4c9b8;border-radius:10px;${cheeseCount > 0 ? 'animation:cheesePulse 1.5s ease-in-out infinite;' : ''}">
                 🧀 Käse-Bestellungen ${cheeseCount > 0 ? '<span style="background:#e74c3c;color:white;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-left:4px;">' + cheeseCount + '</span>' : ''}
             </button>
-            <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #636e72, #2d3436);color:white;border:none;border-radius:10px;">
+            <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:10px;font-size:0.85rem;background:#e0e3e8;color:#4a5568;border:1px solid #cbd5e0;border-radius:10px;">
                 📋 Belege drucken
             </button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-            <button class="btn" onclick="Router.navigate('admin-fehlende')" style="padding:12px;background:#f39c12;color:white;border:none;border-radius:10px;font-size:0.9rem;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+            <button class="btn" onclick="Router.navigate('admin-fehlende')" style="padding:10px;font-size:0.85rem;background:#fde8d0;color:#b45309;border:1px solid #f6d5a8;border-radius:10px;">
                 🚨 Fehlende Getränke <small>(${fehlendeOffen.length})</small>
             </button>
-            <button class="btn btn-danger" onclick="Router.navigate('admin-umlage')" style="padding:12px;border-radius:10px;font-size:0.9rem;">
+            <button class="btn" onclick="Router.navigate('admin-umlage')" style="padding:10px;font-size:0.85rem;background:#f0d0d0;color:#9b2c2c;border:1px solid #e8b4b4;border-radius:10px;">
                  Umlage buchen
             </button>
         </div>
-        <button class="btn btn-block" onclick="Router.navigate('admin-ideas-export')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #2980b9, #3498db);color:white;border:none;border-radius:10px;margin-bottom:12px;">
-            📊 Export IDEAS
-        </button>
 
         <!-- ===== VERWALTUNG (SELTEN GEBRAUCHT) ===== -->
         <div style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:12px;">
@@ -5118,10 +5115,11 @@ Router.register('admin-dashboard', async () => {
                 <span style="font-size:0.9rem;">⚙️</span>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
                 <button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:10px;font-size:0.8rem;border-radius:8px;"> Artikel</button>
                 <button class="btn btn-primary" onclick="Router.navigate('admin-artikel-sortierung')" style="padding:10px;font-size:0.8rem;border-radius:8px;"> Sortieren</button>
                 <button class="btn btn-primary" onclick="Router.navigate('admin-gruppen')" style="padding:10px;font-size:0.8rem;border-radius:8px;"> Gruppen</button>
+                <button class="btn" onclick="Router.navigate('admin-ideas-export')" style="padding:10px;font-size:0.8rem;background:#dfe6ed;color:#4a5568;border:1px solid #cbd5e0;border-radius:8px;">📊 Export</button>
             </div>
         </div>
 
