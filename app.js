@@ -5082,44 +5082,42 @@ Router.register('admin-dashboard', async () => {
             </div>
         </div>
 
-        <!-- ===== WEITERE AKTIONEN (DEZENT) ===== -->
+        <!-- ===== WEITERE AKTIONEN (KRAeFTIG) ===== -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-            <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:10px;font-size:0.85rem;background:#e8e0d0;color:#7a6b55;border:1px solid #d4c9b8;border-radius:10px;${cheeseCount > 0 ? 'animation:cheesePulse 1.5s ease-in-out infinite;' : ''}">
+            <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, #f4d03f, #f39c12);color:#5d4e37;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(243,156,18,0.3);${cheeseCount > 0 ? 'animation:cheesePulse 1.5s ease-in-out infinite;' : ''}">
                 🧀 Käse-Bestellungen ${cheeseCount > 0 ? '<span style="background:#e74c3c;color:white;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-left:4px;">' + cheeseCount + '</span>' : ''}
             </button>
-            <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:10px;font-size:0.85rem;background:#e0e3e8;color:#4a5568;border:1px solid #cbd5e0;border-radius:10px;">
+            <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, #636e72, #2d3436);color:white;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(45,52,54,0.3);">
                 📋 Belege drucken
             </button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-            <button class="btn" onclick="Router.navigate('admin-fehlende')" style="padding:10px;font-size:0.85rem;background:#fde8d0;color:#b45309;border:1px solid #f6d5a8;border-radius:10px;">
+            <button class="btn" onclick="Router.navigate('admin-fehlende')" style="padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, #e67e22, #f39c12);color:white;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(230,126,34,0.3);">
                 🚨 Fehlende Getränke <small>(${fehlendeOffen.length})</small>
             </button>
-            <button class="btn" onclick="Router.navigate('admin-umlage')" style="padding:10px;font-size:0.85rem;background:#f0d0d0;color:#9b2c2c;border:1px solid #e8b4b4;border-radius:10px;">
+            <button class="btn" onclick="Router.navigate('admin-umlage')" style="padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, #e74c3c, #c0392b);color:white;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(231,76,60,0.3);">
                  Umlage buchen
             </button>
         </div>
 
-        <!-- ===== VERWALTUNG (SELTEN GEBRAUCHT) ===== -->
+        <!-- ===== VERWALTUNG (DEZENT) ===== -->
         <div style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:12px;">
-            <div style="font-weight:700;margin-bottom:10px;font-size:0.85rem;color:#636e72;">⚙️ Verwaltung</div>
+            <div style="font-weight:700;margin-bottom:10px;font-size:0.85rem;color:#a0a8b0;">⚙️ Verwaltung</div>
 
             <!-- PREISMODUS -->
-            <div onclick="Router.navigate('admin-preismodus')" style="background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};border-radius:10px;padding:10px 14px;margin-bottom:8px;color:white;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <div>
-                        <div style="font-weight:600;font-size:0.85rem;">Preismodus: ${isHP ? 'HALBPENSION' : 'SELBSTVERSORGER'}</div>
-                        <div style="font-size:0.7rem;opacity:0.8;">${isHP ? 'HP-Preise aktiv' : 'Standard-Preise aktiv'}</div>
-                    </div>
+            <div onclick="Router.navigate('admin-preismodus')" style="background:${isHP ? '#e8dff0' : '#dce8f0'};border-radius:10px;padding:10px 14px;margin-bottom:8px;color:${isHP ? '#6b4d8a' : '#3a6d8a'};cursor:pointer;display:flex;align-items:center;justify-content:space-between;border:1px solid ${isHP ? '#d4c5e2' : '#c5d8e5'};">
+                <div>
+                    <div style="font-weight:600;font-size:0.85rem;">Preismodus: ${isHP ? 'HALBPENSION' : 'SELBSTVERSORGER'}</div>
+                    <div style="font-size:0.7rem;opacity:0.7;">${isHP ? 'HP-Preise aktiv' : 'Standard-Preise aktiv'}</div>
                 </div>
-                <span style="font-size:0.9rem;">⚙️</span>
+                <span style="font-size:0.9rem;opacity:0.5;">⚙️</span>
             </div>
 
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
-                <button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:10px;font-size:0.8rem;border-radius:8px;"> Artikel</button>
-                <button class="btn btn-primary" onclick="Router.navigate('admin-artikel-sortierung')" style="padding:10px;font-size:0.8rem;border-radius:8px;"> Sortieren</button>
-                <button class="btn btn-primary" onclick="Router.navigate('admin-gruppen')" style="padding:10px;font-size:0.8rem;border-radius:8px;"> Gruppen</button>
-                <button class="btn" onclick="Router.navigate('admin-ideas-export')" style="padding:10px;font-size:0.8rem;background:#dfe6ed;color:#4a5568;border:1px solid #cbd5e0;border-radius:8px;">📊 Export</button>
+                <button onclick="Router.navigate('admin-articles')" style="padding:10px;font-size:0.8rem;border-radius:8px;background:#e8ecf0;color:#4a5568;border:1px solid #d0d7e0;cursor:pointer;"> Artikel</button>
+                <button onclick="Router.navigate('admin-artikel-sortierung')" style="padding:10px;font-size:0.8rem;border-radius:8px;background:#e8ecf0;color:#4a5568;border:1px solid #d0d7e0;cursor:pointer;"> Sortieren</button>
+                <button onclick="Router.navigate('admin-gruppen')" style="padding:10px;font-size:0.8rem;border-radius:8px;background:#e8ecf0;color:#4a5568;border:1px solid #d0d7e0;cursor:pointer;"> Gruppen</button>
+                <button onclick="Router.navigate('admin-ideas-export')" style="padding:10px;font-size:0.8rem;border-radius:8px;background:#e8ecf0;color:#4a5568;border:1px solid #d0d7e0;cursor:pointer;">📊 Export</button>
             </div>
         </div>
 
