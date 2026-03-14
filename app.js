@@ -5025,66 +5025,73 @@ Router.register('admin-dashboard', async () => {
     
     UI.render(`<div class="app-header"><div class="header-left"><div class="header-title"> Admin Dashboard</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
-        <!-- PREISMODUS SWITCH -->
-        <div onclick="Router.navigate('admin-preismodus')" style="background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};border-radius:12px;padding:14px 16px;margin-bottom:12px;color:white;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span style="font-size:1.5rem;">🍽️</span>
-                <div>
-                    <div style="font-weight:700;font-size:1rem;">Preismodus: ${isHP ? 'HALBPENSION' : 'SELBSTVERSORGER'}</div>
-                    <div style="font-size:0.8rem;opacity:0.85;">${isHP ? 'HP-Preise aktiv' : 'Standard-Preise aktiv'}</div>
-                </div>
-            </div>
-            <span>⚙️</span>
-        </div>
-        
-        <div class="stats-grid">
-            <div class="stat-card"><div class="stat-value">${guests.length}</div><div class="stat-label">Gäste</div></div>
-            <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(window._gastGesamtUmsatz || 0)}</div><div class="stat-label">Offener Umsatz</div></div>
-            <div class="stat-card"><div class="stat-value">${heuteB.length}</div><div class="stat-label">Buchungen heute</div></div>
-            <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(heuteB.reduce((s,b) => s+b.preis*b.menge, 0))}</div><div class="stat-label">Umsatz heute</div></div>
-        </div>
-        
-        <!-- NACHRICHT + TAGESMENUe NEBENEINANDER -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-            <div onclick="Router.navigate('admin-nachricht')" style="background:${aktiveNachricht ? 'linear-gradient(135deg, #e74c3c, #c0392b)' : 'linear-gradient(135deg, #95a5a6, #7f8c8d)'};border-radius:12px;padding:14px;color:white;cursor:pointer;">
-                <div style="font-weight:700;font-size:0.95rem;">📢 ${aktiveNachricht ? 'Nachricht aktiv!' : 'Nachricht'}</div>
-                <div style="font-size:0.75rem;opacity:0.85;margin-top:4px;">${aktiveNachricht ? `"${aktiveNachricht.text.substring(0, 30)}${aktiveNachricht.text.length > 30 ? '...' : ''}" • ${verbleibendeZeit}` : 'Info an alle Gäste senden'}</div>
-            </div>
-            <div onclick="Router.navigate('admin-tagesmenu')" style="background:${aktivesMenu ? 'linear-gradient(135deg, #8B4513, #D2691E)' : 'linear-gradient(135deg, #95a5a6, #7f8c8d)'};border-radius:12px;padding:14px;color:white;cursor:pointer;">
-                <div style="font-weight:700;font-size:0.95rem;"> ${aktivesMenu ? 'Tagesmenü aktiv!' : 'Tagesmenü'}</div>
-                <div style="font-size:0.75rem;opacity:0.85;margin-top:4px;">${aktivesMenu ? `"${menuPreview.substring(0, 30)}${menuPreview.length > 30 ? '...' : ''}"` : 'Menü auf Startseite anzeigen'}</div>
-            </div>
-        </div>
-        
-        <!-- AUFFUeLLLISTE -->
-        <button class="btn btn-primary btn-block" onclick="Router.navigate('admin-auffuellliste')" style="padding:16px;font-size:1.1rem;margin-bottom:10px;">
-             Auffüllliste drucken <small style="opacity:0.9;">(${auffüllAnzahl} Getränke)</small>
-        </button>
-        
-        <!-- KAeSE / BUCHUNGEN / BELEGE / EXPORT - KOMPAKT -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-            <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #f4d03f, #f39c12);color:#5d4e37;border:none;border-radius:10px;${cheeseCount > 0 ? 'animation:cheesePulse 1.5s ease-in-out infinite;' : ''}">
-                🧀 Käse-Bestellungen ${cheeseCount > 0 ? '<span style="background:#e74c3c;color:white;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-left:4px;">' + cheeseCount + '</span>' : ''}
-            </button>
-            <button class="btn btn-block" onclick="Router.navigate('admin-alle-buchungen')" style="padding:12px;font-size:0.9rem;background:#6c5ce7;color:white;border:none;border-radius:10px;">
-                 Alle Buchungen <small>(${bs.length})</small>
-            </button>
-            <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #636e72, #2d3436);color:white;border:none;border-radius:10px;">
-                📋 Belege drucken
-            </button>
-            <button class="btn btn-block" onclick="Router.navigate('admin-ideas-export')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #2980b9, #3498db);color:white;border:none;border-radius:10px;">
-                📊 Export IDEAS
-            </button>
-        </div>
         <style>
             @keyframes cheesePulse {
                 0%, 100% { transform: scale(1); box-shadow: 0 4px 15px rgba(243,156,18,0.4); }
                 50% { transform: scale(1.03); box-shadow: 0 8px 30px rgba(243,156,18,0.7); }
             }
         </style>
-        
-        <!-- FEHLENDE + UMLAGE -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+
+        <!-- ===== WICHTIGE SCHNELLZUGRIFFE (OBEN) ===== -->
+
+        <!-- TAGESMENUe - prominent -->
+        <div onclick="Router.navigate('admin-tagesmenu')" style="background:${aktivesMenu ? 'linear-gradient(135deg, #D2691E, #8B4513)' : 'linear-gradient(135deg, #8B4513, #5C3010)'};border-radius:12px;padding:16px;color:white;cursor:pointer;margin-bottom:10px;border:2px solid ${aktivesMenu ? '#f39c12' : 'transparent'};">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="font-weight:700;font-size:1.1rem;">🍽️ ${aktivesMenu ? 'Tagesmenü aktiv!' : 'Tagesmenü'}</div>
+                <span style="font-size:1.2rem;">→</span>
+            </div>
+            <div style="font-size:0.8rem;opacity:0.85;margin-top:4px;">${aktivesMenu ? `"${menuPreview.substring(0, 40)}${menuPreview.length > 40 ? '...' : ''}"` : 'Menü auf Startseite anzeigen'}</div>
+        </div>
+
+        <!-- TOP-ROW: Gäste, Alle Buchungen, Auffüllliste, Nachricht -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <button onclick="Router.navigate('admin-guests')" style="padding:14px;font-size:1rem;font-weight:700;background:linear-gradient(135deg, #00b894, #00cec9);color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 10px rgba(0,184,148,0.3);">
+                👥 Gäste <span style="background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:10px;font-size:0.8rem;margin-left:4px;">${guests.length}</span>
+            </button>
+            <button onclick="Router.navigate('admin-alle-buchungen')" style="padding:14px;font-size:1rem;font-weight:700;background:linear-gradient(135deg, #6c5ce7, #a29bfe);color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 10px rgba(108,92,231,0.3);">
+                📖 Buchungen <span style="background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:10px;font-size:0.8rem;margin-left:4px;">${bs.length}</span>
+            </button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <button onclick="Router.navigate('admin-auffuellliste')" style="padding:14px;font-size:1rem;font-weight:700;background:linear-gradient(135deg, #0984e3, #74b9ff);color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 10px rgba(9,132,227,0.3);">
+                🖨️ Auffüllliste <span style="background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:10px;font-size:0.8rem;margin-left:4px;">${auffüllAnzahl}</span>
+            </button>
+            <div onclick="Router.navigate('admin-nachricht')" style="padding:14px;font-size:1rem;font-weight:700;background:${aktiveNachricht ? 'linear-gradient(135deg, #e74c3c, #ff6b6b)' : 'linear-gradient(135deg, #e17055, #fab1a0)'};color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 10px rgba(231,76,60,0.3);${aktiveNachricht ? 'border:2px solid #ff0;' : ''}">
+                <div>📢 ${aktiveNachricht ? 'Nachricht aktiv!' : 'Nachricht'}</div>
+                ${aktiveNachricht ? `<div style="font-size:0.7rem;opacity:0.9;margin-top:2px;">${verbleibendeZeit}</div>` : ''}
+            </div>
+        </div>
+
+        <!-- ===== STATS (KOMPAKT) ===== -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:12px;">
+            <div style="background:#f0f3f7;border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:1.1rem;font-weight:700;color:#2d3436;">${guests.length}</div>
+                <div style="font-size:0.65rem;color:#636e72;">Gäste</div>
+            </div>
+            <div style="background:#f0f3f7;border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:1.1rem;font-weight:700;color:#2d3436;">${Utils.formatCurrency(window._gastGesamtUmsatz || 0)}</div>
+                <div style="font-size:0.65rem;color:#636e72;">Offen</div>
+            </div>
+            <div style="background:#f0f3f7;border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:1.1rem;font-weight:700;color:#2d3436;">${heuteB.length}</div>
+                <div style="font-size:0.65rem;color:#636e72;">Buchungen</div>
+            </div>
+            <div style="background:#f0f3f7;border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:1.1rem;font-weight:700;color:#2d3436;">${Utils.formatCurrency(heuteB.reduce((s,b) => s+b.preis*b.menge, 0))}</div>
+                <div style="font-size:0.65rem;color:#636e72;">Umsatz</div>
+            </div>
+        </div>
+
+        <!-- ===== WEITERE AKTIONEN ===== -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <button class="btn btn-block" onclick="Router.navigate('admin-cheese')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #f4d03f, #f39c12);color:#5d4e37;border:none;border-radius:10px;${cheeseCount > 0 ? 'animation:cheesePulse 1.5s ease-in-out infinite;' : ''}">
+                🧀 Käse-Bestellungen ${cheeseCount > 0 ? '<span style="background:#e74c3c;color:white;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-left:4px;">' + cheeseCount + '</span>' : ''}
+            </button>
+            <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #636e72, #2d3436);color:white;border:none;border-radius:10px;">
+                📋 Belege drucken
+            </button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
             <button class="btn" onclick="Router.navigate('admin-fehlende')" style="padding:12px;background:#f39c12;color:white;border:none;border-radius:10px;font-size:0.9rem;">
                 🚨 Fehlende Getränke <small>(${fehlendeOffen.length})</small>
             </button>
@@ -5092,18 +5099,35 @@ Router.register('admin-dashboard', async () => {
                  Umlage buchen
             </button>
         </div>
-        
-        <!-- VERWALTUNG -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
-            <button class="btn btn-primary" onclick="Router.navigate('admin-guests')" style="padding:14px;font-size:0.85rem;"> Gäste</button>
-            <button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:14px;font-size:0.85rem;"> Artikel</button>
-            <button class="btn btn-primary" onclick="Router.navigate('admin-artikel-sortierung')" style="padding:14px;font-size:0.85rem;"> Sortieren</button>
-            <button class="btn btn-primary" onclick="Router.navigate('admin-gruppen')" style="padding:14px;font-size:0.85rem;"> Gruppen</button>
+        <button class="btn btn-block" onclick="Router.navigate('admin-ideas-export')" style="padding:12px;font-size:0.9rem;background:linear-gradient(135deg, #2980b9, #3498db);color:white;border:none;border-radius:10px;margin-bottom:12px;">
+            📊 Export IDEAS
+        </button>
+
+        <!-- ===== VERWALTUNG (SELTEN GEBRAUCHT) ===== -->
+        <div style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:12px;">
+            <div style="font-weight:700;margin-bottom:10px;font-size:0.85rem;color:#636e72;">⚙️ Verwaltung</div>
+
+            <!-- PREISMODUS -->
+            <div onclick="Router.navigate('admin-preismodus')" style="background:${isHP ? 'linear-gradient(135deg, #9b59b6, #8e44ad)' : 'linear-gradient(135deg, #3498db, #2980b9)'};border-radius:10px;padding:10px 14px;margin-bottom:8px;color:white;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div>
+                        <div style="font-weight:600;font-size:0.85rem;">Preismodus: ${isHP ? 'HALBPENSION' : 'SELBSTVERSORGER'}</div>
+                        <div style="font-size:0.7rem;opacity:0.8;">${isHP ? 'HP-Preise aktiv' : 'Standard-Preise aktiv'}</div>
+                    </div>
+                </div>
+                <span style="font-size:0.9rem;">⚙️</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                <button class="btn btn-primary" onclick="Router.navigate('admin-articles')" style="padding:10px;font-size:0.8rem;border-radius:8px;"> Artikel</button>
+                <button class="btn btn-primary" onclick="Router.navigate('admin-artikel-sortierung')" style="padding:10px;font-size:0.8rem;border-radius:8px;"> Sortieren</button>
+                <button class="btn btn-primary" onclick="Router.navigate('admin-gruppen')" style="padding:10px;font-size:0.8rem;border-radius:8px;"> Gruppen</button>
+            </div>
         </div>
-        
+
         <!-- DATEN-MANAGEMENT -->
         <div style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:12px;">
-            <div style="font-weight:700;margin-bottom:10px;font-size:0.9rem;"> Daten-Management</div>
+            <div style="font-weight:700;margin-bottom:10px;font-size:0.85rem;color:#636e72;">💾 Daten-Management</div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
                 <button class="btn" onclick="DataProtection.createFullBackup()" style="padding:10px;background:#27ae60;color:white;border:none;border-radius:8px;font-size:0.8rem;">
                      Backup<br><small style="opacity:0.8;">${DataProtection.getLastBackupText()}</small>
@@ -5116,7 +5140,7 @@ Router.register('admin-dashboard', async () => {
                 </button>
             </div>
         </div>
-        
+
         <!-- NOTFALL -->
         <div style="text-align:center;padding-top:8px;">
             <a href="#" onclick="Router.navigate('admin-notfall-export');return false;" style="color:#888;font-size:0.8rem;text-decoration:none;">
