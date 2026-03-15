@@ -10549,17 +10549,17 @@ Router.register('buchen', async () => {
         border-radius: 16px 16px 0 0;
     ">
         <!-- Zusammenfassung-Leiste (immer sichtbar) -->
-        <div onclick="toggleWarenkorbDetails()" style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span style="font-size:1.3rem;">🛒</span>
+        <div onclick="toggleWarenkorbDetails()" style="padding:16px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-size:1.8rem;">🛒</span>
                 <div>
-                    <div style="font-weight:700;font-size:1rem;">${sessionCount > 0 ? sessionCount + ' Artikel' : 'Warenkorb leer'}</div>
-                    ${sessionCount > 0 ? '<div style="font-size:0.8rem;opacity:0.85;">Antippen zum Anzeigen/Stornieren</div>' : ''}
+                    <div style="font-weight:800;font-size:1.2rem;">${sessionCount > 0 ? sessionCount + ' Artikel' : 'Warenkorb leer'}</div>
+                    ${sessionCount > 0 ? '<div style="font-size:0.85rem;opacity:0.85;">Antippen zum Anzeigen/Stornieren</div>' : ''}
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:12px;">
-                <span style="font-size:1.4rem;font-weight:800;">${Utils.formatCurrency(sessionTotal)}</span>
-                <span id="warenkorb-arrow" style="font-size:0.9rem;">${sessionCount > 0 ? '▲' : ''}</span>
+                <span style="font-size:1.8rem;font-weight:800;">${Utils.formatCurrency(sessionTotal)}</span>
+                <span id="warenkorb-arrow" style="font-size:1.1rem;">${sessionCount > 0 ? '▲' : ''}</span>
             </div>
         </div>
         <!-- Artikel-Details (aufklappbar) -->
@@ -10579,25 +10579,25 @@ Router.register('buchen', async () => {
         </div>
         <!-- Fertig Button -->
         ${sessionCount > 0 ? `
-        <div style="padding:8px 16px 12px;">
-            <button onclick="handleGastAbmelden()" style="width:100%;background:white;color:var(--color-alpine-green, #4A7C59);border:none;border-radius:12px;padding:14px;font-size:1.1rem;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+        <div style="padding:10px 20px 14px;">
+            <button onclick="handleGastAbmelden()" style="width:100%;background:white;color:var(--color-alpine-green, #4A7C59);border:none;border-radius:12px;padding:16px;font-size:1.2rem;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
                  Fertig & Abmelden
             </button>
         </div>` : ''}
     </div>
     
-    <div class="main-content" style="padding-bottom:120px;">`);
+    <div class="main-content" style="padding-top:8px;padding-bottom:140px;">`);
     
     // Ampel nach dem Rendern aktualisieren
     setTimeout(() => SyncManager.updateUI(), 100);
     
     UI.append(`
         ${meineBuchungen.length ? `
-        <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);border-radius:16px;margin-bottom:20px;overflow:hidden;">
-            <div onclick="toggleBuchungsDetails()" style="padding:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+        <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);border-radius:12px;margin-bottom:10px;overflow:hidden;">
+            <div onclick="toggleBuchungsDetails()" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
                 <div style="color:white;">
-                    <div style="font-weight:700;font-size:1rem;"> ${t('my_bookings')}</div>
-                    <div style="font-size:0.85rem;opacity:0.9;">${meineBuchungen.length} Positionen</div>
+                    <div style="font-weight:700;font-size:0.95rem;"> ${t('my_bookings')}</div>
+                    <div style="font-size:0.8rem;opacity:0.9;">${meineBuchungen.length} Positionen</div>
                 </div>
                 <div style="text-align:right;color:white;">
                     <div style="font-size:1.3rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
@@ -10695,7 +10695,7 @@ Router.register('buchen', async () => {
         </div>`;
         })() : ''}
         
-        <div class="category-tabs" style="margin-bottom:14px;">
+        <div class="category-tabs" style="margin-bottom:10px;">
             ${sichtbareKats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0)).map(k => {
                 const catIcons = {1:'💧',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍫',7:'📦'};
                 const icon = catIcons[k.kategorie_id] || '';
