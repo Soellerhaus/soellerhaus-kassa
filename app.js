@@ -10586,42 +10586,43 @@ Router.register('buchen', async () => {
         </div>` : ''}
     </div>
     
-    <div class="main-content" style="padding-top:0 !important;margin-top:0;padding-bottom:160px;">`);
+    <!-- BUCHUNGEN DIREKT NACH HEADER (ausserhalb main-content) -->
+    <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);margin:0;overflow:hidden;">
+        <div onclick="${meineBuchungen.length ? 'toggleBuchungsDetails()' : ''}" style="padding:10px 14px;${meineBuchungen.length ? 'cursor:pointer;' : ''}display:flex;justify-content:space-between;align-items:center;">
+            <div style="color:white;">
+                <div style="font-weight:700;font-size:0.95rem;"> ${t('my_bookings')}</div>
+                <div style="font-size:0.8rem;opacity:0.9;">${meineBuchungen.length ? meineBuchungen.length + ' Positionen' : 'Keine offenen Buchungen'}</div>
+            </div>
+            <div style="text-align:right;color:white;">
+                <div style="font-size:1.3rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
+                ${meineBuchungen.length ? '<div id="buchungen-arrow" style="font-size:1rem;"></div>' : ''}
+            </div>
+        </div>
+        ${meineBuchungen.length ? `<div id="buchungen-details" style="display:none;background:white;padding:12px;max-height:250px;overflow-y:auto;">
+            ${Object.keys(nachDatum).map(datum => `
+            <div style="margin-bottom:12px;">
+                <div style="font-weight:700;color:var(--color-alpine-green);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #eee;font-size:0.9rem;">
+                     ${datum}
+                </div>
+                ${nachDatum[datum].map(b => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#f5f5f5;border-radius:6px;margin-bottom:4px;font-size:0.85rem;">
+                    <div>
+                        <div style="font-weight:600;">${b.artikel_name}</div>
+                        <div style="font-size:0.75rem;color:#888;"> ${b.uhrzeit?.substring(0,5) || ''} * ${b.menge}x</div>
+                    </div>
+                    <div style="font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(b.preis * b.menge)}</div>
+                </div>
+                `).join('')}
+            </div>
+            `).join('')}
+        </div>` : ''}
+    </div>
+    <div class="main-content" style="padding-top:6px !important;margin-top:0;padding-bottom:160px;">`);
 
     // Ampel nach dem Rendern aktualisieren
     setTimeout(() => SyncManager.updateUI(), 100);
 
     UI.append(`
-        <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);border-radius:12px;margin-bottom:8px;overflow:hidden;">
-            <div onclick="${meineBuchungen.length ? 'toggleBuchungsDetails()' : ''}" style="padding:10px 14px;${meineBuchungen.length ? 'cursor:pointer;' : ''}display:flex;justify-content:space-between;align-items:center;">
-                <div style="color:white;">
-                    <div style="font-weight:700;font-size:0.95rem;"> ${t('my_bookings')}</div>
-                    <div style="font-size:0.8rem;opacity:0.9;">${meineBuchungen.length ? meineBuchungen.length + ' Positionen' : 'Keine offenen Buchungen'}</div>
-                </div>
-                <div style="text-align:right;color:white;">
-                    <div style="font-size:1.3rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
-                    ${meineBuchungen.length ? '<div id="buchungen-arrow" style="font-size:1rem;"></div>' : ''}
-                </div>
-            </div>
-            ${meineBuchungen.length ? `<div id="buchungen-details" style="display:none;background:white;padding:12px;max-height:250px;overflow-y:auto;">
-                ${Object.keys(nachDatum).map(datum => `
-                <div style="margin-bottom:12px;">
-                    <div style="font-weight:700;color:var(--color-alpine-green);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #eee;font-size:0.9rem;">
-                         ${datum}
-                    </div>
-                    ${nachDatum[datum].map(b => `
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#f5f5f5;border-radius:6px;margin-bottom:4px;font-size:0.85rem;">
-                        <div>
-                            <div style="font-weight:600;">${b.artikel_name}</div>
-                            <div style="font-size:0.75rem;color:#888;"> ${b.uhrzeit?.substring(0,5) || ''} * ${b.menge}x</div>
-                        </div>
-                        <div style="font-weight:700;color:var(--color-alpine-green);">${Utils.formatCurrency(b.preis * b.menge)}</div>
-                    </div>
-                    `).join('')}
-                </div>
-                `).join('')}
-            </div>` : ''}
-        </div>
 
         ${fehlendeOffen.length ? (() => {
             // Icons aus Artikeldatenbank holen
