@@ -10520,8 +10520,7 @@ Router.register('buchen', async () => {
     // Warenkorb-Button entfernt - Warenkorb wird jetzt als fixe Leiste unten angezeigt
     
     UI.render(`<style>
-        #buchen-content .main-content { padding: 4px 12px 160px 12px !important; margin: 0 !important; }
-        #buchen-content .category-tabs { padding: 4px 0 !important; margin-bottom: 6px !important; }
+        .category-tabs { padding: 4px 0 !important; margin-bottom: 6px !important; }
         .artikel-tile { border:2px solid var(--tile-color, #2C5F7C) !important; background:white !important; }
         .artikel-tile::before { opacity:1 !important; height:4px !important; }
         .artikel-tile:hover { box-shadow:0 4px 12px rgba(0,0,0,0.12) !important; transform:translateY(-3px); }
@@ -10619,13 +10618,12 @@ Router.register('buchen', async () => {
             </div>
             `).join('')}
         </div>` : ''}
-    </div>
-    <div class="main-content" style="padding:4px 12px 160px 12px !important;">`);
+    </div>`);
 
     // Ampel nach dem Rendern aktualisieren
     setTimeout(() => SyncManager.updateUI(), 100);
 
-    UI.append(`
+    UI.append(`<div style="padding:4px 12px 160px 12px;max-width:1200px;margin:0 auto;">
 
         ${fehlendeOffen.length ? (() => {
             // Icons aus Artikeldatenbank holen
