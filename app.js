@@ -10520,11 +10520,14 @@ Router.register('buchen', async () => {
     // Warenkorb-Button entfernt - Warenkorb wird jetzt als fixe Leiste unten angezeigt
     
     UI.render(`<style>
+        #buchen-content .main-content { padding: 4px 12px 160px 12px !important; margin: 0 !important; }
+        #buchen-content .category-tabs { padding: 4px 0 !important; margin-bottom: 6px !important; }
         .artikel-tile { border:2px solid var(--tile-color, #2C5F7C) !important; background:white !important; }
         .artikel-tile::before { opacity:1 !important; height:4px !important; }
         .artikel-tile:hover { box-shadow:0 4px 12px rgba(0,0,0,0.12) !important; transform:translateY(-3px); }
         .artikel-price { color:var(--tile-color, #2C5F7C) !important; }
     </style>
+    <div id="buchen-content">
     <div class="app-header">
         <div class="header-left">
             <div class="header-title" style="font-size:1.8rem;font-weight:800;letter-spacing:0.5px;"> ${name}</div>
@@ -10707,8 +10710,8 @@ Router.register('buchen', async () => {
                 return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${renderTileContent(a)}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(tilePreis)}</div></div>`;
             }).join('')}
         </div>
-    </div>`);
-    
+    </div></div>`);
+
     // Akkordeon-Zustand wiederherstellen
     if (sessionStorage.getItem('_fehlende_open') === '1') {
         const acc = document.getElementById('fehlende-accordion');
