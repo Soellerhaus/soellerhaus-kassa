@@ -10592,19 +10592,18 @@ Router.register('buchen', async () => {
     setTimeout(() => SyncManager.updateUI(), 100);
     
     UI.append(`
-        ${meineBuchungen.length ? `
         <div class="buchungen-uebersicht" style="background:var(--color-alpine-green);border-radius:12px;margin-bottom:10px;overflow:hidden;">
-            <div onclick="toggleBuchungsDetails()" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+            <div onclick="${meineBuchungen.length ? 'toggleBuchungsDetails()' : ''}" style="padding:10px 14px;${meineBuchungen.length ? 'cursor:pointer;' : ''}display:flex;justify-content:space-between;align-items:center;">
                 <div style="color:white;">
                     <div style="font-weight:700;font-size:0.95rem;"> ${t('my_bookings')}</div>
-                    <div style="font-size:0.8rem;opacity:0.9;">${meineBuchungen.length} Positionen</div>
+                    <div style="font-size:0.8rem;opacity:0.9;">${meineBuchungen.length ? meineBuchungen.length + ' Positionen' : 'Keine offenen Buchungen'}</div>
                 </div>
                 <div style="text-align:right;color:white;">
                     <div style="font-size:1.3rem;font-weight:700;">${Utils.formatCurrency(gesamtSumme)}</div>
-                    <div id="buchungen-arrow" style="font-size:1rem;"></div>
+                    ${meineBuchungen.length ? '<div id="buchungen-arrow" style="font-size:1rem;"></div>' : ''}
                 </div>
             </div>
-            <div id="buchungen-details" style="display:none;background:white;padding:12px;max-height:250px;overflow-y:auto;">
+            ${meineBuchungen.length ? `<div id="buchungen-details" style="display:none;background:white;padding:12px;max-height:250px;overflow-y:auto;">
                 ${Object.keys(nachDatum).map(datum => `
                 <div style="margin-bottom:12px;">
                     <div style="font-weight:700;color:var(--color-alpine-green);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #eee;font-size:0.9rem;">
@@ -10621,10 +10620,9 @@ Router.register('buchen', async () => {
                     `).join('')}
                 </div>
                 `).join('')}
-            </div>
+            </div>` : ''}
         </div>
-        ` : ''}
-        
+
         ${fehlendeOffen.length ? (() => {
             // Icons aus Artikeldatenbank holen
             const artIconMap = {};

@@ -583,6 +583,7 @@ a {
     color: var(--color-slate);
     transition: all var(--transition-fast);
     white-space: nowrap;
+    cursor: pointer;
 }
 
 .category-tab:hover {
