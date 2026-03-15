@@ -10617,7 +10617,7 @@ Router.register('buchen', async () => {
             `).join('')}
         </div>` : ''}
     </div>
-    <div class="main-content" style="padding-top:6px !important;margin-top:0;padding-bottom:160px;">`);
+    <div class="main-content" style="padding:4px 12px 160px 12px !important;">`);
 
     // Ampel nach dem Rendern aktualisieren
     setTimeout(() => SyncManager.updateUI(), 100);
