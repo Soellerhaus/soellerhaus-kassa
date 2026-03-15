@@ -5121,17 +5121,17 @@ Router.register('admin-dashboard', async () => {
             </div>
         </div>
 
-        <!-- DATEN-MANAGEMENT -->
+        <!-- DATEN-MANAGEMENT (DEZENT) -->
         <div style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:12px;">
-            <div style="font-weight:700;margin-bottom:10px;font-size:0.85rem;color:#636e72;">💾 Daten-Management</div>
+            <div style="font-weight:700;margin-bottom:10px;font-size:0.85rem;color:#a0a8b0;">💾 Daten-Management</div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-                <button class="btn" onclick="DataProtection.createFullBackup()" style="padding:10px;background:#27ae60;color:white;border:none;border-radius:8px;font-size:0.8rem;">
-                     Backup<br><small style="opacity:0.8;">${DataProtection.getLastBackupText()}</small>
+                <button onclick="DataProtection.createFullBackup()" style="padding:10px;background:#d5f0de;color:#1e6e3a;border:1px solid #b8e0c8;border-radius:8px;font-size:0.8rem;cursor:pointer;">
+                     Backup<br><small style="opacity:0.7;">${DataProtection.getLastBackupText()}</small>
                 </button>
-                <button class="btn" onclick="DataProtection.selectRestoreFile()" style="padding:10px;background:#e74c3c;color:white;border:none;border-radius:8px;font-size:0.8rem;">
+                <button onclick="DataProtection.selectRestoreFile()" style="padding:10px;background:#f5d5d5;color:#8b2020;border:1px solid #e8b8b8;border-radius:8px;font-size:0.8rem;cursor:pointer;">
                      Backup laden
                 </button>
-                <button class="btn" onclick="migrateLocalToSupabase()" style="padding:10px;background:#9b59b6;color:white;border:none;border-radius:8px;font-size:0.8rem;">
+                <button onclick="migrateLocalToSupabase()" style="padding:10px;background:#e0d5f0;color:#5b2c8c;border:1px solid #cfc0e0;border-radius:8px;font-size:0.8rem;cursor:pointer;">
                     🔄 Lokal → Supabase
                 </button>
             </div>
@@ -7933,6 +7933,7 @@ Router.register('admin-guests', async () => {
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
                     <strong id="sammel-count">0 Gäste ausgewählt</strong>
                     <button class="btn btn-primary" onclick="erstelleSammelrechnung()" style="padding:8px 16px;font-size:0.9rem;">📋 Sammelrechnung erstellen</button>
+                    <small style="color:#856404;font-size:0.75rem;">⚠️ Nur für Selbstversorger geeignet</small>
                     <button class="btn btn-secondary" onclick="exportSammelPDF()" style="padding:8px 16px;font-size:0.9rem;">📄 PDF Zusammenfassung</button>
                 </div>
             </div>
@@ -9503,17 +9504,21 @@ window.erstelleSammelrechnung = async () => {
 };
 
 // PDF Zusammenfassung der ausgewählten Gäste
+window._pdfSelectedGuests = [];
 window.exportSammelPDF = async () => {
     const selected = getSelectedGäste();
     if (selected.length === 0) { Utils.showToast('Bitte Gäste auswählen', 'warning'); return; }
-    
+
+    // Auswahl speichern bevor Modal geöffnet wird
+    window._pdfSelectedGuests = [...selected];
+
     // Datum-Auswahl Modal
     document.body.insertAdjacentHTML('beforeend', `
     <div id="pdf-datum-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:3000;display:flex;justify-content:center;align-items:center;" onclick="if(event.target===this)this.remove()">
         <div style="background:white;border-radius:16px;padding:24px;max-width:450px;width:90%;">
             <h3 style="margin:0 0 16px;">📄 PDF Zusammenfassung</h3>
             <p style="color:#666;font-size:0.9rem;margin-bottom:16px;">${selected.length} Gäste: ${selected.map(s=>s.name).join(', ')}</p>
-            
+
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
                 <div>
                     <label style="font-size:0.85rem;font-weight:600;">Von Datum:</label>
@@ -9524,16 +9529,16 @@ window.exportSammelPDF = async () => {
                     <input type="date" id="pdf-bis" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" value="${new Date().toISOString().split('T')[0]}">
                 </div>
             </div>
-            
+
             <div style="margin-bottom:16px;">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
                     <input type="checkbox" id="pdf-alle" checked>
                     <span style="font-size:0.9rem;">Auch bereits bezahlte/exportierte Buchungen einschließen</span>
                 </label>
             </div>
-            
+
             <div style="display:flex;gap:8px;">
-                <button onclick="generateSammelPDF()" style="flex:1;padding:12px;background:var(--color-alpine-green);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;">PDF erstellen</button>
+                <button onclick="generateSammelPDF()" style="flex:1;padding:12px;background:var(--color-alpine-green, #4A7C59);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;">PDF erstellen</button>
                 <button onclick="document.getElementById('pdf-datum-modal').remove()" style="padding:12px 20px;background:#eee;border:none;border-radius:8px;cursor:pointer;">Abbrechen</button>
             </div>
         </div>
@@ -9541,7 +9546,10 @@ window.exportSammelPDF = async () => {
 };
 
 window.generateSammelPDF = async () => {
-    const selected = getSelectedGäste();
+    // Gespeicherte Auswahl verwenden (nicht erneut aus DOM lesen, da Modal das stören kann)
+    const selected = window._pdfSelectedGuests || getSelectedGäste();
+    if (selected.length === 0) { Utils.showToast('Keine Gäste ausgewählt', 'warning'); return; }
+
     const vonDatum = document.getElementById('pdf-von')?.value || '';
     const bisDatum = document.getElementById('pdf-bis')?.value || '';
     const inclBezahlt = document.getElementById('pdf-alle')?.checked ?? true;
@@ -9663,10 +9671,26 @@ window.generateSammelPDF = async () => {
     
     html += `<div class="gesamt">GESAMTSUMME: ${Utils.formatCurrency(gesamtSumme)}</div></body></html>`;
     
+    // Popup öffnen - Popup-Blocker umgehen durch direktes window.open
     const printWin = window.open('', '_blank');
+    if (!printWin) {
+        // Fallback: als Blob-Download wenn Popup geblockt
+        Utils.showToast('Popup geblockt - PDF wird als Download erstellt...', 'info');
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Zusammenfassung_${selected.map(s=>s.name).join('_')}_${new Date().toISOString().split('T')[0]}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+    }
     printWin.document.write(html);
     printWin.document.close();
-    setTimeout(() => printWin.print(), 500);
+    setTimeout(() => { try { printWin.print(); } catch(e) { console.error('Print error:', e); } }, 500);
+
+    // Auswahl zurücksetzen
+    window._pdfSelectedGuests = [];
 };
 
 // Preismodus Dropdown Toggle
@@ -10493,27 +10517,7 @@ Router.register('buchen', async () => {
     
     const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
     
-    // Warenkorb-Button HTML (oben rechts, kompakt)
-    const warenkorbBtnHtml = sessionBuchungen.length ? `
-        <button onclick="toggleWarenkorbDropdown()" id="warenkorb-btn" style="
-            position: relative;
-            background: var(--color-alpine-green);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            padding: 6px 12px;
-            font-size: 0.95rem;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        ">
-             <span style="background:white;color:var(--color-alpine-green);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;">${sessionCount}</span>
-            <span style="font-size:0.85rem;">${Utils.formatCurrency(sessionTotal)}</span>
-        </button>
-    ` : '';
+    // Warenkorb-Button entfernt - Warenkorb wird jetzt als fixe Leiste unten angezeigt
     
     UI.render(`<style>
         .artikel-tile { border:2px solid var(--tile-color, #2C5F7C) !important; background:white !important; }
@@ -10523,61 +10527,66 @@ Router.register('buchen', async () => {
     </style>
     <div class="app-header">
         <div class="header-left">
-            <div class="header-title"> ${name}</div>
+            <div class="header-title" style="font-size:1.4rem;font-weight:800;letter-spacing:0.5px;"> ${name}</div>
             ${currentGroup ? `<div style="font-size:0.75rem;opacity:0.8;"> ${currentGroup}</div>` : ''}
         </div>
         <div class="header-right" style="display:flex;align-items:center;gap:8px;">
             ${SyncManager.getAmpelHtml()}
-            ${warenkorbBtnHtml}
             <button class="btn btn-secondary" onclick="handleGastAbmelden()" style="padding:6px 10px;font-size:0.9rem;">${t('logout')}</button>
         </div>
     </div>
     
-    <!-- WARENKORB DROPDOWN -->
-    <div id="warenkorb-dropdown" style="
-        display: none;
+    <!-- WARENKORB FIXE LEISTE UNTEN -->
+    <div id="warenkorb-bar" style="
         position: fixed;
-        top: 55px;
-        right: 10px;
-        width: 300px;
-        max-width: calc(100vw - 20px);
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        border: 2px solid var(--color-alpine-green);
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--color-alpine-green, #4A7C59);
+        color: white;
         z-index: 2000;
-        overflow: hidden;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+        border-radius: 16px 16px 0 0;
     ">
-        <div style="padding:10px 14px;background:var(--color-alpine-green);color:white;display:flex;justify-content:space-between;align-items:center;">
-            <strong style="font-size:0.95rem;"> Aktuell gebucht</strong>
-            <button onclick="toggleWarenkorbDropdown()" style="background:none;border:none;color:white;font-size:1.3rem;cursor:pointer;line-height:1;">x</button>
+        <!-- Zusammenfassung-Leiste (immer sichtbar) -->
+        <div onclick="toggleWarenkorbDetails()" style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:1.3rem;">🛒</span>
+                <div>
+                    <div style="font-weight:700;font-size:1rem;">${sessionCount > 0 ? sessionCount + ' Artikel' : 'Warenkorb leer'}</div>
+                    ${sessionCount > 0 ? '<div style="font-size:0.8rem;opacity:0.85;">Antippen zum Anzeigen/Stornieren</div>' : ''}
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-size:1.4rem;font-weight:800;">${Utils.formatCurrency(sessionTotal)}</span>
+                <span id="warenkorb-arrow" style="font-size:0.9rem;">${sessionCount > 0 ? '▲' : ''}</span>
+            </div>
         </div>
-        <div style="padding:10px;max-height:250px;overflow-y:auto;">
+        <!-- Artikel-Details (aufklappbar) -->
+        <div id="warenkorb-details" style="display:none;background:white;max-height:40vh;overflow-y:auto;">
             ${sessionBuchungen.length ? sessionBuchungen.map(b => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#f5f5f5;border-radius:8px;margin-bottom:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #eee;">
                 <div style="flex:1;">
-                    <div style="font-weight:600;font-size:0.9rem;">${b.artikel_name}</div>
-                    <div style="font-size:0.8rem;color:#666;">${b.menge}x ${Utils.formatCurrency(b.preis)}</div>
+                    <div style="font-weight:600;font-size:0.95rem;color:#333;">${b.artikel_name}</div>
+                    <div style="font-size:0.8rem;color:#888;">${b.menge}x ${Utils.formatCurrency(b.preis)}</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="font-weight:700;font-size:0.9rem;">${Utils.formatCurrency(b.preis * b.menge)}</span>
-                    <button onclick="stornoBuchung('${b.buchung_id}')" style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:0.85rem;">x</button>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-weight:700;font-size:1rem;color:#333;">${Utils.formatCurrency(b.preis * b.menge)}</span>
+                    <button onclick="stornoBuchung('${b.buchung_id}')" style="background:#e74c3c;color:white;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:0.9rem;font-weight:700;">Storno</button>
                 </div>
             </div>
-            `).join('') : '<p style="text-align:center;color:#999;padding:15px;font-size:0.9rem;">Noch keine Buchungen</p>'}
+            `).join('') : '<p style="text-align:center;color:#999;padding:20px;font-size:0.95rem;">Noch keine Buchungen in dieser Sitzung</p>'}
         </div>
-        <div style="padding:10px 14px;border-top:1px solid #ddd;background:#fafafa;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <strong style="font-size:0.9rem;">Summe:</strong>
-                <strong style="font-size:1.2rem;color:var(--color-alpine-green);">${Utils.formatCurrency(sessionTotal)}</strong>
-            </div>
-            <button onclick="handleGastAbmelden()" style="width:100%;background:var(--color-alpine-green);color:white;border:none;border-radius:10px;padding:12px;font-size:1rem;font-weight:700;cursor:pointer;">
+        <!-- Fertig Button -->
+        ${sessionCount > 0 ? `
+        <div style="padding:8px 16px 12px;">
+            <button onclick="handleGastAbmelden()" style="width:100%;background:white;color:var(--color-alpine-green, #4A7C59);border:none;border-radius:12px;padding:14px;font-size:1.1rem;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
                  Fertig & Abmelden
             </button>
-        </div>
+        </div>` : ''}
     </div>
     
-    <div class="main-content" style="padding-bottom:20px;">`);
+    <div class="main-content" style="padding-bottom:120px;">`);
     
     // Ampel nach dem Rendern aktualisieren
     setTimeout(() => SyncManager.updateUI(), 100);
@@ -10686,10 +10695,12 @@ Router.register('buchen', async () => {
         </div>`;
         })() : ''}
         
-        <div class="form-group" style="margin-bottom:12px;"><input type="text" class="form-input" placeholder=" ${t('search')}" oninput="searchArtikel(this.value)" style="padding:10px 14px;"></div>
         <div class="category-tabs" style="margin-bottom:14px;">
-            ${sichtbareKats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0)).map(k => `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})" style="${State.selectedCategory===k.kategorie_id ? 'background:'+catColor(k.kategorie_id)+';color:white;border:2px solid '+catColor(k.kategorie_id) : 'border:2px solid '+catColor(k.kategorie_id)+';color:'+catColor(k.kategorie_id)+';background:white'}">${k.name}</div>`).join('')}
-            <div class="category-tab ${State.selectedCategory==='alle'?'active':''}" onclick="filterCategory('alle')" style="${State.selectedCategory==='alle' ? 'background:#555;color:white;border:2px solid #555' : 'border:2px solid #555;color:#555;background:white'}">${t('cat_all')}</div>
+            ${sichtbareKats.sort((a,b) => (a.sortierung||0) - (b.sortierung||0)).map(k => {
+                const catIcons = {1:'💧',2:'🍺',3:'🍷',4:'🥃',5:'☕',6:'🍫',7:'📦'};
+                const icon = catIcons[k.kategorie_id] || '';
+                return `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})" style="${State.selectedCategory===k.kategorie_id ? 'background:'+catColor(k.kategorie_id)+';color:white;border:2px solid '+catColor(k.kategorie_id) : 'border:2px solid '+catColor(k.kategorie_id)+';color:'+catColor(k.kategorie_id)+';background:white'}">${icon} ${k.name}</div>`;
+            }).join('')}
         </div>
         <div class="artikel-grid">
             ${filtered.map(a => {
@@ -10709,24 +10720,19 @@ Router.register('buchen', async () => {
     }
 });
 
-// Warenkorb Dropdown toggle
-window.toggleWarenkorbDropdown = () => {
-    const dropdown = document.getElementById('warenkorb-dropdown');
-    if (dropdown) {
-        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+// Warenkorb Details toggle (fixe Leiste unten)
+window.toggleWarenkorbDetails = () => {
+    const details = document.getElementById('warenkorb-details');
+    const arrow = document.getElementById('warenkorb-arrow');
+    if (details) {
+        const isOpen = details.style.display !== 'none';
+        details.style.display = isOpen ? 'none' : 'block';
+        if (arrow) arrow.textContent = isOpen ? '▲' : '▼';
     }
 };
 
-// Dropdown schließen wenn ausserhalb geklickt
-document.addEventListener('click', (e) => {
-    const dropdown = document.getElementById('warenkorb-dropdown');
-    const btn = document.getElementById('warenkorb-btn');
-    if (dropdown && dropdown.style.display === 'block') {
-        if (!dropdown.contains(e.target) && (!btn || !btn.contains(e.target))) {
-            dropdown.style.display = 'none';
-        }
-    }
-});
+// Legacy alias
+window.toggleWarenkorbDropdown = window.toggleWarenkorbDetails;
 
 
 // Buchungsdetails aufklappen/zuklappen
