@@ -5390,16 +5390,12 @@ window.printAuffuellliste = async () => {
                     font-weight: 700;
                 }
                 .item-name {
-                    width: 25%;
-                    max-width: 25%;
+                    flex: 1;
                     font-weight: 700;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
                 }
                 .item-check {
-                    flex: 1;
-                    text-align: center;
+                    width: 80px;
+                    text-align: right;
                     font-weight: 900;
                     font-size: 16px;
                     font-family: Arial, sans-serif;
