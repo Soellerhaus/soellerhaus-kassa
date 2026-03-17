@@ -5281,7 +5281,7 @@ Router.register('admin-auffuellliste', async () => {
                             ${byKat[kat].map(item => `
                                 <tr style="border-bottom:1px solid var(--color-stone-medium);">
                                     <td style="padding:12px;font-weight:500;">${item.name}</td>
-                                    <td style="padding:12px;text-align:center;color:#888;">__:__</td>
+                                    <td style="padding:12px;text-align:center;color:#888;">____:____</td>
                                     <td style="padding:12px;text-align:right;font-size:1.3rem;font-weight:700;color:var(--color-alpine-green);">${item.menge}x</td>
                                 </tr>
                             `).join('')}
@@ -5389,20 +5389,24 @@ window.printAuffuellliste = async () => {
                     font-size: 14px;
                     font-weight: 700;
                 }
-                .item-name { 
-                    flex: 1; 
+                .item-name {
+                    width: 25%;
+                    max-width: 25%;
                     font-weight: 700;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
                 }
                 .item-check {
-                    width: 50px;
+                    flex: 1;
                     text-align: center;
                     font-weight: 900;
                     font-size: 16px;
                     font-family: Arial, sans-serif;
                 }
-                .item-menge { 
-                    min-width: 35px; 
-                    text-align: right; 
+                .item-menge {
+                    min-width: 35px;
+                    text-align: right;
                     font-weight: 900;
                     font-size: 16px;
                 }
@@ -5433,7 +5437,7 @@ window.printAuffuellliste = async () => {
         </head>
         <body>
             <div class="header">
-                <h1>AUFFUeLLLISTE</h1>
+                <h1>AUFFUELLLISTE</h1>
                 <div class="datum">${datum} ${zeit}</div>
             </div>
             
@@ -5442,16 +5446,15 @@ window.printAuffuellliste = async () => {
                 ${byKat[kat].map(item => `
                     <div class="item">
                         <span class="item-name">${item.name}</span>
-                        <span class="item-check">__:__</span>
+                        <span class="item-check">____:____</span>
                         <span class="item-menge">${item.menge}x</span>
                     </div>
                 `).join('')}
             `).join('')}
             
-            <div class="total">GESAMT: ${total} STUeCK</div>
+            <div class="total">GESAMT: ${total} STUECK</div>
             
             <div class="footer">
-                Söllerhaus Kassa
             </div>
         </body>
         </html>
