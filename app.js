@@ -10510,8 +10510,8 @@ Router.register('buchen', async () => {
     const renderTileContent = (a) => {
         const icon = getSmartIcon(a) || a.icon || '';
         const hasPhoto = a.bild && a.bild.startsWith('data:');
-        const photoHtml = hasPhoto ? `<img src="${a.bild}" style="position:absolute;left:0;top:0;width:48px;height:100%;object-fit:cover;border-radius:10px 0 0 10px;">` : '';
-        return `${photoHtml}<div class="artikel-icon" ${hasPhoto ? 'style="margin-left:20px;"' : ''}>${icon}</div>`;
+        const photoHtml = hasPhoto ? `<img src="${a.bild}" style="width:52px;height:52px;object-fit:contain;border-radius:6px;">` : '';
+        return hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`;
     };
     
     const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
