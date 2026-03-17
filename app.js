@@ -10510,7 +10510,7 @@ Router.register('buchen', async () => {
     const renderTileContent = (a) => {
         const icon = getSmartIcon(a) || a.icon || '';
         const hasPhoto = a.bild && a.bild.startsWith('data:');
-        const photoHtml = hasPhoto ? `<img src="${a.bild}" style="width:80px;height:80px;object-fit:contain;">` : '';
+        const photoHtml = hasPhoto ? `<img src="${a.bild}" style="width:80px;height:80px;object-fit:contain;background:#fff;">` : '';
         return hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`;
     };
     
