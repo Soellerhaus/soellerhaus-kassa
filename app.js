@@ -2544,9 +2544,16 @@ const RegisteredGuests = {
         return [];
     },
     
-    async getAll() { 
+    async getAll() {
         if (supabaseClient && isOnline) {
-            const { data } = await supabaseClient.from('profiles').select('id, vorname, first_name, display_name, group_name, aktiv, geloescht, email, visibleId').eq('geloescht', false).eq('aktiv', true).order('first_name');
+            const { data, error } = await supabaseClient.from('profiles').select('id, vorname, first_name, display_name, group_name, aktiv, geloescht, email, visibleId').eq('geloescht', false).eq('aktiv', true).order('first_name');
+            if (error) {
+                console.error('getAll profiles error:', error);
+                // Fallback: Query ohne optionale Spalten
+                const { data: data2, error: error2 } = await supabaseClient.from('profiles').select('id, vorname, first_name, group_name, aktiv, geloescht, email').eq('geloescht', false).eq('aktiv', true).order('first_name');
+                if (error2) console.error('getAll fallback error:', error2);
+                return (data2 || []).map(g => ({ ...g, firstName: g.first_name }));
+            }
             return (data || []).map(g => ({ ...g, firstName: g.first_name }));
         }
         const all = await db.registeredGuests.toArray();
