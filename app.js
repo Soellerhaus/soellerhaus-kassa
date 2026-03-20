@@ -1118,6 +1118,13 @@ const TagesMenu = {
             menuData = { wochentage: {} };
             this.WOCHENTAGE.forEach(t => { menuData.wochentage[t.toLowerCase()] = JSON.parse(JSON.stringify(def)); });
         }
+        // Zwischenspeicher-Slots initialisieren
+        if (!menuData.zwischenspeicher) { menuData.zwischenspeicher = {}; }
+        for (let i = 1; i <= 7; i++) {
+            if (!menuData.zwischenspeicher['slot'+i]) {
+                menuData.zwischenspeicher['slot'+i] = { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } };
+            }
+        }
         return menuData;
     },
     async speichern(menuData) {
@@ -7479,14 +7486,32 @@ Router.register('admin-tagesmenu', async () => {
         </div>
         <div style="text-align:center;margin-bottom:8px;color:#888;font-size:0.75rem;">💡 Tage per Drag & Drop verschieben oder tauschen</div>
         
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+        <div style="flex:1;min-width:300px;">
         <div style="text-align:center;margin-bottom:16px;"><h2 style="margin:0;font-size:1.3rem;">${tagName}${isHeute ? ' (heute)' : ''}</h2></div>
-        
+
         <div class="card mb-3" style="border:3px solid ${tagMenu.abend?.aktiv ? '#8B4513' : '#ddd'};"><div class="card-header" style="background:${tagMenu.abend?.aktiv ? 'linear-gradient(135deg,#8B4513,#D2691E)' : '#95a5a6'};color:white;"><h2 class="card-title" style="margin:0;color:white;display:flex;align-items:center;gap:10px;"><span>🌙</span> Abendmenü - ${tagName} ${tagMenu.abend?.aktiv ? '<span style="background:rgba(255,255,255,0.3);padding:2px 10px;border-radius:12px;font-size:0.8rem;">AKTIV</span>' : ''}</h2></div><div class="card-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;"><div class="form-group" style="margin:0;"><label class="form-label" style="font-weight:600;font-size:0.85rem;">⏰ Servierzeit</label><input type="time" id="abend-uhrzeit" class="form-input" value="${tagMenu.abend?.uhrzeit || '18:00'}"></div><div class="form-group" style="margin:0;"><label class="form-label" style="font-weight:600;font-size:0.85rem;">🕐 Ausblenden um</label><input type="time" id="abend-ausblenden" class="form-input" value="${tagMenu.abend?.ausblenden_um || '19:30'}"></div></div><div class="form-group"><label class="form-label" style="font-weight:600;">Menü-Text</label><textarea id="abend-text" class="form-input" rows="6" placeholder="Tagessuppe&#10;****&#10;Schweinsbraten mit Knödel&#10;***&#10;Apfelstrudel" style="font-size:0.95rem;line-height:1.5;">${tagMenu.abend?.text || ''}</textarea></div><div style="display:flex;gap:12px;"><button class="btn ${tagMenu.abend?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleWochentagMenu('abend')" style="flex:1;padding:14px;">${tagMenu.abend?.aktiv ? '⏸️ Deaktivieren' : '✅ Aktivieren'}</button>${tagMenu.abend?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('abend')" style="padding:14px;">👁️ Vorschau</button>` : ''}</div></div></div>
-        
+
         <div class="card mb-3" style="border:3px solid ${tagMenu.mittag?.aktiv ? '#f39c12' : '#ddd'};"><div class="card-header" style="background:${tagMenu.mittag?.aktiv ? 'linear-gradient(135deg,#f39c12,#e67e22)' : '#95a5a6'};color:white;"><h2 class="card-title" style="margin:0;color:white;display:flex;align-items:center;gap:10px;"><span>☀️</span> Mittagsmenü - ${tagName} ${tagMenu.mittag?.aktiv ? '<span style="background:rgba(255,255,255,0.3);padding:2px 10px;border-radius:12px;font-size:0.8rem;">AKTIV</span>' : ''}</h2></div><div class="card-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;"><div class="form-group" style="margin:0;"><label class="form-label" style="font-weight:600;font-size:0.85rem;">⏰ Servierzeit</label><input type="time" id="mittag-uhrzeit" class="form-input" value="${tagMenu.mittag?.uhrzeit || '12:00'}"></div><div class="form-group" style="margin:0;"><label class="form-label" style="font-weight:600;font-size:0.85rem;">🕐 Ausblenden um</label><input type="time" id="mittag-ausblenden" class="form-input" value="${tagMenu.mittag?.ausblenden_um || '14:30'}"></div></div><div class="form-group"><label class="form-label" style="font-weight:600;">Menü-Text</label><textarea id="mittag-text" class="form-input" rows="6" placeholder="Gemischter Salat&#10;****&#10;Käsespätzle&#10;***&#10;Dessert" style="font-size:0.95rem;line-height:1.5;">${tagMenu.mittag?.text || ''}</textarea></div><div style="display:flex;gap:12px;"><button class="btn ${tagMenu.mittag?.aktiv ? 'btn-secondary' : 'btn-primary'}" onclick="toggleWochentagMenu('mittag')" style="flex:1;padding:14px;">${tagMenu.mittag?.aktiv ? '⏸️ Deaktivieren' : '✅ Aktivieren'}</button>${tagMenu.mittag?.aktiv ? `<button class="btn btn-primary" onclick="TagesMenu.showModal('mittag')" style="padding:14px;">👁️ Vorschau</button>` : ''}</div></div></div>
-        
+
         <button class="btn btn-block" onclick="speichereWochentagMenu()" style="padding:20px;font-size:1.2rem;background:var(--color-alpine-green);color:white;border:none;">💾 ${tagName} speichern</button>
-    </div>`);
+        </div>
+
+        <div style="width:160px;min-width:140px;">
+            <div style="font-weight:700;font-size:0.85rem;text-align:center;margin-bottom:8px;color:#555;">📋 Zwischenspeicher</div>
+            ${[1,2,3,4,5,6,7].map(i => {
+                const slotKey = 'slot'+i;
+                const slot = menuData.zwischenspeicher?.[slotKey];
+                const hatAbend = slot?.abend?.text?.trim();
+                const hatMittag = slot?.mittag?.text?.trim();
+                const belegt = hatAbend || hatMittag;
+                const preview = hatAbend ? hatAbend.split('\\n')[0].substring(0,20) : (hatMittag ? hatMittag.split('\\n')[0].substring(0,20) : '');
+                return `<div draggable="${belegt ? 'true' : 'false'}" ondragstart="menuDragStart(event,'${slotKey}')" ondragover="event.preventDefault();this.style.outline='3px solid #8B4513'" ondragleave="this.style.outline=''" ondrop="menuDrop(event,'${slotKey}');this.style.outline=''" style="border:2px ${belegt ? 'solid #8B4513' : 'dashed #ccc'};border-radius:8px;padding:8px 10px;margin-bottom:6px;background:${belegt ? '#fef9f3' : '#fafafa'};cursor:${belegt ? 'grab' : 'default'};min-height:36px;display:flex;align-items:center;gap:6px;"><span style="font-weight:700;color:${belegt ? '#8B4513' : '#aaa'};font-size:0.9rem;">${i}</span><span style="font-size:0.7rem;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${belegt ? (hatAbend ? '🌙' : '☀️') + ' ' + preview : 'leer'}</span></div>`;
+            }).join('')}
+            <div style="text-align:center;color:#999;font-size:0.65rem;margin-top:4px;">Menüs hierher ziehen</div>
+        </div>
+        </div>
+    </div>`)
 });
 
 window.selectMenuTag = (tag) => { State.selectedMenuTag = tag; Router.navigate('admin-tagesmenu'); };
@@ -7499,24 +7524,39 @@ window.menuDragStart = (e, tag) => {
     e.target.style.opacity = '0.5';
     setTimeout(() => { if (e.target) e.target.style.opacity = '1'; }, 300);
 };
+// Helper: Menu aus wochentage oder zwischenspeicher lesen
+function _getMenuFrom(menuData, key) {
+    const def = { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } };
+    if (key.startsWith('slot')) return JSON.parse(JSON.stringify(menuData.zwischenspeicher?.[key] || def));
+    return JSON.parse(JSON.stringify(menuData.wochentage?.[key] || def));
+}
+function _setMenuTo(menuData, key, menu) {
+    if (key.startsWith('slot')) { if (!menuData.zwischenspeicher) menuData.zwischenspeicher = {}; menuData.zwischenspeicher[key] = menu; }
+    else { menuData.wochentage[key] = menu; }
+}
+function _menuLabel(key) {
+    if (key.startsWith('slot')) return 'Slot ' + key.replace('slot','');
+    const n = { montag: 'Mo', dienstag: 'Di', mittwoch: 'Mi', donnerstag: 'Do', freitag: 'Fr', samstag: 'Sa', sonntag: 'So' };
+    return n[key] || key;
+}
+
 window.menuDrop = async (e, targetTag) => {
     e.preventDefault();
     const sourceTag = window._menuDragTag;
     if (!sourceTag || sourceTag === targetTag) return;
-    
+
     const menuData = await TagesMenu.getAlleMenus();
-    const sourceMenu = JSON.parse(JSON.stringify(menuData.wochentage[sourceTag] || { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } }));
-    const targetMenu = JSON.parse(JSON.stringify(menuData.wochentage[targetTag] || { abend: { aktiv: false, text: '', uhrzeit: '18:00', ausblenden_um: '19:30' }, mittag: { aktiv: false, text: '', uhrzeit: '12:00', ausblenden_um: '14:30' } }));
-    
+    const sourceMenu = _getMenuFrom(menuData, sourceTag);
+    const targetMenu = _getMenuFrom(menuData, targetTag);
+
     // Tauschen
-    menuData.wochentage[targetTag] = sourceMenu;
-    menuData.wochentage[sourceTag] = targetMenu;
-    
+    _setMenuTo(menuData, targetTag, sourceMenu);
+    _setMenuTo(menuData, sourceTag, targetMenu);
+
     await TagesMenu.speichern(menuData);
-    
-    const tageNamen = { montag: 'Mo', dienstag: 'Di', mittwoch: 'Mi', donnerstag: 'Do', freitag: 'Fr', samstag: 'Sa', sonntag: 'So' };
-    Utils.showToast(`🔄 ${tageNamen[sourceTag]} ↔ ${tageNamen[targetTag]} getauscht`, 'success');
-    State.selectedMenuTag = targetTag;
+
+    Utils.showToast(`🔄 ${_menuLabel(sourceTag)} ↔ ${_menuLabel(targetTag)} getauscht`, 'success');
+    if (!targetTag.startsWith('slot')) State.selectedMenuTag = targetTag;
     Router.navigate('admin-tagesmenu');
 };
 
