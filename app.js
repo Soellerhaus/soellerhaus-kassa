@@ -10748,7 +10748,7 @@ Router.register('buchen', async () => {
                 return `<div class="category-tab ${State.selectedCategory===k.kategorie_id?'active':''}" onclick="filterCategory(${k.kategorie_id})" style="${State.selectedCategory===k.kategorie_id ? 'background:'+catColor(k.kategorie_id)+';color:white;border:2px solid '+catColor(k.kategorie_id) : 'border:2px solid '+catColor(k.kategorie_id)+';color:'+catColor(k.kategorie_id)+';background:white'}">${icon} ${k.name}</div>`;
             }).join('')}
         </div>
-        <div style="text-align:center;margin-bottom:6px;color:#888;font-size:0.72rem;">💡 Lange drücken = mehrere Stück auf einmal buchen</div>
+        ${State.selectedCategory === 4 ? '<div style="text-align:center;margin-bottom:6px;color:#888;font-size:0.72rem;">💡 Lange drücken = mehrere Stück auf einmal buchen</div>' : ''}
         <div class="artikel-grid">
             ${filtered.map(a => {
                 const tilePreis = effektiverModus === 'hp' ? (a.preis_hp ?? a.preis ?? 0) : (a.preis ?? 0);
