@@ -4695,8 +4695,9 @@ Router.register('login', async () => {
     </div>
     ` : '';
     
-    // Fehlende Getränke laden und zusammenfassen
-    const fehlendeOffen = await FehlendeGetränke.getOffene();
+    // Fehlende Getränke: Erst direkt laden, dann Fallback auf gecachte Summary
+    let fehlendeOffen = [];
+    try { fehlendeOffen = await FehlendeGetränke.getOffene(); } catch(e) {}
     const zusammenfassung = {};
     fehlendeOffen.forEach(f => {
         if (!zusammenfassung[f.artikel_name]) {
@@ -4705,20 +4706,43 @@ Router.register('login', async () => {
         zusammenfassung[f.artikel_name].menge++;
     });
     const fehlendeList = Object.values(zusammenfassung);
-    const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
-    
-    const fehlendeHtml = fehlendeList.length ? `
-    <div style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:24px;color:white;max-width:600px;margin:0 auto 24px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <span style="font-size:1.3rem;">⚠</span>
-            <div style="font-weight:700;">${t('missing_drinks')}</div>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-            ${fehlendeList.map(f => `<span style="background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:20px;font-size:0.9rem;">${f.menge}x ${f.name}</span>`).join('')}
-        </div>
-        <div style="font-size:0.85rem;opacity:0.9;">${t('total')}: ${Utils.formatCurrency(gesamtPreis)} * ${t('please_take_after_login')}</div>
-    </div>
-    ` : '';
+    let fehlAnzahl = fehlendeOffen.length;
+    let fehlBetrag = fehlendeOffen.reduce((s, f) => s + (f.artikel_preis || 0), 0);
+
+    // Fallback: gecachte Summary aus settings laden (RLS-sicher, auch ohne Login)
+    if (fehlAnzahl === 0 && supabaseClient && isOnline) {
+        try {
+            const { data: summaryData } = await supabaseClient.from('settings').select('value').eq('key', 'fehlende_summary').single();
+            if (summaryData?.value) {
+                const sv = typeof summaryData.value === 'string' ? JSON.parse(summaryData.value) : summaryData.value;
+                fehlAnzahl = sv.anzahl || 0;
+                fehlBetrag = sv.betrag || 0;
+            }
+        } catch(e) {}
+    }
+
+    let fehlendeHtml = '';
+    if (fehlendeList.length > 0) {
+        fehlendeHtml = `
+        <div style="background:linear-gradient(135deg, #f39c12, #e74c3c);border-radius:16px;padding:16px;margin-bottom:24px;color:white;max-width:600px;margin:0 auto 24px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                <span style="font-size:1.3rem;">⚠</span>
+                <div style="font-weight:700;">${t('missing_drinks')}</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+                ${fehlendeList.map(f => `<span style="background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:20px;font-size:0.9rem;">${f.menge}x ${f.name}</span>`).join('')}
+            </div>
+            <div style="font-size:0.85rem;opacity:0.9;">${t('total')}: ${Utils.formatCurrency(fehlBetrag)} * ${t('please_take_after_login')}</div>
+        </div>`;
+    } else if (fehlAnzahl > 0) {
+        fehlendeHtml = `
+        <div style="background:linear-gradient(135deg, #e67e22, #f39c12);border-radius:16px;padding:16px;margin-bottom:24px;color:white;max-width:600px;margin:0 auto 24px;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+                <span style="font-size:1.3rem;">⚠</span>
+                <div><span style="font-weight:700;font-size:1.1rem;">${fehlAnzahl} fehlende Getraenke</span><span style="margin-left:10px;opacity:0.9;">${Utils.formatCurrency(fehlBetrag)}</span></div>
+            </div>
+        </div>`;
+    }
     
     // Sprachauswahl Button mit WhatsApp (nur auf Startseite)
     const langBtn = i18n.renderLangButtonWithWhatsApp();
@@ -5010,6 +5034,13 @@ Router.register('admin-dashboard', async () => {
     
     try {
         fehlendeOffen = await FehlendeGetränke.getOffene();
+        // Fehlende-Summary fuer Login-Seite in settings cachen (RLS-sicher)
+        if (supabaseClient && isOnline) {
+            try {
+                const fehlGesamtPreis = fehlendeOffen.reduce((s, f) => s + (f.artikel_preis || 0), 0);
+                await supabaseClient.from('settings').upsert({ key: 'fehlende_summary', value: { anzahl: fehlendeOffen.length, betrag: fehlGesamtPreis } });
+            } catch(e2) { console.error('fehlende summary cache error:', e2); }
+        }
     } catch(e) { console.error('fehlende error:', e); }
     
     // Offene Käse-Bestellungen laden
