@@ -4659,8 +4659,9 @@ Router.register('login', async () => {
         nachrichtHtml = GastNachricht.renderHtml(nachricht);
     }
     
-    // Tagesmenü laden
-    const tagesMenu = await TagesMenu.getAktiv();
+    // Tagesmenü laden (erst ab 07:30 anzeigen)
+    const jetztMinuten = new Date().getHours() * 60 + new Date().getMinutes();
+    const tagesMenu = jetztMinuten >= 7 * 60 + 30 ? await TagesMenu.getAktiv() : null;
     const tagesMenuHtml = tagesMenu ? `<div style="max-width:600px;margin:0 auto 24px;">${TagesMenu.renderButtons(tagesMenu)}</div>` : '';
     
     // Gast-spezifische Nachrichten laden (GastNachrichten - mehrere pro Gast möglich)
@@ -5134,6 +5135,11 @@ Router.register('admin-dashboard', async () => {
             </button>
             <button class="btn btn-block" onclick="Router.navigate('admin-alte-belege')" style="padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, #636e72, #2d3436);color:white;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(45,52,54,0.3);">
                 📋 Belege drucken
+            </button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px;">
+            <button class="btn btn-block" onclick="Router.navigate('admin-checkout-uebersicht')" style="padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, #0984e3, #6c5ce7);color:white;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(9,132,227,0.3);">
+                🧾 Checkout-Übersicht (alle Gäste)
             </button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
@@ -6004,6 +6010,135 @@ window.druckeBeleg = async (gastId, gastName, gesamtSumme) => {
     let rows=''; Object.keys(byD).sort().forEach(d=>{const bs=byD[d]; rows+=`<tr><td colspan="4" style="padding:6px 0 2px;font-weight:700;border-top:1px dashed #000;font-size:11px;">--- ${d} ---</td></tr>`; bs.forEach(b=>{rows+=`<tr><td style="padding:1px 2px;font-size:11px;">${b.uhrzeit||''}</td><td style="padding:1px 2px;font-size:11px;">${b.artikel_name||'-'}</td><td style="padding:1px 2px;text-align:right;font-size:11px;">${b.menge||0}</td><td style="padding:1px 2px;text-align:right;font-size:11px;">${fmt((b.preis||0)*(b.menge||0))}</td></tr>`;});});
     const pw = window.open('','_blank','width=350,height=700');
     pw.document.write(`<!DOCTYPE html><html><head><title>Beleg ${gastName}</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Courier New',monospace;width:72mm;padding:4mm;font-size:11px;line-height:1.3;}table{width:100%;border-collapse:collapse;}@media print{.no-print{display:none!important;}body{width:72mm;padding:2mm;}}</style></head><body><div style="text-align:center;margin-bottom:8px;"><div style="font-size:14px;font-weight:700;">BELEG</div><div style="font-size:13px;font-weight:700;margin:4px 0;">${gastName}</div><div style="font-size:10px;">${new Date().toLocaleString('de-AT')}</div></div><div style="border-top:1px dashed #000;border-bottom:1px dashed #000;margin:4px 0;padding:2px 0;"><table><thead><tr style="font-weight:700;font-size:10px;"><td>Zeit</td><td>Artikel</td><td style="text-align:right;">Anz</td><td style="text-align:right;">Preis</td></tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:6px;padding-top:4px;border-top:2px solid #000;"><table style="font-size:12px;"><tr><td style="font-weight:700;">GESAMT:</td><td style="text-align:right;font-weight:700;font-size:14px;">${fmt(gesamtSumme)}</td></tr></table></div><div style="margin-top:6px;border-top:1px dashed #000;padding-top:4px;font-size:10px;"><table><tr><td>Netto (${mwstSatz}%):</td><td style="text-align:right;">${fmt(netto)}</td></tr><tr><td>MwSt ${mwstSatz}%:</td><td style="text-align:right;">${fmt(mwstBetrag)}</td></tr><tr style="font-weight:700;"><td>Brutto:</td><td style="text-align:right;">${fmt(gesamtSumme)}</td></tr></table></div><div style="text-align:center;margin-top:8px;font-size:9px;border-top:1px dashed #000;padding-top:4px;">Vielen Dank für Ihren Aufenthalt!</div><div class="no-print" style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;font-size:14px;background:#333;color:white;border:none;border-radius:6px;cursor:pointer;">🖨️ Drucken</button> <button onclick="window.close()" style="padding:10px 24px;font-size:14px;background:#999;color:white;border:none;border-radius:6px;cursor:pointer;">Schließen</button></div></body></html>`);
+    pw.document.close();
+};
+
+// ============ CHECKOUT-ÜBERSICHT (alle aktiven Gäste mit Summen) ============
+Router.register('admin-checkout-uebersicht', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+
+    let gaeste = [];
+    if (supabaseClient && isOnline) {
+        try {
+            const { data } = await supabaseClient.from('profiles').select('id, vorname, first_name, display_name, group_name').eq('aktiv', true).eq('geloescht', false).order('vorname');
+            if (data) gaeste = data;
+        } catch(e) { console.error('Checkout-Übersicht Gäste laden:', e); }
+    }
+
+    // Deduplizierung
+    const seenNames = new Set();
+    gaeste = gaeste.filter(g => {
+        const name = (g.display_name || g.vorname || g.first_name || '').toUpperCase().trim();
+        if (seenNames.has(name)) return false;
+        seenNames.add(name);
+        return true;
+    });
+
+    // Buchungen für alle aktiven Gäste laden
+    const gastSummen = [];
+    let gesamtSummeAlle = 0;
+
+    for (const gast of gaeste) {
+        const name = gast.display_name || gast.vorname || gast.first_name || '?';
+        let buchungen = [];
+        try {
+            const { data } = await supabaseClient.from('buchungen').select('preis, menge, storniert')
+                .or(`user_id.eq.${gast.id},gast_id.eq.${gast.id}`)
+                .eq('storniert', false);
+            if (data) buchungen = data;
+        } catch(e) {}
+
+        const summe = buchungen.reduce((s, b) => s + (b.preis || 0) * (b.menge || 0), 0);
+        gastSummen.push({ id: gast.id, name, gruppe: gast.group_name || '-', anzahl: buchungen.length, summe });
+        gesamtSummeAlle += summe;
+    }
+
+    // Nach Name sortieren
+    gastSummen.sort((a, b) => a.name.localeCompare(b.name));
+
+    const fmt = Utils.formatCurrency;
+
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🧾 Checkout-Übersicht</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Router.navigate('admin-dashboard')">← Dashboard</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3" style="background:linear-gradient(135deg,#0984e3,#6c5ce7);color:white;"><div style="padding:16px;text-align:center;"><div style="font-size:1.3rem;font-weight:700;">🧾 Checkout-Übersicht</div><div style="opacity:0.9;font-size:0.9rem;">${gastSummen.length} aktive Gäste | Gesamt: ${fmt(gesamtSummeAlle)}</div></div></div>
+
+        <button class="btn btn-primary btn-block" onclick="druckeCheckoutUebersicht()" style="padding:14px;margin-bottom:16px;font-size:1rem;">🖨️ Übersicht drucken (Thermodrucker)</button>
+
+        <div class="card">
+            <div class="card-header" style="background:#fffde7;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-weight:700;">Aktive Gäste mit offenen Beträgen</span>
+                <span style="font-weight:700;color:#0984e3;">${fmt(gesamtSummeAlle)}</span>
+            </div>
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+                    <thead>
+                        <tr style="background:#fffde7;">
+                            <th style="padding:10px;border:1px solid #ddd;text-align:left;">Gast</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:left;">Gruppe</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:center;">Buchungen</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:right;">Betrag</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${gastSummen.length === 0 ? '<tr><td colspan="4" style="padding:20px;text-align:center;color:#666;">Keine aktiven Gäste</td></tr>' : gastSummen.map(g => `
+                        <tr style="border-bottom:1px solid #eee;${g.summe === 0 ? 'opacity:0.5;' : ''}">
+                            <td style="padding:10px;border:1px solid #ddd;font-weight:600;">${g.name}</td>
+                            <td style="padding:10px;border:1px solid #ddd;font-size:0.85rem;">${g.gruppe}</td>
+                            <td style="padding:10px;border:1px solid #ddd;text-align:center;">${g.anzahl}</td>
+                            <td style="padding:10px;border:1px solid #ddd;text-align:right;font-weight:700;${g.summe > 0 ? 'color:#e74c3c;' : ''}">${fmt(g.summe)}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background:#fffde7;font-weight:700;">
+                            <td style="padding:12px;border:1px solid #ddd;" colspan="2">GESAMT</td>
+                            <td style="padding:12px;border:1px solid #ddd;text-align:center;">${gastSummen.reduce((s,g) => s + g.anzahl, 0)}</td>
+                            <td style="padding:12px;border:1px solid #ddd;text-align:right;font-size:1.1rem;color:#e74c3c;">${fmt(gesamtSummeAlle)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>`);
+});
+
+window.druckeCheckoutUebersicht = async () => {
+    let gaeste = [];
+    if (supabaseClient && isOnline) {
+        try {
+            const { data } = await supabaseClient.from('profiles').select('id, vorname, first_name, display_name, group_name').eq('aktiv', true).eq('geloescht', false).order('vorname');
+            if (data) gaeste = data;
+        } catch(e) {}
+    }
+    const seenNames = new Set();
+    gaeste = gaeste.filter(g => {
+        const name = (g.display_name || g.vorname || g.first_name || '').toUpperCase().trim();
+        if (seenNames.has(name)) return false;
+        seenNames.add(name);
+        return true;
+    });
+
+    const gastSummen = [];
+    let gesamtSumme = 0;
+    for (const gast of gaeste) {
+        const name = gast.display_name || gast.vorname || gast.first_name || '?';
+        let buchungen = [];
+        try {
+            const { data } = await supabaseClient.from('buchungen').select('preis, menge').or(`user_id.eq.${gast.id},gast_id.eq.${gast.id}`).eq('storniert', false);
+            if (data) buchungen = data;
+        } catch(e) {}
+        const summe = buchungen.reduce((s, b) => s + (b.preis || 0) * (b.menge || 0), 0);
+        if (summe > 0) {
+            gastSummen.push({ name, summe, anzahl: buchungen.length });
+            gesamtSumme += summe;
+        }
+    }
+    gastSummen.sort((a, b) => a.name.localeCompare(b.name));
+
+    const fmt = (v) => new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+    let rows = gastSummen.map(g => `<tr><td style="padding:2px 0;font-size:11px;">${g.name}</td><td style="padding:2px 0;text-align:center;font-size:10px;">${g.anzahl}</td><td style="padding:2px 0;text-align:right;font-size:11px;font-weight:600;">${fmt(g.summe)}</td></tr>`).join('');
+
+    const pw = window.open('', '_blank', 'width=350,height=700');
+    pw.document.write(`<!DOCTYPE html><html><head><title>Checkout-Übersicht</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Courier New',monospace;width:72mm;padding:4mm;font-size:11px;line-height:1.3;}table{width:100%;border-collapse:collapse;}@media print{.no-print{display:none!important;}body{width:72mm;padding:2mm;}}</style></head><body><div style="text-align:center;margin-bottom:8px;"><div style="font-size:14px;font-weight:700;">CHECKOUT-ÜBERSICHT</div><div style="font-size:10px;">${new Date().toLocaleString('de-AT')}</div><div style="font-size:10px;">${gastSummen.length} Gäste mit offenen Beträgen</div></div><div style="border-top:1px dashed #000;margin:4px 0;padding:4px 0;"><table><thead><tr style="font-weight:700;font-size:10px;border-bottom:1px dashed #000;"><td>Gast</td><td style="text-align:center;">Anz</td><td style="text-align:right;">Betrag</td></tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:6px;padding-top:4px;border-top:2px solid #000;"><table style="font-size:13px;"><tr><td style="font-weight:700;">GESAMT:</td><td style="text-align:right;font-weight:700;font-size:15px;">${fmt(gesamtSumme)}</td></tr></table></div><div style="text-align:center;margin-top:8px;font-size:9px;border-top:1px dashed #000;padding-top:4px;">Söllerhaus Checkout-Kontrolle</div><div class="no-print" style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;font-size:14px;background:#333;color:white;border:none;border-radius:6px;cursor:pointer;">🖨️ Drucken</button> <button onclick="window.close()" style="padding:10px 24px;font-size:14px;background:#999;color:white;border:none;border-radius:6px;cursor:pointer;">Schließen</button></div></body></html>`);
     pw.document.close();
 };
 
@@ -9117,7 +9252,7 @@ window.renderSchnellbuchenModal = () => {
                         padding:14px 10px;text-align:center;cursor:pointer;transition:all 0.15s;
                         box-shadow:0 2px 6px rgba(0,0,0,0.08);
                     " onmouseover="this.style.transform='scale(1.03)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 6px rgba(0,0,0,0.08)'">
-                        <div style="font-size:1.8rem;margin-bottom:4px;">${getSmartIcon(a) || a.icon || ''}</div>
+                        ${a.bild && a.bild.startsWith('data:') ? `<img src="${a.bild}" style="width:80px;height:80px;object-fit:contain;background:#fff;margin-bottom:4px;">` : `<div style="font-size:1.8rem;margin-bottom:4px;">${getSmartIcon(a) || a.icon || ''}</div>`}
                         <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">${a.name}</div>
                         <div style="color:${catColor(a.kategorie_id)};font-weight:700;font-size:1rem;">${Utils.formatCurrency(State.currentPreisModus === 'hp' ? (a.preis_hp ?? a.preis) : a.preis)}</div>
                     </div>
@@ -9138,12 +9273,15 @@ window.schnellbuchenArtikelWaehlen = (artikelId) => {
     const art = window._schnellArts.find(a => a.artikel_id === artikelId);
     if (!art) return;
     
+    // Preis basierend auf aktuellem Preismodus ermitteln
+    const artikelPreis = State.currentPreisModus === 'hp' ? (art.preis_hp ?? art.preis) : art.preis;
+
     // Mengenabfrage per prompt (schnell per Tastatur)
-    const menge = prompt(`${art.name} (${Utils.formatCurrency(art.preis)})\n\nAnzahl eingeben:`, '1');
+    const menge = prompt(`${art.name} (${Utils.formatCurrency(artikelPreis)})\n\nAnzahl eingeben:`, '1');
     if (!menge || isNaN(parseInt(menge)) || parseInt(menge) < 1) return;
-    
+
     const anzahl = parseInt(menge);
-    
+
     // Zum Warenkorb hinzufügen (gleiche Artikel zusammenfassen)
     const existing = window._schnellWarenkorb.find(w => w.artikel_id === artikelId);
     if (existing) {
@@ -9152,7 +9290,7 @@ window.schnellbuchenArtikelWaehlen = (artikelId) => {
         window._schnellWarenkorb.push({
             artikel_id: art.artikel_id,
             name: art.name,
-            preis: art.preis,
+            preis: artikelPreis,
             menge: anzahl,
             kategorie_id: art.kategorie_id,
             icon: art.icon
