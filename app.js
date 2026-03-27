@@ -8020,6 +8020,22 @@ Router.register('admin-guests', async () => {
         return nameA.localeCompare(nameB);
     });
     
+    // Buchungssummen für alle Gäste laden
+    const kontoSummen = {};
+    let kontoGesamt = 0;
+    if (supabaseClient && isOnline) {
+        for (const g of guests) {
+            try {
+                const { data } = await supabaseClient.from('buchungen').select('preis, menge, storniert')
+                    .or(`user_id.eq.${g.id},gast_id.eq.${g.id}`)
+                    .eq('storniert', false);
+                const summe = (data || []).reduce((s, b) => s + (b.preis || 0) * (b.menge || 0), 0);
+                kontoSummen[g.id] = summe;
+                kontoGesamt += summe;
+            } catch(e) { kontoSummen[g.id] = 0; }
+        }
+    }
+
     // Gruppen laden
     const gruppen = await db.gruppen.toArray();
     const gruppenAktiv = gruppen.filter(g => g.aktiv);
@@ -8076,7 +8092,7 @@ Router.register('admin-guests', async () => {
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;width:30px;"><input type="checkbox" onclick="toggleAllGäste(this.checked)" title="Alle auswählen"></th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:120px;">Nachname</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:left;min-width:150px;">Gruppenname</th>
-                            <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:100px;">Passwort (PIN)</th>
+                            <th style="padding:10px;border:1px solid #ddd;text-align:right;min-width:90px;">Konto</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:120px;">Registriert</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:140px;">Letzter Login</th>
                             <th style="padding:10px;border:1px solid #ddd;text-align:center;min-width:100px;">Ausnahme Umlage</th>
@@ -8088,9 +8104,8 @@ Router.register('admin-guests', async () => {
                         ${guests.length === 0 ? '<tr><td colspan="9" style="padding:20px;text-align:center;color:#666;">Keine Gäste vorhanden</td></tr>' : guests.map(g => {
                             const name = g.nachname || g.firstName || '-';
                             const grpName = g.gruppenname || g.group_name || 'keiner Gruppe zugehörig';
-                            const pw = g.passwort || g.passwordHash || g.pin_hash;
-                            const pwDisplay = pw ? '<span style="color:#27ae60;">🔒 PIN gesetzt</span>' : '<span style="color:#e74c3c;">⚠️ KEINE PIN</span>';
-                            const pwStyle = '';
+                            const kontoWert = kontoSummen[g.id] || 0;
+                            const kontoDisplay = Utils.formatCurrency(kontoWert);
                             const ausnahme = g.ausnahmeumlage || false;
                             const gastPM = g.gast_preismodus || 'default';
                             const effectivePM = gastPM === 'default' ? (State.currentPreisModus || 'sv') : gastPM;
@@ -8110,7 +8125,7 @@ Router.register('admin-guests', async () => {
                                 </td>
                                 <td style="padding:10px;border:1px solid #ddd;font-weight:600;">${name}</td>
                                 <td style="padding:10px;border:1px solid #ddd;">${grpName}</td>
-                                <td style="padding:10px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:1.2rem;font-weight:bold;${pwStyle}">${pwDisplay}</td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:right;font-weight:700;${kontoWert > 0 ? 'color:#e74c3c;' : 'color:#999;'}">${kontoDisplay}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;font-size:0.85rem;color:#27ae60;">${createdFormatted}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;font-size:0.85rem;color:#666;">${lastLoginFormatted}</td>
                                 <td style="padding:10px;border:1px solid #ddd;text-align:center;">
@@ -8133,7 +8148,7 @@ Router.register('admin-guests', async () => {
                 </table>
             </div>
             <div style="padding:12px;background:#f8f9fa;border-top:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <small>Gesamt: ${guests.length} aktive Gäste | Ausgenommen von Umlage: ${guests.filter(g => g.ausnahmeumlage).length}</small>
+                <small>Gesamt: ${guests.length} aktive Gäste | Konto gesamt: <strong style="color:#e74c3c;">${Utils.formatCurrency(kontoGesamt)}</strong> | Ausgenommen von Umlage: ${guests.filter(g => g.ausnahmeumlage).length}</small>
                 <div style="display:flex;gap:8px;">
                     ${inaktivCount > 0 ? `<button class="btn btn-secondary" onclick="Router.navigate('admin-guests-inaktiv')" style="padding:6px 12px;font-size:0.85rem;"> Inaktive (${inaktivCount})</button>` : ''}
                     <button class="btn btn-secondary" onclick="syncPinsToSupabase()" style="padding:6px 12px;font-size:0.85rem;"> Sync</button>
