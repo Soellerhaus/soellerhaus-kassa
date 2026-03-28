@@ -6518,15 +6518,18 @@ Router.register('admin-umlage', async () => {
     // Gäste von Supabase laden
     let totalGuests = 0;
     let ausgenommen = 0;
-    
+    let aktiveGäste = [];
+
     if (supabaseClient && isOnline) {
         const { data: profiles } = await supabaseClient
             .from('profiles')
             .select('*')
             .eq('aktiv', true)
-            .eq('geloescht', false);
-        
+            .eq('geloescht', false)
+            .order('vorname');
+
         if (profiles) {
+            aktiveGäste = profiles;
             // Gäste mit Ausnahme zählen
             const ohneAusnahme = profiles.filter(g => g.ausnahmeumlage !== true);
             totalGuests = ohneAusnahme.length;
@@ -6602,8 +6605,99 @@ Router.register('admin-umlage', async () => {
             </div>
         </div>
         `}
+
+        <div class="card mt-3">
+            <div class="card-header" style="background:linear-gradient(135deg,#2c3e50,#34495e);color:white;">
+                <h3 style="margin:0;">💰 Manuelle Umlage auf Einzelkonto</h3>
+            </div>
+            <div class="card-body">
+                <p style="color:var(--color-stone-dark);margin-bottom:16px;">Einem einzelnen aktiven Konto einen Umlage-Betrag zuweisen.</p>
+                <div style="margin-bottom:12px;">
+                    <label style="font-weight:600;display:block;margin-bottom:6px;">Konto auswählen:</label>
+                    <select id="umlage-manual-konto" class="form-input" style="width:100%;padding:12px;font-size:1rem;">
+                        <option value="">-- Konto wählen --</option>
+                        ${aktiveGäste.map(g => {
+                            const name = g.vorname || g.display_name || g.first_name || 'Unbekannt';
+                            const gruppe = g.group_name && g.group_name !== 'keiner Gruppe zugehörig' && g.group_name !== 'keiner Gruppe zugehoerig' ? ' (' + g.group_name + ')' : '';
+                            const ausnahme = g.ausnahmeumlage === true ? ' ⚠️' : '';
+                            return '<option value="' + g.id + '" data-gast-name="' + name + '" data-group="' + (g.group_name || '') + '">' + name + gruppe + ausnahme + '</option>';
+                        }).join('')}
+                    </select>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-weight:600;display:block;margin-bottom:6px;">Betrag (€):</label>
+                    <input type="number" id="umlage-manual-betrag" class="form-input" step="0.01" min="0.01" placeholder="0.00" style="width:100%;padding:12px;font-size:1.1rem;">
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="font-weight:600;display:block;margin-bottom:6px;">Beschreibung (optional):</label>
+                    <input type="text" id="umlage-manual-beschreibung" class="form-input" placeholder="z.B. Umlage Reinigung" style="width:100%;padding:12px;font-size:1rem;">
+                </div>
+                <button class="btn btn-block" onclick="bucheManuelleUmlage()" style="padding:16px;font-size:1.1rem;background:linear-gradient(135deg,#2c3e50,#34495e);color:white;border:none;font-weight:700;">
+                    💰 Umlage buchen
+                </button>
+            </div>
+        </div>
     </div>`);
 });
+
+window.bucheManuelleUmlage = async () => {
+    if (!supabaseClient || !isOnline) {
+        Utils.showToast('Keine Internetverbindung!', 'error');
+        return;
+    }
+
+    const select = document.getElementById('umlage-manual-konto');
+    const gastId = select?.value;
+    if (!gastId) {
+        Utils.showToast('Bitte ein Konto auswählen!', 'warning');
+        return;
+    }
+
+    const betragInput = document.getElementById('umlage-manual-betrag');
+    const betrag = parseFloat(betragInput?.value);
+    if (!betrag || betrag <= 0) {
+        Utils.showToast('Bitte einen gültigen Betrag eingeben!', 'warning');
+        return;
+    }
+
+    const beschreibung = document.getElementById('umlage-manual-beschreibung')?.value?.trim();
+    const gastName = select.querySelector(`option[value="${gastId}"]`)?.dataset?.gastName || 'Unbekannt';
+    const groupName = select.querySelector(`option[value="${gastId}"]`)?.dataset?.group || '';
+    const artikelName = beschreibung ? `Umlage: ${beschreibung}` : 'Umlage';
+
+    if (!confirm(`Manuelle Umlage buchen?\n\nKonto: ${gastName}\nBetrag: ${Utils.formatCurrency(betrag)}\nBeschreibung: ${artikelName}`)) {
+        return;
+    }
+
+    const heute = Utils.getBuchungsDatum();
+    const uhrzeit = Utils.formatTime(new Date());
+
+    const { error } = await supabaseClient.from('buchungen').insert({
+        buchung_id: Utils.uuid(),
+        user_id: gastId,
+        gast_vorname: gastName,
+        artikel_id: 324,
+        artikel_name: artikelName,
+        preis: betrag,
+        menge: 1,
+        datum: heute,
+        uhrzeit: uhrzeit,
+        erstellt_am: new Date().toISOString(),
+        storniert: false,
+        exportiert: false,
+        ist_umlage: true,
+        group_name: groupName
+    });
+
+    if (error) {
+        console.error('❌ Manuelle Umlage Fehler:', error);
+        Utils.showToast('Fehler beim Buchen der Umlage!', 'error');
+        return;
+    }
+
+    Utils.showToast(`✅ Umlage ${Utils.formatCurrency(betrag)} auf "${gastName}" gebucht`, 'success');
+    Router.navigate('admin-umlage');
+};
 
 window.bucheUmlageFürAlle = async () => {
     // NUR Supabase!
