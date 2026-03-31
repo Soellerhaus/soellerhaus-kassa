@@ -10837,7 +10837,7 @@ Router.register('buchen', async () => {
         const hasPhoto = a.bild && a.bild.startsWith('data:');
         const photoHtml = hasPhoto ? `<img src="${a.bild}" style="width:80px;height:80px;object-fit:contain;background:#fff;">` : '';
         const fastLeer = a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date();
-        const badge = fastLeer ? `<div class="fast-leer-badge">🧊 nur Kühlschrank</div>` : '';
+        const badge = fastLeer ? `<div class="fast-leer-badge">🧊 nur noch was im Kühlschrank</div>` : '';
         return (hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`) + badge;
     };
     
