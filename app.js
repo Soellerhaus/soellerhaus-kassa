@@ -10839,9 +10839,12 @@ Router.register('buchen', async () => {
         return hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`;
     };
     const lagerHinweis = (a) => {
-        if (a.nicht_lieferbar) return `<div class="lager-hinweis">nicht mehr lieferbar!</div>`;
-        if (!(a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())) return '';
-        return `<div class="lager-hinweis">${a.komplett_aus ? 'komplett aus' : 'fast aus'}</div>`;
+        const now = new Date();
+        const hints = [];
+        if (a.fast_leer_bis       && new Date(a.fast_leer_bis)        > now) hints.push('fast aus');
+        if (a.komplett_aus_bis    && new Date(a.komplett_aus_bis)     > now) hints.push('komplett aus');
+        if (a.nicht_lieferbar_bis && new Date(a.nicht_lieferbar_bis)  > now) hints.push('nicht mehr lieferbar!');
+        return hints.map(h => `<div class="lager-hinweis">${h}</div>`).join('');
     };
     
     const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
@@ -12048,30 +12051,25 @@ window.showEditArticleModal = async id => {
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
     <div style="background:#fff8f0;border:1.5px solid #e65100;border-radius:12px;padding:14px;margin-top:16px;">
         <div style="font-weight:700;margin-bottom:10px;color:#e65100;font-size:0.9rem;">Lagerhinweis</div>
-        ${a.nicht_lieferbar
-            ? `<div style="color:#b34000;font-size:0.83rem;margin-bottom:10px;font-weight:600;">Aktiv: <strong>nicht mehr lieferbar!</strong></div>
-               <button type="button" onclick="setFastLeer('reset',0)" style="width:100%;padding:8px;border:1.5px solid #999;background:white;color:#666;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
-            : (a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())
-            ? `<div style="color:#b34000;font-size:0.83rem;margin-bottom:10px;">
-                   Aktiv: <strong>${a.komplett_aus ? 'komplett aus' : 'fast aus'}</strong> — bis ${new Date(a.fast_leer_bis).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}
-               </div>
-               <button type="button" onclick="setFastLeer('reset',0)" style="width:100%;padding:8px;border:1.5px solid #999;background:white;color:#666;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
-            : `${[
-                  {typ:'fast',           label:'fast aus',            color:'#e65100'},
-                  {typ:'komplett',       label:'komplett aus',         color:'#c62828'},
-                  {typ:'nicht_lieferbar',label:'nicht mehr lieferbar!',color:'#880000'}
-               ].map(({typ,label,color}) => `
-                   <div style="margin-bottom:10px;">
-                       <div style="font-size:0.78rem;font-weight:700;color:${color};margin-bottom:5px;">${label}</div>
-                       <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;">
-                           ${typ === 'nicht_lieferbar'
-                               ? `<button type="button" onclick="setFastLeer('nicht_lieferbar',0)" style="grid-column:1/-1;padding:7px;border:1.5px solid ${color};background:white;color:${color};border-radius:6px;font-size:0.78rem;font-weight:700;cursor:pointer;">dauerhaft setzen</button>`
-                               : [1,2,3,4,5,6,7].map(t=>`<button type="button" onclick="setFastLeer('${typ}',${t})" style="padding:5px 2px;border:1.5px solid ${color};background:white;color:${color};border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;">${t}T</button>`).join('') +
-                                 `<button type="button" onclick="setFastLeer('${typ}',14)" style="padding:5px 2px;border:1.5px solid ${color};background:white;color:${color};border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;">2W</button>`
-                           }
-                       </div>
-                   </div>`).join('')}`
-        }
+        ${[
+            {typ:'fast',           field:'fast_leer_bis',       label:'fast aus',             color:'#e65100'},
+            {typ:'komplett',       field:'komplett_aus_bis',    label:'komplett aus',          color:'#c62828'},
+            {typ:'nicht_lieferbar',field:'nicht_lieferbar_bis', label:'nicht mehr lieferbar!', color:'#880000'}
+        ].map(({typ,field,label,color}) => {
+            const aktiv = a[field] && new Date(a[field]) > new Date();
+            const bisDatum = aktiv ? new Date(a[field]).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
+            return `<div style="margin-bottom:12px;">
+                <div style="font-size:0.78rem;font-weight:700;color:${color};margin-bottom:4px;">${label}</div>
+                ${aktiv
+                    ? `<div style="font-size:0.75rem;color:#888;margin-bottom:4px;">aktiv bis ${bisDatum}</div>
+                       <button type="button" onclick="setFastLeer('${typ}',0)" style="width:100%;padding:5px;border:1.5px solid #999;background:white;color:#666;border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;">✕ entfernen</button>`
+                    : `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
+                           ${[1,2,3,4,5,6,7].map(t=>`<button type="button" onclick="setFastLeer('${typ}',${t})" style="padding:5px 2px;border:1.5px solid ${color};background:white;color:${color};border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;">${t}T</button>`).join('')}
+                           <button type="button" onclick="setFastLeer('${typ}',14)" style="padding:5px 2px;border:1.5px solid ${color};background:white;color:${color};border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;">2W</button>
+                       </div>`
+                }
+            </div>`;
+        }).join('')}
     </div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = a.bild || null;
@@ -12083,16 +12081,17 @@ window.setFastLeer = async (typ, tage) => {
     if (!id) return;
     let update = {};
     let msg = '';
-    if (typ === 'reset') {
-        update = { fast_leer_bis: null, komplett_aus: false, nicht_lieferbar: false };
+    const feldMap = { fast:'fast_leer_bis', komplett:'komplett_aus_bis', nicht_lieferbar:'nicht_lieferbar_bis' };
+    const feld = feldMap[typ];
+    if (!feld) return;
+    if (tage === 0) {
+        update = { [feld]: null };
         msg = 'Hinweis entfernt';
-    } else if (typ === 'nicht_lieferbar') {
-        update = { nicht_lieferbar: true, fast_leer_bis: null, komplett_aus: false };
-        msg = 'Nicht mehr lieferbar gesetzt';
     } else {
         const d = new Date(); d.setDate(d.getDate() + tage);
-        update = { fast_leer_bis: d.toISOString(), komplett_aus: typ === 'komplett', nicht_lieferbar: false };
-        msg = `${typ === 'komplett' ? 'Komplett aus' : 'Fast aus'} für ${tage === 14 ? '2 Wochen' : tage + ' Tag' + (tage > 1 ? 'e' : '')} gesetzt`;
+        update = { [feld]: d.toISOString() };
+        const labelMap = { fast:'Fast aus', komplett:'Komplett aus', nicht_lieferbar:'Nicht mehr lieferbar' };
+        msg = `${labelMap[typ]} für ${tage === 14 ? '2 Wochen' : tage + ' Tag' + (tage > 1 ? 'e' : '')} gesetzt`;
     }
     await db.artikel.update(id, update);
     if (supabaseClient && isOnline) {
