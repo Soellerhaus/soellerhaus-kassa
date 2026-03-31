@@ -2669,33 +2669,35 @@ const Auth = {
             Utils.showToast('Keine Verbindung zu Supabase', 'error');
             return false;
         }
-        
+
         try {
-            const { data, error } = await supabaseClient.auth.signInWithPassword({
-                email: 'admin@soellerhaus.local',
-                password: pw
-            });
-            
-            if (error) {
-                console.log('❌ Login fehlgeschlagen:', error.message);
+            const adminAccounts = ['admin@soellerhaus.local', 'admin2@soellerhaus.local'];
+            let data = null;
+            for (const email of adminAccounts) {
+                const res = await supabaseClient.auth.signInWithPassword({ email, password: pw });
+                if (!res.error && res.data?.user) { data = res.data; break; }
+            }
+
+            if (!data) {
+                console.log('❌ Login fehlgeschlagen');
                 Utils.showToast('Falsches Passwort', 'error');
                 return false;
             }
-            
-            if (data.user && data.user.email === 'admin@soellerhaus.local') {
+
+            if (data.user) {
                 State.isAdmin = true;
                 State.adminUser = data.user;
                 // Admin-Passwort merken für Auth-Sync bei PIN-Änderungen
                 try { sessionStorage.setItem('_admin_pw', pw); } catch(e) {}
                 console.log('✅ Admin-Login erfolgreich');
-                Utils.showToast('Admin-Login erfolgreich!', 'success'); 
+                Utils.showToast('Admin-Login erfolgreich!', 'success');
                 return true;
             }
-            
+
             Utils.showToast('Kein Admin-Account', 'error');
             return false;
-            
-        } catch (e) { 
+
+        } catch (e) {
             console.error('❌ Login-Fehler:', e.message);
             Utils.showToast('Login-Fehler', 'error');
             return false;
