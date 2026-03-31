@@ -10836,7 +10836,9 @@ Router.register('buchen', async () => {
         const icon = getSmartIcon(a) || a.icon || '';
         const hasPhoto = a.bild && a.bild.startsWith('data:');
         const photoHtml = hasPhoto ? `<img src="${a.bild}" style="width:80px;height:80px;object-fit:contain;background:#fff;">` : '';
-        return hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`;
+        const fastLeer = a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date();
+        const badge = fastLeer ? `<div class="fast-leer-badge">⚠ fast leer</div>` : '';
+        return (hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`) + badge;
     };
     
     const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
@@ -12041,10 +12043,40 @@ window.showEditArticleModal = async id => {
         <div class="form-group"><label class="form-label">Kategorie</label><select id="article-category" class="form-input">${[1,2,3,4,5,6,7].map(i => `<option value="${i}" ${a.kategorie_id===i?'selected':''}>${{1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Suesses & Salziges',7:'Sonstiges'}[i]}</option>`).join('')}</select></div>
     </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
+    <div style="background:#fff8f0;border:1.5px solid #e65100;border-radius:12px;padding:14px;margin-top:16px;">
+        <div style="font-weight:700;margin-bottom:10px;color:#e65100;font-size:0.9rem;">⚠ Fast leer Markierung</div>
+        ${(a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())
+            ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;">Sticker aktiv bis: <strong>${new Date(a.fast_leer_bis).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong></div>
+               <button type="button" onclick="setFastLeer(null)" style="width:100%;padding:8px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">✕ Markierung entfernen</button>`
+            : `<div style="font-size:0.8rem;color:#888;margin-bottom:10px;">Zeigt roten Sticker auf der Kachel — automatisch weg nach:</div>
+               <div style="display:flex;gap:8px;">
+                   <button type="button" onclick="setFastLeer(2)"  style="flex:1;padding:8px 4px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">2 Tage</button>
+                   <button type="button" onclick="setFastLeer(7)"  style="flex:1;padding:8px 4px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">1 Woche</button>
+                   <button type="button" onclick="setFastLeer(14)" style="flex:1;padding:8px 4px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">2 Wochen</button>
+               </div>`
+        }
+    </div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
     window.currentArticleImage = a.bild || null;
 };
 window.closeArticleModal = () => { document.getElementById('article-modal-container').innerHTML = ''; window.currentArticleImage = null; };
+
+window.setFastLeer = async (tage) => {
+    const id = parseInt(document.getElementById('article-id')?.value);
+    if (!id) return;
+    let fast_leer_bis = null;
+    if (tage) {
+        const d = new Date();
+        d.setDate(d.getDate() + tage);
+        fast_leer_bis = d.toISOString();
+    }
+    await db.artikel.update(id, { fast_leer_bis });
+    if (supabaseClient && isOnline) {
+        await supabaseClient.from('artikel').update({ fast_leer_bis }).eq('artikel_id', id);
+    }
+    Utils.showToast(tage ? `Fast leer für ${tage} Tage markiert` : 'Markierung entfernt', 'success');
+    await showEditArticleModal(id);
+};
 
 // Bild-Handler
 window.handleImagePreview = async (event) => {
