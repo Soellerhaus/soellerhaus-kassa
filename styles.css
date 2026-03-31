@@ -543,10 +543,13 @@ a {
 .lager-hinweis {
     font-size: 0.62rem;
     font-weight: 700;
-    color: #d32f2f;
-    margin-top: 4px;
+    color: white;
+    background: #d32f2f;
+    margin-top: 5px;
+    padding: 2px 8px;
+    border-radius: 6px;
     text-align: center;
-    line-height: 1.2;
+    line-height: 1.4;
 }
 
 .artikel-icon {
