@@ -10839,9 +10839,8 @@ Router.register('buchen', async () => {
         return hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`;
     };
     const lagerHinweis = (a) => {
-        if (a.komplett_aus) return `<div class="lager-hinweis">komplett aus</div>`;
-        if (a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date()) return `<div class="lager-hinweis">fast aus</div>`;
-        return '';
+        if (!(a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())) return '';
+        return `<div class="lager-hinweis">${a.komplett_aus ? 'komplett aus' : 'fast aus'}</div>`;
     };
     
     const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
@@ -12047,17 +12046,23 @@ window.showEditArticleModal = async id => {
     </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
     <div style="background:#fff8f0;border:1.5px solid #e65100;border-radius:12px;padding:14px;margin-top:16px;">
-        <div style="font-weight:700;margin-bottom:10px;color:#e65100;font-size:0.9rem;">🧊 Lagerhinweis</div>
-        ${a.komplett_aus
-            ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;font-weight:600;">❌ komplett aus</div>
-               <button type="button" onclick="setFastLeer('reset')" style="width:100%;padding:8px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
-            : (a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())
-            ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;">fast aus — bis <strong>${new Date(a.fast_leer_bis).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong></div>
-               <button type="button" onclick="setFastLeer('komplett')" style="width:100%;padding:8px;margin-bottom:6px;border:1.5px solid #c62828;background:white;color:#c62828;border-radius:8px;font-weight:600;cursor:pointer;">❌ auf „komplett aus" ändern</button>
-               <button type="button" onclick="setFastLeer('reset')" style="width:100%;padding:8px;border:1.5px solid #999;background:white;color:#666;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
-            : `<div style="font-size:0.8rem;color:#888;margin-bottom:8px;">Hinweis unter dem Preis anzeigen:</div>
-               <button type="button" onclick="setFastLeer('kuehlschrank')" style="width:100%;padding:8px;margin-bottom:6px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">fast aus</button>
-               <button type="button" onclick="setFastLeer('komplett')"     style="width:100%;padding:8px;border:1.5px solid #c62828;background:white;color:#c62828;border-radius:8px;font-weight:600;cursor:pointer;">❌ komplett aus</button>`
+        <div style="font-weight:700;margin-bottom:10px;color:#e65100;font-size:0.9rem;">Lagerhinweis</div>
+        ${(a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())
+            ? `<div style="color:#b34000;font-size:0.83rem;margin-bottom:10px;">
+                   Aktiv: <strong>${a.komplett_aus ? 'komplett aus' : 'fast aus'}</strong> — bis ${new Date(a.fast_leer_bis).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}
+               </div>
+               <button type="button" onclick="setFastLeer('reset',0)" style="width:100%;padding:8px;border:1.5px solid #999;background:white;color:#666;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
+            : `${[
+                  {typ:'fast',    label:'fast aus',     color:'#e65100'},
+                  {typ:'komplett',label:'komplett aus',  color:'#c62828'}
+               ].map(({typ,label,color}) => `
+                   <div style="margin-bottom:10px;">
+                       <div style="font-size:0.78rem;font-weight:700;color:${color};margin-bottom:5px;">${label}</div>
+                       <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;">
+                           ${[1,2,3,4,5,6,7].map(t=>`<button type="button" onclick="setFastLeer('${typ}',${t})" style="padding:5px 2px;border:1.5px solid ${color};background:white;color:${color};border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;">${t}T</button>`).join('')}
+                           <button type="button" onclick="setFastLeer('${typ}',14)" style="padding:5px 2px;border:1.5px solid ${color};background:white;color:${color};border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;">2W</button>
+                       </div>
+                   </div>`).join('')}`
         }
     </div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
@@ -12065,21 +12070,18 @@ window.showEditArticleModal = async id => {
 };
 window.closeArticleModal = () => { document.getElementById('article-modal-container').innerHTML = ''; window.currentArticleImage = null; };
 
-window.setFastLeer = async (aktion) => {
+window.setFastLeer = async (typ, tage) => {
     const id = parseInt(document.getElementById('article-id')?.value);
     if (!id) return;
     let update = {};
     let msg = '';
-    if (aktion === 'kuehlschrank') {
-        const d = new Date(); d.setDate(d.getDate() + 14);
-        update = { fast_leer_bis: d.toISOString(), komplett_aus: false };
-        msg = 'Hinweis gesetzt: nur noch was im Kühlschrank';
-    } else if (aktion === 'komplett') {
-        update = { komplett_aus: true, fast_leer_bis: null };
-        msg = 'Hinweis gesetzt: komplett aus';
-    } else {
+    if (typ === 'reset') {
         update = { fast_leer_bis: null, komplett_aus: false };
         msg = 'Hinweis entfernt';
+    } else {
+        const d = new Date(); d.setDate(d.getDate() + tage);
+        update = { fast_leer_bis: d.toISOString(), komplett_aus: typ === 'komplett' };
+        msg = `${typ === 'komplett' ? 'Komplett aus' : 'Fast aus'} für ${tage === 14 ? '2 Wochen' : tage + ' Tag' + (tage > 1 ? 'e' : '')} gesetzt`;
     }
     await db.artikel.update(id, update);
     if (supabaseClient && isOnline) {
