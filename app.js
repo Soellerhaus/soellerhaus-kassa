@@ -10837,7 +10837,7 @@ Router.register('buchen', async () => {
         const hasPhoto = a.bild && a.bild.startsWith('data:');
         const photoHtml = hasPhoto ? `<img src="${a.bild}" style="width:80px;height:80px;object-fit:contain;background:#fff;">` : '';
         const fastLeer = a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date();
-        const badge = fastLeer ? `<div class="fast-leer-badge">⚠ fast leer</div>` : '';
+        const badge = fastLeer ? `<div class="fast-leer-badge">🧊 nur Kühlschrank</div>` : '';
         return (hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`) + badge;
     };
     
@@ -12044,11 +12044,11 @@ window.showEditArticleModal = async id => {
     </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
     <div style="background:#fff8f0;border:1.5px solid #e65100;border-radius:12px;padding:14px;margin-top:16px;">
-        <div style="font-weight:700;margin-bottom:10px;color:#e65100;font-size:0.9rem;">⚠ Fast leer Markierung</div>
+        <div style="font-weight:700;margin-bottom:10px;color:#e65100;font-size:0.9rem;">🧊 Nur noch im Kühlschrank</div>
         ${(a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())
             ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;">Sticker aktiv bis: <strong>${new Date(a.fast_leer_bis).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong></div>
                <button type="button" onclick="setFastLeer(null)" style="width:100%;padding:8px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">✕ Markierung entfernen</button>`
-            : `<div style="font-size:0.8rem;color:#888;margin-bottom:10px;">Zeigt roten Sticker auf der Kachel — automatisch weg nach:</div>
+            : `<div style="font-size:0.8rem;color:#888;margin-bottom:10px;">Zeigt Sticker auf der Kachel — automatisch weg nach:</div>
                <div style="display:flex;gap:8px;">
                    <button type="button" onclick="setFastLeer(2)"  style="flex:1;padding:8px 4px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">2 Tage</button>
                    <button type="button" onclick="setFastLeer(7)"  style="flex:1;padding:8px 4px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">1 Woche</button>
@@ -12074,7 +12074,7 @@ window.setFastLeer = async (tage) => {
     if (supabaseClient && isOnline) {
         await supabaseClient.from('artikel').update({ fast_leer_bis }).eq('artikel_id', id);
     }
-    Utils.showToast(tage ? `Fast leer für ${tage} Tage markiert` : 'Markierung entfernt', 'success');
+    Utils.showToast(tage ? `Nur Kühlschrank — Sticker für ${tage} Tage gesetzt` : 'Markierung entfernt', 'success');
     await showEditArticleModal(id);
 };
 
