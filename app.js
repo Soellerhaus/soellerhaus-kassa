@@ -10839,7 +10839,7 @@ Router.register('buchen', async () => {
         return hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`;
     };
     const lagerHinweis = (a) => {
-        if (a.komplett_aus) return `<div class="lager-hinweis">bereits komplett aus</div>`;
+        if (a.komplett_aus) return `<div class="lager-hinweis">komplett aus</div>`;
         if (a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date()) return `<div class="lager-hinweis">fast aus</div>`;
         return '';
     };
@@ -12049,7 +12049,7 @@ window.showEditArticleModal = async id => {
     <div style="background:#fff8f0;border:1.5px solid #e65100;border-radius:12px;padding:14px;margin-top:16px;">
         <div style="font-weight:700;margin-bottom:10px;color:#e65100;font-size:0.9rem;">🧊 Lagerhinweis</div>
         ${a.komplett_aus
-            ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;font-weight:600;">❌ bereits komplett aus</div>
+            ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;font-weight:600;">❌ komplett aus</div>
                <button type="button" onclick="setFastLeer('reset')" style="width:100%;padding:8px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
             : (a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())
             ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;">fast aus — bis <strong>${new Date(a.fast_leer_bis).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong></div>
@@ -12057,7 +12057,7 @@ window.showEditArticleModal = async id => {
                <button type="button" onclick="setFastLeer('reset')" style="width:100%;padding:8px;border:1.5px solid #999;background:white;color:#666;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
             : `<div style="font-size:0.8rem;color:#888;margin-bottom:8px;">Hinweis unter dem Preis anzeigen:</div>
                <button type="button" onclick="setFastLeer('kuehlschrank')" style="width:100%;padding:8px;margin-bottom:6px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">fast aus</button>
-               <button type="button" onclick="setFastLeer('komplett')"     style="width:100%;padding:8px;border:1.5px solid #c62828;background:white;color:#c62828;border-radius:8px;font-weight:600;cursor:pointer;">❌ bereits komplett aus</button>`
+               <button type="button" onclick="setFastLeer('komplett')"     style="width:100%;padding:8px;border:1.5px solid #c62828;background:white;color:#c62828;border-radius:8px;font-weight:600;cursor:pointer;">❌ komplett aus</button>`
         }
     </div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
@@ -12076,7 +12076,7 @@ window.setFastLeer = async (aktion) => {
         msg = 'Hinweis gesetzt: nur noch was im Kühlschrank';
     } else if (aktion === 'komplett') {
         update = { komplett_aus: true, fast_leer_bis: null };
-        msg = 'Hinweis gesetzt: bereits komplett aus';
+        msg = 'Hinweis gesetzt: komplett aus';
     } else {
         update = { fast_leer_bis: null, komplett_aus: false };
         msg = 'Hinweis entfernt';
