@@ -540,19 +540,13 @@ a {
     transform: translateY(-2px) scale(0.98);
 }
 
-.fast-leer-badge {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    background: #d32f2f;
-    color: white;
-    font-size: 0.6rem;
+.lager-hinweis {
+    font-size: 0.62rem;
     font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 8px;
-    white-space: nowrap;
-    z-index: 2;
-    pointer-events: none;
+    color: #d32f2f;
+    margin-top: 4px;
+    text-align: center;
+    line-height: 1.2;
 }
 
 .artikel-icon {

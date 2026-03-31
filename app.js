@@ -10836,9 +10836,12 @@ Router.register('buchen', async () => {
         const icon = getSmartIcon(a) || a.icon || '';
         const hasPhoto = a.bild && a.bild.startsWith('data:');
         const photoHtml = hasPhoto ? `<img src="${a.bild}" style="width:80px;height:80px;object-fit:contain;background:#fff;">` : '';
-        const fastLeer = a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date();
-        const badge = fastLeer ? `<div class="fast-leer-badge">🧊 nur noch was im Kühlschrank</div>` : '';
-        return (hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`) + badge;
+        return hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`;
+    };
+    const lagerHinweis = (a) => {
+        if (a.komplett_aus) return `<div class="lager-hinweis">bereits komplett aus</div>`;
+        if (a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date()) return `<div class="lager-hinweis">🧊 nur noch was im Kühlschrank</div>`;
+        return '';
     };
     
     const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
@@ -11032,7 +11035,7 @@ Router.register('buchen', async () => {
         <div class="artikel-grid">
             ${filtered.map(a => {
                 const tilePreis = effektiverModus === 'hp' ? (a.preis_hp ?? a.preis ?? 0) : (a.preis ?? 0);
-                return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${renderTileContent(a)}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(tilePreis)}</div></div>`;
+                return `<div class="artikel-tile" style="--tile-color:${catColor(a.kategorie_id)}" data-artikel-id="${a.artikel_id}" onmousedown="artikelPressStart(event, ${a.artikel_id})" onmouseup="artikelPressEnd(event)" onmouseleave="artikelPressEnd(event)" ontouchstart="artikelPressStart(event, ${a.artikel_id})" ontouchmove="artikelPressMove(event)" ontouchend="artikelPressEnd(event)">${renderTileContent(a)}<div class="artikel-name">${a.name}</div><div class="artikel-price">${Utils.formatCurrency(tilePreis)}</div>${lagerHinweis(a)}</div>`;
             }).join('')}
         </div>
     </div></div>`);
@@ -12044,16 +12047,17 @@ window.showEditArticleModal = async id => {
     </div>
     <div class="form-checkbox"><input type="checkbox" id="article-active" ${a.aktiv?'checked':''}><label for="article-active">Aktiv</label></div>
     <div style="background:#fff8f0;border:1.5px solid #e65100;border-radius:12px;padding:14px;margin-top:16px;">
-        <div style="font-weight:700;margin-bottom:10px;color:#e65100;font-size:0.9rem;">🧊 Nur noch im Kühlschrank</div>
-        ${(a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())
-            ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;">Sticker aktiv bis: <strong>${new Date(a.fast_leer_bis).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong></div>
-               <button type="button" onclick="setFastLeer(null)" style="width:100%;padding:8px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">✕ Markierung entfernen</button>`
-            : `<div style="font-size:0.8rem;color:#888;margin-bottom:10px;">Zeigt Sticker auf der Kachel — automatisch weg nach:</div>
-               <div style="display:flex;gap:8px;">
-                   <button type="button" onclick="setFastLeer(2)"  style="flex:1;padding:8px 4px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">2 Tage</button>
-                   <button type="button" onclick="setFastLeer(7)"  style="flex:1;padding:8px 4px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">1 Woche</button>
-                   <button type="button" onclick="setFastLeer(14)" style="flex:1;padding:8px 4px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">2 Wochen</button>
-               </div>`
+        <div style="font-weight:700;margin-bottom:10px;color:#e65100;font-size:0.9rem;">🧊 Lagerhinweis</div>
+        ${a.komplett_aus
+            ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;font-weight:600;">❌ bereits komplett aus</div>
+               <button type="button" onclick="setFastLeer('reset')" style="width:100%;padding:8px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
+            : (a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())
+            ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;">🧊 nur noch was im Kühlschrank — bis <strong>${new Date(a.fast_leer_bis).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong></div>
+               <button type="button" onclick="setFastLeer('komplett')" style="width:100%;padding:8px;margin-bottom:6px;border:1.5px solid #c62828;background:white;color:#c62828;border-radius:8px;font-weight:600;cursor:pointer;">❌ auf „komplett aus" ändern</button>
+               <button type="button" onclick="setFastLeer('reset')" style="width:100%;padding:8px;border:1.5px solid #999;background:white;color:#666;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
+            : `<div style="font-size:0.8rem;color:#888;margin-bottom:8px;">Hinweis unter dem Preis anzeigen:</div>
+               <button type="button" onclick="setFastLeer('kuehlschrank')" style="width:100%;padding:8px;margin-bottom:6px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">🧊 nur noch was im Kühlschrank</button>
+               <button type="button" onclick="setFastLeer('komplett')"     style="width:100%;padding:8px;border:1.5px solid #c62828;background:white;color:#c62828;border-radius:8px;font-weight:600;cursor:pointer;">❌ bereits komplett aus</button>`
         }
     </div>
     <div style="display:flex;gap:16px;margin-top:24px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeArticleModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1;" onclick="saveEditArticle()">Speichern</button></div></div></div>`;
@@ -12061,20 +12065,27 @@ window.showEditArticleModal = async id => {
 };
 window.closeArticleModal = () => { document.getElementById('article-modal-container').innerHTML = ''; window.currentArticleImage = null; };
 
-window.setFastLeer = async (tage) => {
+window.setFastLeer = async (aktion) => {
     const id = parseInt(document.getElementById('article-id')?.value);
     if (!id) return;
-    let fast_leer_bis = null;
-    if (tage) {
-        const d = new Date();
-        d.setDate(d.getDate() + tage);
-        fast_leer_bis = d.toISOString();
+    let update = {};
+    let msg = '';
+    if (aktion === 'kuehlschrank') {
+        const d = new Date(); d.setDate(d.getDate() + 14);
+        update = { fast_leer_bis: d.toISOString(), komplett_aus: false };
+        msg = 'Hinweis gesetzt: nur noch was im Kühlschrank';
+    } else if (aktion === 'komplett') {
+        update = { komplett_aus: true, fast_leer_bis: null };
+        msg = 'Hinweis gesetzt: bereits komplett aus';
+    } else {
+        update = { fast_leer_bis: null, komplett_aus: false };
+        msg = 'Hinweis entfernt';
     }
-    await db.artikel.update(id, { fast_leer_bis });
+    await db.artikel.update(id, update);
     if (supabaseClient && isOnline) {
-        await supabaseClient.from('artikel').update({ fast_leer_bis }).eq('artikel_id', id);
+        await supabaseClient.from('artikel').update(update).eq('artikel_id', id);
     }
-    Utils.showToast(tage ? `Nur Kühlschrank — Sticker für ${tage} Tage gesetzt` : 'Markierung entfernt', 'success');
+    Utils.showToast(msg, 'success');
     await showEditArticleModal(id);
 };
 
