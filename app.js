@@ -6608,29 +6608,24 @@ Router.register('admin-umlage', async () => {
 
         <div class="card mt-3">
             <div class="card-header" style="background:linear-gradient(135deg,#2c3e50,#34495e);color:white;">
-                <h3 style="margin:0;">💰 Manuelle Umlage auf Konten</h3>
+                <h3 style="margin:0;">💰 Manuelle Umlage auf Einzelkonto</h3>
             </div>
             <div class="card-body">
-                <p style="color:var(--color-stone-dark);margin-bottom:16px;">Einen Umlage-Betrag auf ausgewählte Konten buchen.</p>
+                <p style="color:var(--color-stone-dark);margin-bottom:16px;">Einem einzelnen aktiven Konto einen Umlage-Betrag zuweisen.</p>
                 <div style="margin-bottom:12px;">
-                    <label style="font-weight:600;display:block;margin-bottom:6px;">Konten auswählen:</label>
-                    <div style="margin-bottom:8px;">
-                        <label style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--color-stone-light);border-radius:8px;cursor:pointer;font-weight:600;">
-                            <input type="checkbox" id="umlage-manual-alle" onchange="toggleAlleUmlageKonten(this.checked)" style="width:20px;height:20px;">
-                            Alle auswählen (<span id="umlage-manual-count">0</span>/${aktiveGäste.length})
-                        </label>
-                    </div>
-                    <div id="umlage-manual-liste" style="max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;padding:4px;">
+                    <label style="font-weight:600;display:block;margin-bottom:6px;">Konto auswählen:</label>
+                    <select id="umlage-manual-konto" class="form-input" style="width:100%;padding:12px;font-size:1rem;">
+                        <option value="">-- Konto wählen --</option>
                         ${aktiveGäste.map(g => {
                             const name = g.vorname || g.display_name || g.first_name || 'Unbekannt';
                             const gruppe = g.group_name && g.group_name !== 'keiner Gruppe zugehörig' && g.group_name !== 'keiner Gruppe zugehoerig' ? ' (' + g.group_name + ')' : '';
                             const ausnahme = g.ausnahmeumlage === true ? ' ⚠️' : '';
-                            return '<label style="display:flex;align-items:center;gap:8px;padding:10px;border-bottom:1px solid #eee;cursor:pointer;" onmouseover="this.style.background=\'#f0f4f8\'" onmouseout="this.style.background=\'\'"><input type="checkbox" class="umlage-manual-cb" value="' + g.id + '" data-gast-name="' + name + '" data-group="' + (g.group_name || '') + '" onchange="updateUmlageKontenCount()" style="width:20px;height:20px;"><span>' + name + gruppe + ausnahme + '</span></label>';
+                            return '<option value="' + g.id + '" data-gast-name="' + name + '" data-group="' + (g.group_name || '') + '">' + name + gruppe + ausnahme + '</option>';
                         }).join('')}
-                    </div>
+                    </select>
                 </div>
                 <div style="margin-bottom:12px;">
-                    <label style="font-weight:600;display:block;margin-bottom:6px;">Betrag pro Konto (€):</label>
+                    <label style="font-weight:600;display:block;margin-bottom:6px;">Betrag (€):</label>
                     <input type="number" id="umlage-manual-betrag" class="form-input" step="0.01" min="0.01" placeholder="0.00" style="width:100%;padding:12px;font-size:1.1rem;">
                 </div>
                 <div style="margin-bottom:16px;">
@@ -6645,29 +6640,16 @@ Router.register('admin-umlage', async () => {
     </div>`);
 });
 
-window.toggleAlleUmlageKonten = (checked) => {
-    document.querySelectorAll('.umlage-manual-cb').forEach(cb => cb.checked = checked);
-    updateUmlageKontenCount();
-};
-
-window.updateUmlageKontenCount = () => {
-    const checked = document.querySelectorAll('.umlage-manual-cb:checked').length;
-    const countEl = document.getElementById('umlage-manual-count');
-    if (countEl) countEl.textContent = checked;
-    const alleCheckbox = document.getElementById('umlage-manual-alle');
-    const total = document.querySelectorAll('.umlage-manual-cb').length;
-    if (alleCheckbox) alleCheckbox.checked = checked === total && total > 0;
-};
-
 window.bucheManuelleUmlage = async () => {
     if (!supabaseClient || !isOnline) {
         Utils.showToast('Keine Internetverbindung!', 'error');
         return;
     }
 
-    const ausgewählt = document.querySelectorAll('.umlage-manual-cb:checked');
-    if (ausgewählt.length === 0) {
-        Utils.showToast('Bitte mindestens ein Konto auswählen!', 'warning');
+    const select = document.getElementById('umlage-manual-konto');
+    const gastId = select?.value;
+    if (!gastId) {
+        Utils.showToast('Bitte ein Konto auswählen!', 'warning');
         return;
     }
 
@@ -6679,51 +6661,41 @@ window.bucheManuelleUmlage = async () => {
     }
 
     const beschreibung = document.getElementById('umlage-manual-beschreibung')?.value?.trim();
+    const gastName = select.querySelector(`option[value="${gastId}"]`)?.dataset?.gastName || 'Unbekannt';
+    const groupName = select.querySelector(`option[value="${gastId}"]`)?.dataset?.group || '';
     const artikelName = beschreibung ? `Umlage: ${beschreibung}` : 'Umlage';
 
-    const namen = Array.from(ausgewählt).map(cb => cb.dataset.gastName).join(', ');
-    const gesamtBetrag = betrag * ausgewählt.length;
-
-    if (!confirm(`Manuelle Umlage buchen?\n\n${ausgewählt.length} Konten: ${namen}\nBetrag pro Konto: ${Utils.formatCurrency(betrag)}\nGesamt: ${Utils.formatCurrency(gesamtBetrag)}\nBeschreibung: ${artikelName}`)) {
+    if (!confirm(`Manuelle Umlage buchen?\n\nKonto: ${gastName}\nBetrag: ${Utils.formatCurrency(betrag)}\nBeschreibung: ${artikelName}`)) {
         return;
     }
 
     const heute = Utils.getBuchungsDatum();
     const uhrzeit = Utils.formatTime(new Date());
-    let erfolg = 0;
-    let fehler = 0;
 
-    for (const cb of ausgewählt) {
-        const { error } = await supabaseClient.from('buchungen').insert({
-            buchung_id: Utils.uuid(),
-            user_id: cb.value,
-            gast_vorname: cb.dataset.gastName || 'Unbekannt',
-            artikel_id: 324,
-            artikel_name: artikelName,
-            preis: betrag,
-            menge: 1,
-            datum: heute,
-            uhrzeit: uhrzeit,
-            erstellt_am: new Date().toISOString(),
-            storniert: false,
-            exportiert: false,
-            ist_umlage: true,
-            group_name: cb.dataset.group || ''
-        });
+    const { error } = await supabaseClient.from('buchungen').insert({
+        buchung_id: Utils.uuid(),
+        user_id: gastId,
+        gast_vorname: gastName,
+        artikel_id: 324,
+        artikel_name: artikelName,
+        preis: betrag,
+        menge: 1,
+        datum: heute,
+        uhrzeit: uhrzeit,
+        erstellt_am: new Date().toISOString(),
+        storniert: false,
+        exportiert: false,
+        ist_umlage: true,
+        group_name: groupName
+    });
 
-        if (error) {
-            console.error('❌ Manuelle Umlage Fehler:', cb.dataset.gastName, error);
-            fehler++;
-        } else {
-            erfolg++;
-        }
+    if (error) {
+        console.error('❌ Manuelle Umlage Fehler:', error);
+        Utils.showToast('Fehler beim Buchen der Umlage!', 'error');
+        return;
     }
 
-    if (fehler > 0) {
-        Utils.showToast(`⚠️ ${erfolg} gebucht, ${fehler} Fehler`, 'warning');
-    } else {
-        Utils.showToast(`✅ Umlage ${Utils.formatCurrency(betrag)} auf ${erfolg} Konten gebucht (Gesamt: ${Utils.formatCurrency(gesamtBetrag)})`, 'success');
-    }
+    Utils.showToast(`✅ Umlage ${Utils.formatCurrency(betrag)} auf "${gastName}" gebucht`, 'success');
     Router.navigate('admin-umlage');
 };
 
@@ -10864,8 +10836,7 @@ Router.register('buchen', async () => {
         const icon = getSmartIcon(a) || a.icon || '';
         const hasPhoto = a.bild && a.bild.startsWith('data:');
         const photoHtml = hasPhoto ? `<img src="${a.bild}" style="width:80px;height:80px;object-fit:contain;background:#fff;">` : '';
-        const fastLeerBadge = a.fast_leer ? `<div class="fast-leer-badge">⚠ fast leer</div>` : '';
-        return (hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`) + fastLeerBadge;
+        return hasPhoto ? photoHtml : `<div class="artikel-icon">${icon}</div>`;
     };
     
     const catColor = (id) => ({1:'#2196F3',2:'#F0A500',3:'#8B1A4A',4:'#5B2C8C',5:'#6D4C41',6:'#E91E8C',7:'#607D6B'})[id] || '#2C5F7C';
