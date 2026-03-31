@@ -10840,7 +10840,7 @@ Router.register('buchen', async () => {
     };
     const lagerHinweis = (a) => {
         if (a.komplett_aus) return `<div class="lager-hinweis">bereits komplett aus</div>`;
-        if (a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date()) return `<div class="lager-hinweis">🧊 nur noch was im Kühlschrank</div>`;
+        if (a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date()) return `<div class="lager-hinweis">fast aus</div>`;
         return '';
     };
     
@@ -12052,11 +12052,11 @@ window.showEditArticleModal = async id => {
             ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;font-weight:600;">❌ bereits komplett aus</div>
                <button type="button" onclick="setFastLeer('reset')" style="width:100%;padding:8px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
             : (a.fast_leer_bis && new Date(a.fast_leer_bis) > new Date())
-            ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;">🧊 nur noch was im Kühlschrank — bis <strong>${new Date(a.fast_leer_bis).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong></div>
+            ? `<div style="color:#b34000;font-size:0.82rem;margin-bottom:10px;">fast aus — bis <strong>${new Date(a.fast_leer_bis).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong></div>
                <button type="button" onclick="setFastLeer('komplett')" style="width:100%;padding:8px;margin-bottom:6px;border:1.5px solid #c62828;background:white;color:#c62828;border-radius:8px;font-weight:600;cursor:pointer;">❌ auf „komplett aus" ändern</button>
                <button type="button" onclick="setFastLeer('reset')" style="width:100%;padding:8px;border:1.5px solid #999;background:white;color:#666;border-radius:8px;font-weight:600;cursor:pointer;">✕ Hinweis entfernen</button>`
             : `<div style="font-size:0.8rem;color:#888;margin-bottom:8px;">Hinweis unter dem Preis anzeigen:</div>
-               <button type="button" onclick="setFastLeer('kuehlschrank')" style="width:100%;padding:8px;margin-bottom:6px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">🧊 nur noch was im Kühlschrank</button>
+               <button type="button" onclick="setFastLeer('kuehlschrank')" style="width:100%;padding:8px;margin-bottom:6px;border:1.5px solid #e65100;background:white;color:#e65100;border-radius:8px;font-weight:600;cursor:pointer;">fast aus</button>
                <button type="button" onclick="setFastLeer('komplett')"     style="width:100%;padding:8px;border:1.5px solid #c62828;background:white;color:#c62828;border-radius:8px;font-weight:600;cursor:pointer;">❌ bereits komplett aus</button>`
         }
     </div>
