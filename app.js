@@ -3388,7 +3388,7 @@ const FehlendeGetränke = {
         // Lokal und Supabase updaten
         try { await db.fehlendeGetraenke.update(id, updateData); } catch(e) {}
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('fehlende_getraenke').update(updateData).eq('id', id);
+            await supabaseClient.rpc('admin_fehlende_uebernehmen', { p_id: id, p_gast_id: gastId, p_gast_name: gastName });
         }
         
         // Buchung erstellen
@@ -3429,17 +3429,12 @@ const FehlendeGetränke = {
     },
     
     async löschen(id) {
-        // Soft-Delete: als übernommen markieren statt hart löschen (RLS-sicher)
+        // Soft-Delete via RPC (umgeht RLS, funktioniert für alle Admins)
         try { await db.fehlendeGetraenke.update(id, { uebernommen: true, geloescht: true }); } catch(e) {}
         if (supabaseClient && isOnline) {
-            const { error } = await supabaseClient.from('fehlende_getraenke')
-                .update({ uebernommen: true, geloescht: true, uebernommen_am: new Date().toISOString() })
-                .eq('id', id);
+            const { error } = await supabaseClient.rpc('admin_fehlende_loeschen', { p_id: id });
             if (error) {
                 console.error('❌ Löschen fehlgeschlagen:', error);
-                // Fallback: Hart löschen versuchen
-                const { error: delErr } = await supabaseClient.from('fehlende_getraenke').delete().eq('id', id);
-                if (delErr) console.error('❌ Auch delete fehlgeschlagen:', delErr);
             }
         }
         await DataProtection.createBackup();
@@ -6806,7 +6801,7 @@ window.executeUmlageGruppenkonto = async () => {
     } else {
         for (const f of fehlendeOffen) { const { error } = await supabaseClient.from('buchungen').insert({ buchung_id: Utils.uuid(), user_id: gastId, gast_vorname: gastName, artikel_id: f.artikel_id, artikel_name: `Umlage: ${f.artikel_name}`, preis: f.artikel_preis, menge: 1, datum: heute, uhrzeit, erstellt_am: new Date().toISOString(), storniert: false, exportiert: false, ist_umlage: true, group_name: kontoWert.startsWith('gast_') ? '' : kontoWert }); if (!error) erfolg++; }
     }
-    for (const f of fehlendeOffen) { await supabaseClient.from('fehlende_getraenke').update({ uebernommen: true, uebernommen_am: new Date().toISOString() }).eq('id', f.id); }
+    for (const f of fehlendeOffen) { await supabaseClient.rpc('admin_fehlende_uebernehmen', { p_id: f.id }); }
     document.getElementById('umlage-gruppe-modal')?.remove();
     Utils.showToast(`✅ Umlage ${Utils.formatCurrency(gesamtPreis)} auf "${gastName}" gebucht`, 'success');
     Router.navigate('admin-dashboard');
