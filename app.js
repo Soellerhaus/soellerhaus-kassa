@@ -3173,27 +3173,16 @@ const Buchungen = {
         if (!supabaseClient || !isOnline) {
             throw new Error('Keine Internetverbindung. Bitte später nochmal versuchen.');
         }
-        
-        const { data, error } = await supabaseClient
-            .from('buchungen')
-            .select('buchung_id')
-            .eq('storniert', false)
-            .or('aufgefuellt.is.null,aufgefuellt.eq.false');
-        
+
+        // RPC-Funktion nutzen (umgeht RLS)
+        const { data: affected, error } = await supabaseClient.rpc('reset_auffuellliste');
+
         if (error) {
             console.error('❌ markAsAufgefuellt error:', error);
-            throw new Error('Fehler beim Laden der Buchungen.');
-        }
-        
-        const ids = (data || []).map(b => b.buchung_id);
-        const update = { aufgefuellt: true, aufgefuellt_am: new Date().toISOString() };
-
-        // Batch-Update in 100er Blöcken
-        for (let i = 0; i < ids.length; i += 100) {
-            await supabaseClient.from('buchungen').update(update).in('buchung_id', ids.slice(i, i + 100));
+            throw new Error('Fehler beim Zurücksetzen der Auffüllliste.');
         }
 
-        console.log(`✅ ${ids.length} Buchungen als aufgefuellt markiert`);
+        console.log(`✅ ${affected || 0} Buchungen als aufgefuellt markiert`);
     },
     
     // Legacy - nicht mehr benutzen
@@ -5526,68 +5515,32 @@ window.printAuffuellliste = async () => {
 // Nur Auffüllliste zurücksetzen (NICHT Export!)
 window.resetAuffuelllisteOhneExport = async () => {
     if (!confirm('Auffüllliste zurücksetzen?\n\nDie Getränke wurden aufgefüllt und die Liste wird auf 0 gesetzt.\n\n(Dies hat keinen Einfluss auf den Registrierkasse-Export)')) return;
-    
+
     try {
         if (!supabaseClient || !isOnline) {
             throw new Error('Keine Internetverbindung.');
         }
-        
-        // Buchungen laden die aufgefüllt werden müssen
-        const { data, error } = await supabaseClient
-            .from('buchungen')
-            .select('buchung_id')
-            .eq('storniert', false)
-            .or('aufgefuellt.is.null,aufgefuellt.eq.false');
-        
-        if (error) throw new Error('Fehler beim Laden: ' + error.message);
-        
-        const ids = (data || []).map(b => b.buchung_id);
-        if (ids.length === 0) {
-            Utils.showToast('Keine offenen Buchungen zum Zurücksetzen', 'info');
-            return;
-        }
-        
-        // Progress Overlay
+
+        // Loading Overlay
         document.body.insertAdjacentHTML('beforeend', `
         <div id="auffuell-progress" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:3000;display:flex;justify-content:center;align-items:center;">
             <div style="background:white;border-radius:16px;padding:32px 40px;max-width:450px;width:90%;text-align:center;">
                 <div style="font-size:2.5rem;margin-bottom:12px;">⏳</div>
                 <div style="font-weight:700;font-size:1.3rem;margin-bottom:4px;">Auffüllliste wird zurückgesetzt...</div>
                 <div style="color:#666;margin-bottom:16px;font-size:0.9rem;">Bitte nicht schließen oder zurück drücken!</div>
-                <div style="background:#e0e0e0;border-radius:10px;height:28px;overflow:hidden;margin:16px 0;position:relative;">
-                    <div id="auffuell-bar" style="background:linear-gradient(90deg,#27ae60,#2ecc71);height:100%;width:0%;transition:width 0.3s;border-radius:10px;"></div>
-                    <div id="auffuell-percent" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem;color:#333;">0%</div>
-                </div>
-                <div id="auffuell-detail" style="font-size:0.9rem;color:#555;">0 / ${ids.length} Buchungen</div>
             </div>
         </div>`);
-        
-        const update = { aufgefuellt: true, aufgefuellt_am: new Date().toISOString() };
-        const chunkSize = 100;
-        let done = 0;
 
-        for (let i = 0; i < ids.length; i += chunkSize) {
-            const chunk = ids.slice(i, i + chunkSize);
-            const { error: updErr } = await supabaseClient
-                .from('buchungen')
-                .update(update)
-                .in('buchung_id', chunk);
-            if (updErr) throw new Error('Fehler beim Aktualisieren: ' + updErr.message);
-            done += chunk.length;
-            const pct = Math.round((done / ids.length) * 100);
-            const bar = document.getElementById('auffuell-bar');
-            const pctEl = document.getElementById('auffuell-percent');
-            const detailEl = document.getElementById('auffuell-detail');
-            if (bar) bar.style.width = pct + '%';
-            if (pctEl) pctEl.textContent = pct + '%';
-            if (detailEl) detailEl.textContent = `${done} / ${ids.length} Buchungen`;
-        }
-        
-        await new Promise(r => setTimeout(r, 600));
+        // RPC-Funktion nutzen (umgeht RLS, ein einziger DB-Aufruf)
+        const { data: affected, error } = await supabaseClient.rpc('reset_auffuellliste');
+
+        if (error) throw new Error('Fehler beim Zurücksetzen: ' + error.message);
+
+        await new Promise(r => setTimeout(r, 400));
         const overlay = document.getElementById('auffuell-progress');
         if (overlay) overlay.remove();
-        
-        Utils.showToast(`✅ ${ids.length} Buchungen zurückgesetzt`, 'success');
+
+        Utils.showToast(`✅ ${affected || 0} Buchungen zurückgesetzt`, 'success');
         Router.navigate('admin-auffuellliste');
     } catch(e) {
         const overlay = document.getElementById('auffuell-progress');
@@ -7895,8 +7848,8 @@ window.erstelleNachricht = async () => {
         return;
     }
     
-    if (text.length > 200) {
-        Utils.showToast('Nachricht zu lang! Max. 200 Zeichen.', 'warning');
+    if (text.length > 500) {
+        Utils.showToast('Nachricht zu lang! Max. 500 Zeichen.', 'warning');
         return;
     }
     
