@@ -1010,7 +1010,7 @@ const GastNachricht = {
                     <div class="nachricht-titel" style="font-weight: 700; font-size: 1.1rem; margin-bottom: 6px;">
                         ${isDringend ? ' WICHTIGE NACHRICHT! ' : 'Nachricht vom Team'}
                     </div>
-                    <div class="nachricht-text" style="font-size: ${isDringend ? '1.3rem' : '1.15rem'}; line-height: 1.4; font-weight: ${isDringend ? '600' : '400'};">
+                    <div class="nachricht-text" style="font-size: ${isDringend ? '1.3rem' : '1.15rem'}; line-height: 1.4; font-weight: ${isDringend ? '600' : '400'}; white-space: pre-line;">
                         ${nachricht.text}
                     </div>
                 </div>
@@ -4681,7 +4681,7 @@ Router.register('login', async () => {
                         ${n.gast_name}
                     </span>
                 </div>
-                <div style="font-size:1.15rem;font-weight:500;line-height:1.4;">
+                <div style="font-size:1.15rem;font-weight:500;line-height:1.4;white-space:pre-line;">
                     ${n.nachricht}
                 </div>
             </div>`;
