@@ -7618,7 +7618,7 @@ Router.register('admin-nachricht', async () => {
             <div class="card-body">
                 <div class="form-group">
                     <label class="form-label" style="font-weight:600;">Nachrichtentext *</label>
-                    <textarea id="nachricht-text" class="form-input" rows="3" placeholder="z.B. Auto mit Kennzeichen W-12345 bitte umparken!" style="font-size:1.1rem;"></textarea>
+                    <textarea id="nachricht-text" class="form-input" rows="8" placeholder="z.B. Auto mit Kennzeichen W-12345 bitte umparken!" style="font-size:1.1rem;"></textarea>
                     <small style="color:var(--color-stone-dark);">Halte die Nachricht kurz und praegnant</small>
                 </div>
                 
