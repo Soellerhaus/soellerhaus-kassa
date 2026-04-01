@@ -41,7 +41,9 @@ async function syncPendingData() {
         const pending = await db.buchungen.where('sync_status').equals('pending').toArray();
         for (const b of pending) {
             try {
-                const { error } = await supabaseClient.from('buchungen').upsert(b, { onConflict: 'buchung_id' });
+                // aufgefuellt/aufgefuellt_am NIE überschreiben — nur beim Reset setzen
+                const { aufgefuellt, aufgefuellt_am, ...bOhneAuffuellt } = b;
+                const { error } = await supabaseClient.from('buchungen').upsert(bOhneAuffuellt, { onConflict: 'buchung_id' });
                 if (!error) {
                     await db.buchungen.update(b.buchung_id, { sync_status: 'synced' });
                 }
