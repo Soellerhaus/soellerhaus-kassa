@@ -3185,12 +3185,12 @@ const Buchungen = {
         
         const ids = (data || []).map(b => b.buchung_id);
         const update = { aufgefuellt: true, aufgefuellt_am: new Date().toISOString() };
-        
-        // NUR Supabase updaten
-        for (const id of ids) {
-            await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
+
+        // Batch-Update in 100er Blöcken
+        for (let i = 0; i < ids.length; i += 100) {
+            await supabaseClient.from('buchungen').update(update).in('buchung_id', ids.slice(i, i + 100));
         }
-        
+
         console.log(`✅ ${ids.length} Buchungen als aufgefuellt markiert`);
     },
     
@@ -5561,11 +5561,17 @@ window.resetAuffuelllisteOhneExport = async () => {
         </div>`);
         
         const update = { aufgefuellt: true, aufgefuellt_am: new Date().toISOString() };
+        const chunkSize = 100;
         let done = 0;
-        
-        for (const id of ids) {
-            await supabaseClient.from('buchungen').update(update).eq('buchung_id', id);
-            done++;
+
+        for (let i = 0; i < ids.length; i += chunkSize) {
+            const chunk = ids.slice(i, i + chunkSize);
+            const { error: updErr } = await supabaseClient
+                .from('buchungen')
+                .update(update)
+                .in('buchung_id', chunk);
+            if (updErr) throw new Error('Fehler beim Aktualisieren: ' + updErr.message);
+            done += chunk.length;
             const pct = Math.round((done / ids.length) * 100);
             const bar = document.getElementById('auffuell-bar');
             const pctEl = document.getElementById('auffuell-percent');
