@@ -2894,15 +2894,12 @@ const Buchungen = {
         });
         
         // =====================================================
-        // 1. ALTE BUCHUNG ALS STORNIERT MARKIEREN
+        // 1. ALTE BUCHUNG ALS STORNIERT MARKIEREN (via RPC für RLS-Kompatibilität)
         // =====================================================
-        const update = { storniert: true, storniert_am: new Date().toISOString() };
-        
-        const { error: updateError } = await supabaseClient
-            .from('buchungen')
-            .update(update)
-            .eq('buchung_id', buchung_id);
-        
+        const { error: updateError } = await supabaseClient.rpc('admin_storno_buchung', {
+            p_buchung_id: buchung_id
+        });
+
         if (updateError) {
             console.error('❌ Stornierung fehlgeschlagen:', updateError);
             throw new Error('Stornierung fehlgeschlagen. Bitte nochmal versuchen.');
