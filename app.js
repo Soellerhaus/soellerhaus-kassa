@@ -4728,7 +4728,7 @@ Router.register('login', async () => {
         <div style="background:linear-gradient(135deg, #e67e22, #f39c12);border-radius:16px;padding:16px;margin-bottom:24px;color:white;max-width:600px;margin:0 auto 24px;">
             <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
                 <span style="font-size:1.3rem;">⚠</span>
-                <div><span style="font-weight:700;font-size:1.1rem;">${fehlAnzahl} fehlende Getraenke</span><span style="margin-left:10px;opacity:0.9;">${Utils.formatCurrency(fehlBetrag)}</span></div>
+                <div><span style="font-weight:700;font-size:1.1rem;">${fehlAnzahl} vergessene Getraenke</span><span style="margin-left:10px;opacity:0.9;">${Utils.formatCurrency(fehlBetrag)}</span></div>
             </div>
         </div>`;
     }
@@ -10943,7 +10943,7 @@ Router.register('buchen', async () => {
                 <div style="display:flex;align-items:center;gap:10px;">
                     <span style="font-size:1.2rem;">⚠️</span>
                     <div>
-                        <div style="font-weight:700;font-size:0.95rem;">Fehlende Getränke</div>
+                        <div style="font-weight:700;font-size:0.95rem;">Vergessene Getränke übernehmen</div>
                         <div style="font-size:0.8rem;opacity:0.85;">${fehlendeOffen.length} Positionen · ${sortDaten.length} Tage · ${Utils.formatCurrency(gesamtFehlend)}</div>
                     </div>
                 </div>
