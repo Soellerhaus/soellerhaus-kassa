@@ -12110,6 +12110,7 @@ window.saveNewArticle = async () => {
 };
 
 window.saveEditArticle = async () => {
+    try {
     const id = parseInt(document.getElementById('article-id')?.value);
     const name = document.getElementById('article-name')?.value;
     if (!name?.trim()) { Utils.showToast('Name erforderlich', 'warning'); return; }
@@ -12117,48 +12118,52 @@ window.saveEditArticle = async () => {
     const newPos = parseInt(document.getElementById('article-sort')?.value) || 1;
     const katMap = {1:'Alkoholfreie Getränke',2:'Biere',3:'Weine',4:'Schnäpse & Spirituosen',5:'Heiße Getränke',6:'Suesses & Salziges',7:'Sonstiges'};
     const iconMap = {1:'',2:'',3:'',4:'',5:'[Kaffee]',6:'',7:''};
-    
+
     // Beide Preise lesen
     const preisSV = parseFloat(document.getElementById('article-price-sv')?.value) || 0;
     const preisHP = parseFloat(document.getElementById('article-price-hp')?.value) || 0;
-    
+
     // Alten Artikel holen für Positions-Tausch
     const oldArticle = await Artikel.getById(id);
     const oldPos = oldArticle?.sortierung || 1;
     const oldKat = oldArticle?.kategorie_id;
-    
+
     // Wenn Position oder Kategorie geändert wurde, Platztausch prüfen
     if (oldPos !== newPos || oldKat !== katId) {
         // Finde Artikel der aktuell auf der neuen Position ist (in der neuen Kategorie)
         const allArticles = await Artikel.getAll();
-        const artikelAufNeuerPos = allArticles.find(a => 
-            a.artikel_id !== id && 
-            a.kategorie_id === katId && 
+        const artikelAufNeuerPos = allArticles.find(a =>
+            a.artikel_id !== id &&
+            a.kategorie_id === katId &&
             a.sortierung === newPos
         );
-        
+
         // Platztausch: Der andere Artikel bekommt die alte Position
         if (artikelAufNeuerPos) {
             await db.artikel.update(artikelAufNeuerPos.artikel_id, { sortierung: oldPos });
         }
     }
-    
-    await Artikel.update(id, { 
-        name: name.trim(), 
-        name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15), 
-        sku: document.getElementById('article-sku')?.value?.trim() || null, 
+
+    await Artikel.update(id, {
+        name: name.trim(),
+        name_kurz: document.getElementById('article-short')?.value?.trim() || name.trim().substring(0,15),
+        sku: document.getElementById('article-sku')?.value?.trim() || null,
         preis: preisSV,
         preis_hp: preisHP,
         steuer_prozent: parseInt(document.getElementById('article-mwst')?.value) || 19,
-        kategorie_id: katId, 
-        kategorie_name: katMap[katId], 
-        aktiv: document.getElementById('article-active')?.checked, 
+        kategorie_id: katId,
+        kategorie_name: katMap[katId],
+        aktiv: document.getElementById('article-active')?.checked,
         sortierung: newPos,
         icon: iconMap[katId],
         bild: window.currentArticleImage || null
     });
     closeArticleModal();
     Router.navigate('admin-articles');
+    } catch(e) {
+        console.error('saveEditArticle Fehler:', e);
+        Utils.showToast('Speichern fehlgeschlagen: ' + e.message, 'error');
+    }
 };
 
 // Init
