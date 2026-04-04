@@ -12049,6 +12049,7 @@ window.setFastLeer = async (typ, tage) => {
         msg = `${labelMap[typ]} für ${tage === 14 ? '2 Wochen' : tage + ' Tag' + (tage > 1 ? 'e' : '')} gesetzt`;
     }
     await db.artikel.update(id, update);
+    artikelCache = null;
     if (supabaseClient && isOnline) {
         await supabaseClient.from('artikel').update(update).eq('artikel_id', id);
     }
