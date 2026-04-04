@@ -4038,7 +4038,7 @@ const Artikel = {
                 await db.artikel.update(a.artikel_id, { aktiv: false });
                 if (supabaseClient && isOnline) {
                     try {
-                        await supabaseClient.from('artikel').update({ aktiv: false }).eq('artikel_id', a.artikel_id);
+                        await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: a.artikel_id, p_changes: { aktiv: false } });
                     } catch(e) {}
                 }
                 deaktiviert++;
@@ -4112,7 +4112,7 @@ const Artikel = {
         return data;
     },
     
-    async update(id, changes) { 
+    async update(id, changes) {
         // Platztausch wenn Position geändert wird
         if (changes.sortierung !== undefined) {
             const artikel = await this.getById(id);
@@ -4120,36 +4120,38 @@ const Artikel = {
                 const katId = changes.kategorie_id || artikel.kategorie_id;
                 const newPos = changes.sortierung;
                 const oldPos = artikel.sortierung || 0;
-                
+
                 const allArtikel = await db.artikel.where('kategorie_id').equals(katId).toArray();
                 const conflicting = allArtikel.find(a => a.artikel_id !== id && a.sortierung === newPos);
-                
+
                 if (conflicting) {
                     // ZUERST Supabase
                     if (supabaseClient && isOnline) {
-                        await supabaseClient.from('artikel').update({ sortierung: oldPos }).eq('artikel_id', conflicting.artikel_id);
+                        try {
+                            await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: conflicting.artikel_id, p_changes: { sortierung: oldPos } });
+                        } catch(e) { console.warn('Platztausch Supabase:', e); }
                     }
                     await db.artikel.update(conflicting.artikel_id, { sortierung: oldPos });
                 }
             }
         }
-        
-        // ZUERST Supabase updaten (wichtig!)
+
+        // ZUERST Supabase updaten via RPC (umgeht RLS-Problem mit auth.users)
         if (supabaseClient && isOnline) {
-            const { error } = await supabaseClient.from('artikel').update(changes).eq('artikel_id', id);
+            const { error } = await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: id, p_changes: changes });
             if (error) {
                 console.error('Supabase Update Fehler:', error);
                 throw new Error('Supabase Fehler: ' + error.message);
             }
             console.log('✅ Artikel ' + id + ' in Supabase aktualisiert');
         }
-        
+
         // Dann lokal updaten
         await db.artikel.update(id, changes);
         artikelCache = null; // Cache invalidieren
-        
-        await DataProtection.createBackup(); 
-        Utils.showToast('Artikel aktualisiert', 'success'); 
+
+        await DataProtection.createBackup();
+        Utils.showToast('Artikel aktualisiert', 'success');
     },
     
     async delete(id) { 
@@ -11610,10 +11612,7 @@ window.setZeitbegrenzung = async (artikelId, stunden) => {
         
         // Supabase updaten
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').update({ 
-                aktiv_bis: aktiv_bis,
-                aktiv: true 
-            }).eq('artikel_id', artikelId);
+            await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: artikelId, p_changes: { aktiv_bis: aktiv_bis, aktiv: true } });
         }
         
         // Cache invalidieren
@@ -11648,13 +11647,13 @@ window.quickUpdatePreis = async (id, typ, wert) => {
         
         // ZUERST Supabase updaten (wichtig!)
         if (supabaseClient && isOnline) {
-            const { error } = await supabaseClient.from('artikel').update(update).eq('artikel_id', id);
+            const { error } = await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: id, p_changes: update });
             if (error) throw new Error('Supabase Fehler: ' + error.message);
         }
-        
+
         await db.artikel.update(id, update);
         artikelCache = null;
-        
+
         const label = typ === 'hp' ? 'HP-Preis' : 'SV-Preis';
         Utils.showToast(`${label} auf ${Utils.formatCurrency(preis)} geändert`, 'success');
     } catch (e) {
@@ -11667,7 +11666,7 @@ window.quickUpdateMwst = async (id, mwst) => {
     try {
         // ZUERST Supabase updaten (wichtig!)
         if (supabaseClient && isOnline) {
-            const { error } = await supabaseClient.from('artikel').update({ steuer_prozent: mwst }).eq('artikel_id', id);
+            const { error } = await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: id, p_changes: { steuer_prozent: mwst } });
             if (error) throw new Error('Supabase Fehler: ' + error.message);
         }
         
@@ -11692,7 +11691,7 @@ window.changeArtikelKategorie = async (id, neueKategorieId) => {
         
         // ZUERST Supabase updaten (wichtig!)
         if (supabaseClient && isOnline) {
-            const { error } = await supabaseClient.from('artikel').update(updateData).eq('artikel_id', id);
+            const { error } = await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: id, p_changes: updateData });
             if (error) throw new Error('Supabase Fehler: ' + error.message);
         }
         
@@ -11804,7 +11803,7 @@ window.handleArtikelBildUpload = async (event) => {
         await db.artikel.update(artikelId, { bild: base64 });
         
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').update({ bild: base64 }).eq('artikel_id', artikelId);
+            await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: artikelId, p_changes: { bild: base64 } });
         }
         
         artikelCache = null;
@@ -11941,7 +11940,7 @@ window.setArtikelIcon = async (artikelId, icon) => {
         
         // Supabase updaten
         if (supabaseClient && isOnline) {
-            await supabaseClient.from('artikel').update({ icon: icon }).eq('artikel_id', artikelId);
+            await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: artikelId, p_changes: { icon: icon } });
         }
         
         // Picker schliessen
@@ -12051,7 +12050,9 @@ window.setFastLeer = async (typ, tage) => {
     await db.artikel.update(id, update);
     artikelCache = null;
     if (supabaseClient && isOnline) {
-        await supabaseClient.from('artikel').update(update).eq('artikel_id', id);
+        try {
+            await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: id, p_changes: update });
+        } catch(e) { console.warn('setFastLeer Supabase:', e); }
     }
     Utils.showToast(msg, 'success');
     await showEditArticleModal(id);
