@@ -5639,7 +5639,7 @@ Router.register('admin-alle-buchungen', async () => {
     // Nach Datum+Zeit sortieren (neueste zuerst) - FLACHE Liste
     bs.sort((a,b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
     
-    const gesamtSumme = bs.filter(b => !b.storniert).reduce((s,b) => s + b.preis * b.menge, 0);
+    const gesamtSumme = bs.filter(b => !b.storniert && !b.buchung_id?.startsWith('STORNO_')).reduce((s,b) => s + b.preis * b.menge, 0);
     const selectedGastName = alleGäste.find(g => g.id === selectedGastId)?.name || 'Alle Gäste';
     
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title"> Alle Buchungen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="Router.navigate('admin-dashboard')">← Dashboard</button></div></div>
@@ -5976,7 +5976,7 @@ Router.register('admin-alte-belege', async () => {
     if (selectedId) {
         const found = aktiveGäste.find(g => g.id === selectedId) || inaktiveGäste.find(g => g.id === selectedId);
         selectedName = found?.name || '?';
-        try { const { data } = await supabaseClient.from('buchungen').select('*').or(`user_id.eq.${selectedId},gast_id.eq.${selectedId}`).order('erstellt_am', { ascending: false }); if (data) { buchungen = data; gesamtSumme = buchungen.filter(b => !b.storniert).reduce((s,b) => s + (b.preis||0)*(b.menge||0), 0); } } catch(e) {}
+        try { const { data } = await supabaseClient.from('buchungen').select('*').or(`user_id.eq.${selectedId},gast_id.eq.${selectedId}`).order('erstellt_am', { ascending: false }); if (data) { buchungen = data; gesamtSumme = buchungen.filter(b => !b.storniert && !b.buchung_id?.startsWith('STORNO_')).reduce((s,b) => s + (b.preis||0)*(b.menge||0), 0); } } catch(e) {}
     }
     const byDatum = {}; buchungen.forEach(b => { const d = b.datum || '?'; if (!byDatum[d]) byDatum[d] = []; byDatum[d].push(b); }); const sortedDates = Object.keys(byDatum).sort().reverse();
     
@@ -6037,13 +6037,13 @@ Router.register('admin-checkout-uebersicht', async () => {
         const name = gast.display_name || gast.vorname || gast.first_name || '?';
         let buchungen = [];
         try {
-            const { data } = await supabaseClient.from('buchungen').select('preis, menge, storniert')
+            const { data } = await supabaseClient.from('buchungen').select('buchung_id, preis, menge, storniert')
                 .or(`user_id.eq.${gast.id},gast_id.eq.${gast.id}`)
                 .eq('storniert', false);
             if (data) buchungen = data;
         } catch(e) {}
 
-        const summe = buchungen.reduce((s, b) => s + (b.preis || 0) * (b.menge || 0), 0);
+        const summe = buchungen.filter(b => !b.buchung_id?.startsWith('STORNO_')).reduce((s, b) => s + (b.preis || 0) * Math.max(b.menge || 0, 0), 0);
         gastSummen.push({ id: gast.id, name, gruppe: gast.group_name || '-', anzahl: buchungen.length, summe });
         gesamtSummeAlle += summe;
     }
@@ -8115,10 +8115,10 @@ Router.register('admin-guests', async () => {
     if (supabaseClient && isOnline) {
         for (const g of guests) {
             try {
-                const { data } = await supabaseClient.from('buchungen').select('preis, menge, storniert')
+                const { data } = await supabaseClient.from('buchungen').select('buchung_id, preis, menge, storniert')
                     .or(`user_id.eq.${g.id},gast_id.eq.${g.id}`)
                     .eq('storniert', false);
-                const summe = (data || []).reduce((s, b) => s + (b.preis || 0) * (b.menge || 0), 0);
+                const summe = (data || []).filter(b => !b.buchung_id.startsWith('STORNO_')).reduce((s, b) => s + (b.preis || 0) * Math.max(b.menge || 0, 0), 0);
                 kontoSummen[g.id] = summe;
                 kontoGesamt += summe;
             } catch(e) { kontoSummen[g.id] = 0; }
