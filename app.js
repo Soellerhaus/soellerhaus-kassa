@@ -4676,9 +4676,8 @@ Router.register('login', async () => {
         nachrichtHtml = GastNachricht.renderHtml(nachricht);
     }
     
-    // Tagesmenü laden (erst ab 07:30 anzeigen)
-    const jetztMinuten = new Date().getHours() * 60 + new Date().getMinutes();
-    const tagesMenu = jetztMinuten >= 7 * 60 + 30 ? await TagesMenu.getAktiv() : null;
+    // Tagesmenü laden
+    const tagesMenu = await TagesMenu.getAktiv();
     const tagesMenuHtml = tagesMenu ? `<div style="max-width:600px;margin:0 auto 24px;">${TagesMenu.renderButtons(tagesMenu)}</div>` : '';
     
     // Gast-spezifische Nachrichten laden (GastNachrichten - mehrere pro Gast möglich)
