@@ -11511,11 +11511,9 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
     console.log('🔄 toggleArtikelAktiv aufgerufen:', id, aktiv);
     
     try {
-        // Bei manueller Deaktivierung auch aktiv_bis löschen
-        const updateData = { aktiv: aktiv };
-        if (!aktiv) {
-            updateData.aktiv_bis = null; // Zeitbegrenzung entfernen
-        }
+        // Bei manueller Aktivierung/Deaktivierung immer aktiv_bis löschen,
+        // damit alte abgelaufene Zeitbegrenzungen nicht zu sofortiger Auto-Deaktivierung führen
+        const updateData = { aktiv: aktiv, aktiv_bis: null };
         
         console.log('📤 Sende an Supabase:', updateData);
 
