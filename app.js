@@ -11518,21 +11518,19 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
         }
         
         console.log('📤 Sende an Supabase:', updateData);
-        
-        // ZUERST Supabase updaten (wichtig!)
+
+        // ZUERST Supabase updaten (wichtig!) - via RPC um RLS-Probleme zu vermeiden
         if (supabaseClient && isOnline) {
-            const { data, error } = await supabaseClient
-                .from('artikel')
-                .update(updateData)
-                .eq('artikel_id', id)
-                .select();
-            
+            const { error } = await supabaseClient.rpc('admin_update_artikel', {
+                p_artikel_id: id,
+                p_changes: updateData
+            });
+
             if (error) {
                 console.error('❌ Supabase Fehler:', error);
                 throw new Error('Supabase Fehler: ' + error.message);
             }
-            
-            console.log('✅ Supabase Antwort:', data);
+
             console.log('✅ Artikel ' + id + ' in Supabase ' + (aktiv ? 'aktiviert' : 'deaktiviert'));
         } else {
             console.error('❌ Keine Supabase-Verbindung!');
