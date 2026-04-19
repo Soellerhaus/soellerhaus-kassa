@@ -3404,18 +3404,31 @@ const FehlendeGetränke = {
         }
         
         if (!fehlend || fehlend.uebernommen) throw new Error('Nicht verfügbar');
-        
+
         const updateData = {
             uebernommen: true,
             uebernommen_von: gastId,
             uebernommen_von_name: gastName,
             uebernommen_am: new Date().toISOString()
         };
-        
+
         // Lokal und Supabase updaten
         try { await db.fehlendeGetraenke.update(id, updateData); } catch(e) {}
         if (supabaseClient && isOnline) {
-            await supabaseClient.rpc('admin_fehlende_uebernehmen', { p_id: id, p_gast_id: gastId, p_gast_name: gastName });
+            // 1. Versuch: RPC-Funktion (umgeht RLS für Admins)
+            const { error: rpcError } = await supabaseClient.rpc('admin_fehlende_uebernehmen', { p_id: id, p_gast_id: gastId, p_gast_name: gastName });
+            if (rpcError) {
+                console.warn('RPC admin_fehlende_uebernehmen fehlgeschlagen, versuche direktes Update:', rpcError);
+                // 2. Fallback: Direktes Update (funktioniert für Gäste mit passender RLS-Policy)
+                const { error: updError } = await supabaseClient
+                    .from('fehlende_getraenke')
+                    .update(updateData)
+                    .eq('id', id);
+                if (updError) {
+                    console.error('❌ Übernahme in Supabase fehlgeschlagen:', updError);
+                    throw new Error('Übernahme fehlgeschlagen: ' + updError.message);
+                }
+            }
         }
         
         // Buchung erstellen
