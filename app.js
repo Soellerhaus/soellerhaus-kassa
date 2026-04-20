@@ -8325,7 +8325,7 @@ Router.register('admin-guests', async () => {
                                 <td style="padding:8px;border:1px solid #ddd;text-align:center;">${pmBadge}</td>
                                 <td style="padding:8px;border:1px solid #ddd;text-align:center;">
                                     <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;">
-                                        <button class="btn btn-primary" onclick="adminSchnellbuchen('${g.id}')" style="padding:5px 8px;font-size:0.75rem;">Buchen</button>
+                                        <button class="btn btn-primary" onclick="adminOeffneGastAccount('${g.id}')" style="padding:5px 8px;font-size:0.75rem;">Buchen</button>
                                         <button class="btn btn-secondary" onclick="editGast('${g.id}')" style="padding:5px 8px;font-size:0.75rem;">Edit</button>
                                         <button class="btn btn-danger" onclick="handleDeleteGast('${g.id}')" style="padding:5px 8px;font-size:0.75rem;">X</button>
                                     </div>
@@ -9259,6 +9259,54 @@ window.adminBuchenFürGast = async (id) => {
 };
 
 // ============ ADMIN SCHNELLBUCHEN (mit Mengenabfrage) ============
+// Admin: Zurück zur Gästeverwaltung (beendet Impersonation)
+window.handleAdminZurueckZurGaesteverwaltung = () => {
+    State._adminImpersonating = false;
+    State.currentUser = null;
+    State.selectedGroup = null;
+    Router.navigate('admin-guests');
+};
+
+// Als Admin in den Account eines Gastes wechseln (für direkte Buchung/Ansicht)
+window.adminOeffneGastAccount = async (gastId) => {
+    let gast = null;
+    if (supabaseClient && isOnline) {
+        try {
+            const { data } = await supabaseClient.from('profiles')
+                .select('id, vorname, display_name, first_name, group_name, gast_preismodus, gast_hp_von, gast_hp_bis')
+                .eq('id', gastId).single();
+            if (data) {
+                gast = {
+                    id: data.id,
+                    firstName: data.display_name || data.vorname || data.first_name,
+                    vorname: data.vorname,
+                    group_name: data.group_name,
+                    gast_preismodus: data.gast_preismodus,
+                    gast_hp_von: data.gast_hp_von,
+                    gast_hp_bis: data.gast_hp_bis
+                };
+            }
+        } catch(e) { console.error('Gast laden Fehler:', e); }
+    }
+    if (!gast) {
+        const local = await db.registeredGuests.toArray();
+        const found = local.find(g => String(g.id) === String(gastId));
+        if (found) gast = {
+            id: found.id,
+            firstName: found.nachname || found.firstName,
+            group_name: found.gruppenname || found.group_name
+        };
+    }
+    if (!gast) { Utils.showToast('Gast nicht gefunden', 'error'); return; }
+
+    // Admin-Flag für Rücksprung merken; Admin-Status bleibt erhalten
+    State._adminImpersonating = true;
+    State.currentUser = gast;
+    State.selectedGroup = gast.group_name || null;
+
+    Router.navigate('buchen');
+};
+
 window.adminSchnellbuchen = async (gastId) => {
     // Gast laden
     let gast = null;
@@ -10960,6 +11008,7 @@ Router.register('buchen', async () => {
         </div>
         <div class="header-right" style="display:flex;align-items:center;gap:8px;">
             ${SyncManager.getAmpelHtml()}
+            ${State._adminImpersonating ? `<button class="btn btn-secondary" onclick="handleAdminZurueckZurGaesteverwaltung()" style="padding:6px 10px;font-size:0.9rem;background:#e67e22;color:white;">← Gästeverwaltung</button>` : ''}
             <button class="btn btn-secondary" onclick="handleGastAbmelden()" style="padding:6px 10px;font-size:0.9rem;">${t('logout')}</button>
         </div>
     </div>
