@@ -8122,29 +8122,54 @@ Router.register('admin-guests', async () => {
     });
     
     // Buchungssummen für alle Gäste laden
+    // Wichtig: user_id-Query + gast_id-Query getrennt, dann mergen.
+    // Das .or() mit Template-Literal kann bei UUIDs oder RLS zu leeren Ergebnissen führen.
     const kontoSummen = {};
     let kontoGesamt = 0;
     if (supabaseClient && isOnline) {
         for (const g of guests) {
             try {
-                const { data, error } = await supabaseClient.from('buchungen').select('buchung_id, preis, menge, storniert')
-                    .or(`user_id.eq.${g.id},gast_id.eq.${g.id}`)
+                // Query 1: über user_id (Haupt-Feld, funktioniert wie in Registrierkasse)
+                const res1 = await supabaseClient.from('buchungen')
+                    .select('buchung_id, preis, menge, storniert')
+                    .eq('user_id', g.id)
                     .eq('storniert', false);
-                if (error) {
-                    console.error('Konto-Query Fehler für Gast', g.id, error);
-                    kontoSummen[g.id] = 0;
-                    continue;
+                // Query 2: über gast_id (falls Altbuchungen nur gast_id haben)
+                const res2 = await supabaseClient.from('buchungen')
+                    .select('buchung_id, preis, menge, storniert')
+                    .eq('gast_id', g.id)
+                    .eq('storniert', false);
+
+                if (res1.error) console.error('Konto-Query user_id Fehler:', g.id, res1.error);
+                if (res2.error) console.warn('Konto-Query gast_id Fehler (evtl. Spalte fehlt):', g.id, res2.error);
+
+                // Ergebnisse mergen (dedupliziert nach buchung_id)
+                const alle = [...(res1.data || []), ...(res2.data || [])];
+                const seen = new Set();
+                const dedup = [];
+                for (const b of alle) {
+                    const key = b.buchung_id || Math.random();
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    dedup.push(b);
                 }
-                // STORNO-Gegenbuchungen ausschließen (buchung_id kann NULL sein → optional chaining nutzen!)
-                // Zusätzlich: negative Preise/Mengen nicht mitzählen
-                const summe = (data || [])
+
+                // STORNO-Gegenbuchungen ausschließen (buchung_id kann NULL sein → optional chaining!)
+                // Zusätzlich: negative Preise/Mengen (Storno-Spuren) explizit ignorieren
+                const summe = dedup
                     .filter(b => !b.buchung_id?.startsWith('STORNO_'))
                     .reduce((s, b) => {
                         const preis = b.preis || 0;
                         const menge = b.menge || 0;
-                        if (preis < 0 || menge < 0) return s; // Storno-Spuren ignorieren
+                        if (preis < 0 || menge < 0) return s;
                         return s + preis * menge;
                     }, 0);
+
+                // Debug-Log pro Gast (hilft beim Troubleshooting)
+                if (dedup.length > 0 || summe > 0) {
+                    console.log(`💰 Konto ${(g.nachname || g.firstName || g.id)}: ${summe.toFixed(2)}€ (${dedup.length} Buchungen)`);
+                }
+
                 kontoSummen[g.id] = summe;
                 kontoGesamt += summe;
             } catch(e) {
