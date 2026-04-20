@@ -8153,46 +8153,43 @@ Router.register('admin-guests', async () => {
     let kontoGesamt = 0;
     if (supabaseClient && isOnline) {
         const dupIds = window._gaesteDuplikatIds || {};
-        // Zusätzlich: ALLE Profile (auch inaktive/gelöschte) laden um Namens-Duplikate zu finden
-        let allProfilesByName = {};
-        try {
-            const { data: allProfs } = await supabaseClient
-                .from('profiles')
-                .select('id, vorname, display_name, first_name');
-            if (allProfs) {
-                for (const p of allProfs) {
-                    const nm = (p.display_name || p.vorname || p.first_name || '').toUpperCase().trim();
-                    if (!nm) continue;
-                    if (!allProfilesByName[nm]) allProfilesByName[nm] = [];
-                    allProfilesByName[nm].push(p.id);
-                }
-            }
-        } catch(e) { console.error('Profile-Lookup Fehler:', e); }
-
         for (const g of guests) {
             try {
-                // Alle IDs dieses Gastes: aus Deduplizierung + aus allen Profiles mit gleichem Namen
-                const nm = (g.nachname || g.firstName || g.vorname || g.display_name || '').toUpperCase().trim();
-                const idsFromName = allProfilesByName[nm] || [];
-                const idsSet = new Set([g.id, ...(dupIds[g.id] || []), ...idsFromName]);
-                const allIds = [...idsSet];
+                // Nur IDs aus aktiven Profilen nutzen (inkl. aktive Namens-Duplikate)
+                const allIds = dupIds[g.id] || [g.id];
 
-                // Query über user_id .in (alle IDs gleichzeitig)
+                // Query über user_id .in
                 const res1 = await supabaseClient.from('buchungen')
                     .select('buchung_id, preis, menge, storniert')
                     .in('user_id', allIds)
                     .eq('storniert', false);
-                // Query über gast_id .in (Altbuchungen)
+                // Query über gast_id .in
                 const res2 = await supabaseClient.from('buchungen')
                     .select('buchung_id, preis, menge, storniert')
                     .in('gast_id', allIds)
                     .eq('storniert', false);
 
                 if (res1.error) console.error('Konto-Query user_id Fehler:', g.id, res1.error);
-                if (res2.error) console.warn('Konto-Query gast_id Fehler (evtl. Spalte fehlt):', g.id, res2.error);
+                if (res2.error) console.warn('Konto-Query gast_id Fehler:', g.id, res2.error);
 
-                // Ergebnisse mergen (dedupliziert nach buchung_id)
-                const alle = [...(res1.data || []), ...(res2.data || [])];
+                let alle = [...(res1.data || []), ...(res2.data || [])];
+
+                // Fallback: Wenn keine Buchungen über IDs gefunden, versuche über den Gast-Namen
+                // (Altbuchungen ohne user_id oder mit ID eines gelöschten Profils)
+                if (alle.length === 0) {
+                    const gName = (g.nachname || g.firstName || g.vorname || g.display_name || '').trim();
+                    if (gName) {
+                        const res3 = await supabaseClient.from('buchungen')
+                            .select('buchung_id, preis, menge, storniert, gast_vorname, gast_nachname')
+                            .eq('storniert', false)
+                            .or(`gast_vorname.eq.${gName},gast_nachname.eq.${gName}`);
+                        if (res3.error) console.warn('Konto-Query Name-Fallback Fehler:', gName, res3.error);
+                        if (res3.data && res3.data.length > 0) {
+                            console.log(`ℹ️ ${gName}: ${res3.data.length} Buchungen nur über Namen gefunden (keine passende user_id)`);
+                            alle = res3.data;
+                        }
+                    }
+                }
                 const seen = new Set();
                 const dedup = [];
                 for (const b of alle) {
