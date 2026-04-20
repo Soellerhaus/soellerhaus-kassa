@@ -8053,17 +8053,24 @@ Router.register('admin-guests', async () => {
             } else if (data && data.length > 0) {
                 loadedFrom = 'Supabase';
                 
-                // DEDUPLIZIERUNG: Nur einen Eintrag pro Name behalten
-                const seenNames = new Set();
-                const uniqueData = data.filter(g => {
+                // DEDUPLIZIERUNG: Nur einen Eintrag pro Name behalten,
+                // aber alle Duplikat-IDs sammeln (für Konto-Summe über mehrere Profile!)
+                const seenNames = new Map(); // name → erstes Profile-Objekt
+                const dupIds = {};           // primaryId → [id1, id2, ...]
+                for (const g of data) {
                     const name = (g.display_name || g.vorname || g.first_name || '').toUpperCase().trim();
                     if (seenNames.has(name)) {
-                        console.log('⚠️ Duplikat übersprungen:', name);
-                        return false;
+                        const primary = seenNames.get(name);
+                        if (!dupIds[primary.id]) dupIds[primary.id] = [primary.id];
+                        dupIds[primary.id].push(g.id);
+                        console.log('⚠️ Duplikat', name, '→ ID', g.id, 'wird zu primary', primary.id, 'zusammengeführt');
+                    } else {
+                        seenNames.set(name, g);
                     }
-                    seenNames.add(name);
-                    return true;
-                });
+                }
+                const uniqueData = [...seenNames.values()];
+                // dupIds global verfügbar machen für kontoSummen-Berechnung
+                window._gaesteDuplikatIds = dupIds;
                 
                 // Supabase Daten mit korrekten Feldnamen mappen
                 guests = uniqueData.map(g => {
@@ -8127,17 +8134,20 @@ Router.register('admin-guests', async () => {
     const kontoSummen = {};
     let kontoGesamt = 0;
     if (supabaseClient && isOnline) {
+        const dupIds = window._gaesteDuplikatIds || {};
         for (const g of guests) {
             try {
-                // Query 1: über user_id (Haupt-Feld, funktioniert wie in Registrierkasse)
+                // Alle IDs dieses Gastes (inkl. Duplikat-Profile gleichen Namens)
+                const allIds = dupIds[g.id] || [g.id];
+                // Query über user_id .in (alle IDs gleichzeitig)
                 const res1 = await supabaseClient.from('buchungen')
                     .select('buchung_id, preis, menge, storniert')
-                    .eq('user_id', g.id)
+                    .in('user_id', allIds)
                     .eq('storniert', false);
-                // Query 2: über gast_id (falls Altbuchungen nur gast_id haben)
+                // Query über gast_id .in (Altbuchungen)
                 const res2 = await supabaseClient.from('buchungen')
                     .select('buchung_id, preis, menge, storniert')
-                    .eq('gast_id', g.id)
+                    .in('gast_id', allIds)
                     .eq('storniert', false);
 
                 if (res1.error) console.error('Konto-Query user_id Fehler:', g.id, res1.error);
