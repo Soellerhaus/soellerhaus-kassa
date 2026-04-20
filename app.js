@@ -3112,30 +3112,38 @@ const Buchungen = {
             console.error('❌ Keine Verbindung zu Supabase');
             return [];
         }
-        
+
         try {
-            let query = supabaseClient.from('buchungen').select('*');
-            
-            if (filter.exportiert !== undefined) {
-                query = query.eq('exportiert', filter.exportiert);
+            // Pagination: Supabase-Default-Limit ist 1000, wir müssen blättern
+            // um ALLE Buchungen zu bekommen.
+            const PAGE = 1000;
+            const buildQuery = () => {
+                let q = supabaseClient.from('buchungen').select('*');
+                if (filter.exportiert !== undefined) q = q.eq('exportiert', filter.exportiert);
+                if (filter.datum) q = q.eq('datum', filter.datum);
+                if (filter.includeStorniert !== true) q = q.eq('storniert', false);
+                if (filter.user_id) q = q.eq('user_id', filter.user_id);
+                if (filter.user_ids && filter.user_ids.length) q = q.in('user_id', filter.user_ids);
+                return q.order('erstellt_am', { ascending: false });
+            };
+
+            let all = [];
+            let from = 0;
+            // Sicherheitslimit: max 20 Seiten = 20000 Buchungen
+            for (let page = 0; page < 20; page++) {
+                const { data, error } = await buildQuery().range(from, from + PAGE - 1);
+                if (error) {
+                    console.error('❌ Buchungen.getAll Supabase error:', error);
+                    break;
+                }
+                if (!data || data.length === 0) break;
+                all = all.concat(data);
+                if (data.length < PAGE) break; // Letzte Seite erreicht
+                from += PAGE;
             }
-            if (filter.datum) {
-                query = query.eq('datum', filter.datum);
-            }
-            if (filter.includeStorniert !== true) {
-                query = query.eq('storniert', false);
-            }
-            
-            query = query.order('erstellt_am', { ascending: false });
-            
-            const { data, error } = await query;
-            if (error) {
-                console.error('❌ Buchungen.getAll Supabase error:', error);
-                return [];
-            }
-            
-            console.log('✅ Buchungen von Supabase geladen:', data.length);
-            return data.map(b => ({ ...b, gast_id: b.user_id }));
+
+            console.log('✅ Buchungen von Supabase geladen:', all.length);
+            return all.map(b => ({ ...b, gast_id: b.user_id }));
         } catch(e) {
             console.error('❌ Buchungen.getAll error:', e);
             return [];
@@ -5597,7 +5605,7 @@ window.resetAuffuelllisteOhneExport = async () => {
 Router.register('admin-alle-buchungen', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
-    // Alle aktiven Gäste laden für Dropdown
+    // Alle aktiven Gäste laden für Dropdown - inkl. aller Duplikat-IDs pro Name
     let alleGäste = [];
     if (supabaseClient && isOnline) {
         const { data } = await supabaseClient
@@ -5607,25 +5615,33 @@ Router.register('admin-alle-buchungen', async () => {
             .eq('aktiv', true)
             .order('vorname');
         if (data) {
-            const seenNames = new Set();
-            alleGäste = data.filter(g => {
+            const nameMap = new Map(); // name → { id, name, allIds: [] }
+            for (const g of data) {
                 const name = (g.display_name || g.vorname || '').toUpperCase().trim();
-                if (seenNames.has(name)) return false;
-                seenNames.add(name);
-                return true;
-            }).map(g => ({ id: g.id, name: g.display_name || g.vorname }));
+                if (!name) continue;
+                if (nameMap.has(name)) {
+                    nameMap.get(name).allIds.push(g.id);
+                } else {
+                    nameMap.set(name, { id: g.id, name: g.display_name || g.vorname, allIds: [g.id] });
+                }
+            }
+            alleGäste = [...nameMap.values()];
         }
     }
     if (alleGäste.length === 0) {
         const local = await db.registeredGuests.toArray();
         const filtered = local.filter(g => !g.gelöscht && g.aktiv !== false);
-        const seenNames = new Set();
-        alleGäste = filtered.filter(g => {
+        const nameMap = new Map();
+        for (const g of filtered) {
             const name = (g.nachname || g.firstName || '').toUpperCase().trim();
-            if (seenNames.has(name)) return false;
-            seenNames.add(name);
-            return true;
-        }).map(g => ({ id: g.id, name: g.nachname || g.firstName }));
+            if (!name) continue;
+            if (nameMap.has(name)) {
+                nameMap.get(name).allIds.push(g.id);
+            } else {
+                nameMap.set(name, { id: g.id, name: g.nachname || g.firstName, allIds: [g.id] });
+            }
+        }
+        alleGäste = [...nameMap.values()];
     }
     
     const selectedGastId = State.selectedGastFilter || '';
@@ -5635,9 +5651,11 @@ Router.register('admin-alle-buchungen', async () => {
     // Alle Buchungen laden
     let bs = await Buchungen.getAll({ includeStorniert: true });
     
-    // Filter nach Gast
+    // Filter nach Gast - inkl. Duplikat-IDs gleichen Namens
     if (selectedGastId) {
-        bs = bs.filter(b => b.user_id === selectedGastId || b.gast_id === selectedGastId);
+        const selGast = alleGäste.find(g => g.id === selectedGastId);
+        const allIds = selGast?.allIds || [selectedGastId];
+        bs = bs.filter(b => allIds.includes(b.user_id) || allIds.includes(b.gast_id));
     }
     
     // Filter nach Datumsbereich
@@ -8135,10 +8153,30 @@ Router.register('admin-guests', async () => {
     let kontoGesamt = 0;
     if (supabaseClient && isOnline) {
         const dupIds = window._gaesteDuplikatIds || {};
+        // Zusätzlich: ALLE Profile (auch inaktive/gelöschte) laden um Namens-Duplikate zu finden
+        let allProfilesByName = {};
+        try {
+            const { data: allProfs } = await supabaseClient
+                .from('profiles')
+                .select('id, vorname, display_name, first_name');
+            if (allProfs) {
+                for (const p of allProfs) {
+                    const nm = (p.display_name || p.vorname || p.first_name || '').toUpperCase().trim();
+                    if (!nm) continue;
+                    if (!allProfilesByName[nm]) allProfilesByName[nm] = [];
+                    allProfilesByName[nm].push(p.id);
+                }
+            }
+        } catch(e) { console.error('Profile-Lookup Fehler:', e); }
+
         for (const g of guests) {
             try {
-                // Alle IDs dieses Gastes (inkl. Duplikat-Profile gleichen Namens)
-                const allIds = dupIds[g.id] || [g.id];
+                // Alle IDs dieses Gastes: aus Deduplizierung + aus allen Profiles mit gleichem Namen
+                const nm = (g.nachname || g.firstName || g.vorname || g.display_name || '').toUpperCase().trim();
+                const idsFromName = allProfilesByName[nm] || [];
+                const idsSet = new Set([g.id, ...(dupIds[g.id] || []), ...idsFromName]);
+                const allIds = [...idsSet];
+
                 // Query über user_id .in (alle IDs gleichzeitig)
                 const res1 = await supabaseClient.from('buchungen')
                     .select('buchung_id, preis, menge, storniert')
