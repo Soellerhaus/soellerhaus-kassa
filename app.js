@@ -8127,13 +8127,30 @@ Router.register('admin-guests', async () => {
     if (supabaseClient && isOnline) {
         for (const g of guests) {
             try {
-                const { data } = await supabaseClient.from('buchungen').select('buchung_id, preis, menge, storniert')
+                const { data, error } = await supabaseClient.from('buchungen').select('buchung_id, preis, menge, storniert')
                     .or(`user_id.eq.${g.id},gast_id.eq.${g.id}`)
                     .eq('storniert', false);
-                const summe = (data || []).filter(b => !b.buchung_id.startsWith('STORNO_')).reduce((s, b) => s + (b.preis || 0) * Math.max(b.menge || 0, 0), 0);
+                if (error) {
+                    console.error('Konto-Query Fehler für Gast', g.id, error);
+                    kontoSummen[g.id] = 0;
+                    continue;
+                }
+                // STORNO-Gegenbuchungen ausschließen (buchung_id kann NULL sein → optional chaining nutzen!)
+                // Zusätzlich: negative Preise/Mengen nicht mitzählen
+                const summe = (data || [])
+                    .filter(b => !b.buchung_id?.startsWith('STORNO_'))
+                    .reduce((s, b) => {
+                        const preis = b.preis || 0;
+                        const menge = b.menge || 0;
+                        if (preis < 0 || menge < 0) return s; // Storno-Spuren ignorieren
+                        return s + preis * menge;
+                    }, 0);
                 kontoSummen[g.id] = summe;
                 kontoGesamt += summe;
-            } catch(e) { kontoSummen[g.id] = 0; }
+            } catch(e) {
+                console.error('Konto-Berechnung Fehler für Gast', g.id, e);
+                kontoSummen[g.id] = 0;
+            }
         }
     }
 
