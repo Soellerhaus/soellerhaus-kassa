@@ -4091,20 +4091,39 @@ const Artikel = {
     async cleanupAbgelaufene() {
         const alle = await db.artikel.toArray();
         let deaktiviert = 0;
-        
+        const jetzt = new Date();
+        const STALE_GRACE_MS = 5 * 60 * 1000; // 5 Minuten "Frist" - vermeidet Race mit frischer Aktivierung
+
         for (const a of alle) {
-            if (a.aktiv && a.aktiv_bis && new Date(a.aktiv_bis) < new Date()) {
-                await db.artikel.update(a.artikel_id, { aktiv: false });
-                if (supabaseClient && isOnline) {
-                    try {
-                        await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: a.artikel_id, p_changes: { aktiv: false } });
-                    } catch(e) {}
-                }
-                deaktiviert++;
-                console.log(`⏰ Artikel "${a.name}" automatisch deaktiviert (abgelaufen)`);
+            if (!a.aktiv || !a.aktiv_bis) continue;
+            const ablauf = new Date(a.aktiv_bis);
+            if (ablauf >= jetzt) continue; // noch gültig
+
+            const staleAge = jetzt - ablauf;
+            if (staleAge > STALE_GRACE_MS) {
+                // Sehr alter aktiv_bis Rest → als manuelle Dauer-Aktivierung interpretieren:
+                // aktiv_bis löschen, Artikel BLEIBT aktiv
+                try {
+                    await db.artikel.update(a.artikel_id, { aktiv_bis: null });
+                    if (supabaseClient && isOnline) {
+                        await supabaseClient.from('artikel').update({ aktiv_bis: null }).eq('artikel_id', a.artikel_id);
+                    }
+                    console.log(`🧹 Artikel "${a.name}": alter aktiv_bis (${a.aktiv_bis}) gelöscht - bleibt aktiv`);
+                } catch(e) { console.warn('aktiv_bis cleanup fehlgeschlagen:', e); }
+                continue;
             }
+
+            // Frisch abgelaufene Zeitbegrenzung → wirklich deaktivieren
+            await db.artikel.update(a.artikel_id, { aktiv: false });
+            if (supabaseClient && isOnline) {
+                try {
+                    await supabaseClient.rpc('admin_update_artikel', { p_artikel_id: a.artikel_id, p_changes: { aktiv: false } });
+                } catch(e) {}
+            }
+            deaktiviert++;
+            console.log(`⏰ Artikel "${a.name}" automatisch deaktiviert (abgelaufen)`);
         }
-        
+
         if (deaktiviert > 0) {
             artikelCache = null; // Cache invalidieren
         }
@@ -11684,6 +11703,15 @@ window.toggleArtikelAktiv = async (id, aktiv) => {
             if (error) {
                 console.error('❌ Supabase Fehler:', error);
                 throw new Error('Supabase Fehler: ' + error.message);
+            }
+
+            // EXPLIZIT aktiv_bis auf NULL setzen via direct update - die RPC schluckt null-Werte
+            // in JSONB-Parametern oft, sodass alte aktiv_bis-Werte stehen bleiben und der
+            // Artikel durch cleanupAbgelaufene() sofort wieder deaktiviert wird!
+            try {
+                await supabaseClient.from('artikel').update({ aktiv_bis: null }).eq('artikel_id', id);
+            } catch(e) {
+                console.warn('aktiv_bis=null direct update fehlgeschlagen (evtl. RLS):', e);
             }
 
             console.log('✅ Artikel ' + id + ' in Supabase ' + (aktiv ? 'aktiviert' : 'deaktiviert'));
