@@ -4115,10 +4115,11 @@ const Artikel = {
     async getAll(f={}) {
         // Erst abgelaufene Artikel cleanup
         await this.cleanupAbgelaufene();
-        
-        // Von Supabase laden wenn online UND (Cache null ODER aelter als 30 Sekunden)
+
+        // Von Supabase laden wenn online UND (Cache null ODER aelter als 5 Sekunden)
+        // Kurzes TTL damit Aktivierungen durch den Admin schnell beim Gast sichtbar werden
         const cacheAge = artikelCacheTime ? (Date.now() - artikelCacheTime) : Infinity;
-        if (supabaseClient && isOnline && (!artikelCache || cacheAge > 30000)) {
+        if (supabaseClient && isOnline && (!artikelCache || cacheAge > 5000)) {
             await this.loadFromSupabase();
         }
         
@@ -10888,6 +10889,8 @@ Router.register('buchen', async () => {
     }
     
     const kats = await db.kategorien.toArray();
+    // Cache invalidieren, damit Gäste sofort Admin-Aktivierungen sehen
+    artikelCache = null;
     const arts = await Artikel.getAll({ aktiv: true });
     const name = State.currentUser.firstName || State.currentUser.vorname;
     const gastId = State.currentUser.id || State.currentUser.gast_id;
