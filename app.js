@@ -3114,9 +3114,6 @@ const Buchungen = {
         }
 
         try {
-            // Pagination: Supabase-Default-Limit ist 1000, wir müssen blättern
-            // um ALLE Buchungen zu bekommen.
-            const PAGE = 1000;
             const buildQuery = () => {
                 let q = supabaseClient.from('buchungen').select('*');
                 if (filter.exportiert !== undefined) q = q.eq('exportiert', filter.exportiert);
@@ -3124,25 +3121,36 @@ const Buchungen = {
                 if (filter.includeStorniert !== true) q = q.eq('storniert', false);
                 if (filter.user_id) q = q.eq('user_id', filter.user_id);
                 if (filter.user_ids && filter.user_ids.length) q = q.in('user_id', filter.user_ids);
+                if (filter.datum_von) q = q.gte('datum', filter.datum_von);
+                if (filter.datum_bis) q = q.lte('datum', filter.datum_bis);
                 return q.order('erstellt_am', { ascending: false });
             };
 
-            let all = [];
-            let from = 0;
-            // Sicherheitslimit: max 20 Seiten = 20000 Buchungen
-            for (let page = 0; page < 20; page++) {
-                const { data, error } = await buildQuery().range(from, from + PAGE - 1);
+            // Nur paginieren wenn explizit angefordert (filter.paginate = true).
+            // Sonst einzelner Call - viel schneller für normale Nutzung.
+            if (filter.paginate !== true) {
+                const { data, error } = await buildQuery().limit(filter.limit || 10000);
                 if (error) {
                     console.error('❌ Buchungen.getAll Supabase error:', error);
-                    break;
+                    return [];
                 }
-                if (!data || data.length === 0) break;
-                all = all.concat(data);
-                if (data.length < PAGE) break; // Letzte Seite erreicht
-                from += PAGE;
+                console.log('✅ Buchungen von Supabase geladen:', (data || []).length);
+                return (data || []).map(b => ({ ...b, gast_id: b.user_id }));
             }
 
-            console.log('✅ Buchungen von Supabase geladen:', all.length);
+            // Pagination-Modus (für Export o.ä.)
+            const PAGE = 1000;
+            let all = [];
+            let from = 0;
+            for (let page = 0; page < 50; page++) {
+                const { data, error } = await buildQuery().range(from, from + PAGE - 1);
+                if (error) { console.error('❌ Buchungen.getAll Pagination error:', error); break; }
+                if (!data || data.length === 0) break;
+                all = all.concat(data);
+                if (data.length < PAGE) break;
+                from += PAGE;
+            }
+            console.log('✅ Buchungen paginiert geladen:', all.length);
             return all.map(b => ({ ...b, gast_id: b.user_id }));
         } catch(e) {
             console.error('❌ Buchungen.getAll error:', e);
@@ -8146,81 +8154,64 @@ Router.register('admin-guests', async () => {
         return nameA.localeCompare(nameB);
     });
     
-    // Buchungssummen für alle Gäste laden
-    // Wichtig: user_id-Query + gast_id-Query getrennt, dann mergen.
-    // Das .or() mit Template-Literal kann bei UUIDs oder RLS zu leeren Ergebnissen führen.
+    // Buchungssummen für alle Gäste laden - PERFORMANCE-OPTIMIERT
+    // Nur 2 Supabase-Queries insgesamt (statt bisher 2-3 pro Gast).
+    // Client-seitige Aggregation nach user_id / gast_id.
     const kontoSummen = {};
     let kontoGesamt = 0;
     if (supabaseClient && isOnline) {
         const dupIds = window._gaesteDuplikatIds || {};
+        // Alle IDs aller aktiven Gäste sammeln + Rückmapping ID → primary Gast-ID
+        const allIds = [];
+        const idToPrimary = {};
         for (const g of guests) {
-            try {
-                // Nur IDs aus aktiven Profilen nutzen (inkl. aktive Namens-Duplikate)
-                const allIds = dupIds[g.id] || [g.id];
-
-                // Query über user_id .in
-                const res1 = await supabaseClient.from('buchungen')
-                    .select('buchung_id, preis, menge, storniert')
-                    .in('user_id', allIds)
-                    .eq('storniert', false);
-                // Query über gast_id .in
-                const res2 = await supabaseClient.from('buchungen')
-                    .select('buchung_id, preis, menge, storniert')
-                    .in('gast_id', allIds)
-                    .eq('storniert', false);
-
-                if (res1.error) console.error('Konto-Query user_id Fehler:', g.id, res1.error);
-                if (res2.error) console.warn('Konto-Query gast_id Fehler:', g.id, res2.error);
-
-                let alle = [...(res1.data || []), ...(res2.data || [])];
-
-                // Fallback: Wenn keine Buchungen über IDs gefunden, versuche über den Gast-Namen
-                // (Altbuchungen ohne user_id oder mit ID eines gelöschten Profils)
-                if (alle.length === 0) {
-                    const gName = (g.nachname || g.firstName || g.vorname || g.display_name || '').trim();
-                    if (gName) {
-                        const res3 = await supabaseClient.from('buchungen')
-                            .select('buchung_id, preis, menge, storniert, gast_vorname, gast_nachname')
-                            .eq('storniert', false)
-                            .or(`gast_vorname.eq.${gName},gast_nachname.eq.${gName}`);
-                        if (res3.error) console.warn('Konto-Query Name-Fallback Fehler:', gName, res3.error);
-                        if (res3.data && res3.data.length > 0) {
-                            console.log(`ℹ️ ${gName}: ${res3.data.length} Buchungen nur über Namen gefunden (keine passende user_id)`);
-                            alle = res3.data;
-                        }
-                    }
-                }
-                const seen = new Set();
-                const dedup = [];
-                for (const b of alle) {
-                    const key = b.buchung_id || Math.random();
-                    if (seen.has(key)) continue;
-                    seen.add(key);
-                    dedup.push(b);
-                }
-
-                // STORNO-Gegenbuchungen ausschließen (buchung_id kann NULL sein → optional chaining!)
-                // Zusätzlich: negative Preise/Mengen (Storno-Spuren) explizit ignorieren
-                const summe = dedup
-                    .filter(b => !b.buchung_id?.startsWith('STORNO_'))
-                    .reduce((s, b) => {
-                        const preis = b.preis || 0;
-                        const menge = b.menge || 0;
-                        if (preis < 0 || menge < 0) return s;
-                        return s + preis * menge;
-                    }, 0);
-
-                // Debug-Log pro Gast (hilft beim Troubleshooting)
-                if (dedup.length > 0 || summe > 0) {
-                    console.log(`💰 Konto ${(g.nachname || g.firstName || g.id)}: ${summe.toFixed(2)}€ (${dedup.length} Buchungen)`);
-                }
-
-                kontoSummen[g.id] = summe;
-                kontoGesamt += summe;
-            } catch(e) {
-                console.error('Konto-Berechnung Fehler für Gast', g.id, e);
-                kontoSummen[g.id] = 0;
+            const ids = dupIds[g.id] || [g.id];
+            for (const id of ids) {
+                allIds.push(id);
+                idToPrimary[id] = g.id;
             }
+            kontoSummen[g.id] = 0;
+        }
+
+        try {
+            // Parallel: eine Query über user_id, eine über gast_id
+            const [res1, res2] = await Promise.all([
+                supabaseClient.from('buchungen')
+                    .select('buchung_id, preis, menge, user_id')
+                    .in('user_id', allIds)
+                    .eq('storniert', false)
+                    .limit(50000),
+                supabaseClient.from('buchungen')
+                    .select('buchung_id, preis, menge, gast_id')
+                    .in('gast_id', allIds)
+                    .eq('storniert', false)
+                    .limit(50000)
+            ]);
+            if (res1.error) console.error('Konto-Query user_id Fehler:', res1.error);
+            if (res2.error) console.warn('Konto-Query gast_id Fehler:', res2.error);
+
+            // Dedupliziert nach buchung_id aggregieren
+            const seen = new Set();
+            const addBuchung = (b, id) => {
+                const key = b.buchung_id || `${id}_${Math.random()}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+                if (b.buchung_id?.startsWith('STORNO_')) return;
+                const preis = b.preis || 0;
+                const menge = b.menge || 0;
+                if (preis < 0 || menge < 0) return;
+                const primaryId = idToPrimary[id];
+                if (!primaryId) return;
+                const wert = preis * menge;
+                kontoSummen[primaryId] = (kontoSummen[primaryId] || 0) + wert;
+                kontoGesamt += wert;
+            };
+            for (const b of (res1.data || [])) addBuchung(b, b.user_id);
+            for (const b of (res2.data || [])) addBuchung(b, b.gast_id);
+
+            console.log(`💰 Konto-Aggregation: ${Object.keys(kontoSummen).length} Gäste, ${kontoGesamt.toFixed(2)}€ gesamt, ${(res1.data||[]).length + (res2.data||[]).length} Buchungen geladen`);
+        } catch(e) {
+            console.error('Konto-Berechnung Fehler:', e);
         }
     }
 
