@@ -11044,16 +11044,16 @@ Router.register('buchen', async () => {
                 <span style="font-size:2.2rem;">🛒</span>
                 <div>
                     <div style="font-weight:800;font-size:1.4rem;">${sessionCount > 0 ? sessionCount + ' Artikel' : 'Warenkorb leer'}</div>
-                    ${sessionCount > 0 ? '<div style="font-size:0.9rem;opacity:0.85;">Antippen zum Anzeigen/Stornieren</div>' : ''}
+                    ${sessionCount > 0 ? '<div style="font-size:0.9rem;opacity:0.85;">🗑 Stornieren möglich bis Abmelden</div>' : ''}
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:12px;">
                 <span style="font-size:2rem;font-weight:800;">${Utils.formatCurrency(sessionTotal)}</span>
-                <span id="warenkorb-arrow" style="font-size:1.2rem;">${sessionCount > 0 ? '▲' : ''}</span>
+                <span id="warenkorb-arrow" style="font-size:1.2rem;">${sessionCount > 0 ? '▼' : ''}</span>
             </div>
         </div>
-        <!-- Artikel-Details (aufklappbar) -->
-        <div id="warenkorb-details" style="display:none;background:white;max-height:40vh;overflow-y:auto;">
+        <!-- Artikel-Details - standardmäßig OFFEN wenn Artikel im Warenkorb -->
+        <div id="warenkorb-details" style="display:${sessionCount > 0 ? 'block' : 'none'};background:white;max-height:40vh;overflow-y:auto;">
             ${sessionBuchungen.length ? sessionBuchungen.map(b => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #eee;">
                 <div style="flex:1;">
