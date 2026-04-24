@@ -2,7 +2,7 @@
 // SEOLLERHAUS KASSA - SERVICE WORKER
 // ================================
 
-const CACHE_NAME = 'seollerhaus-kassa-v3-warenkorb';
+const CACHE_NAME = 'seollerhaus-kassa-v4-autorefresh';
 const urlsToCache = [
     '/kassa/',
     '/kassa/index.html',

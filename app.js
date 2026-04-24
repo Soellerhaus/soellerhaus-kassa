@@ -4001,8 +4001,9 @@ const Umlage = {
         
         if (alleGäste.length === 0) throw new Error('Keine aktiven Gäste für Umlage');
         
-        // Preis pro Gast berechnen (aufgerundet auf 2 Dezimalen)
-        const preisProGast = Math.ceil((artikel.preis / alleGäste.length) * 100) / 100;
+        // Preis pro Gast berechnen - auf 10 Cent gerundet (letzte Stelle immer 0)
+        // 5 rauf auf nächsten 10er, unter 5 runter
+        const preisProGast = Math.round((artikel.preis / alleGäste.length) * 10) / 10;
         
         const heute = Utils.getBuchungsDatum();
         const uhrzeit = Utils.formatTime(new Date());
@@ -6593,7 +6594,8 @@ Router.register('admin-umlage', async () => {
     // Fehlende Getränke laden
     const fehlendeOffen = await FehlendeGetränke.getOffene();
     const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
-    const preisProGast = totalGuests > 0 ? Math.ceil((gesamtPreis / totalGuests) * 100) / 100 : gesamtPreis;
+    // Auf 10 Cent runden (letzte Stelle immer 0)
+    const preisProGast = totalGuests > 0 ? Math.round((gesamtPreis / totalGuests) * 10) / 10 : gesamtPreis;
     
     UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title"> Umlage buchen</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
     <div class="main-content">
@@ -6788,7 +6790,8 @@ window.bucheUmlageFürAlle = async () => {
     }
     
     const gesamtPreis = fehlendeOffen.reduce((s, f) => s + f.artikel_preis, 0);
-    const preisProGast = Math.ceil((gesamtPreis / totalGuests) * 100) / 100;
+    // Auf 10 Cent runden (letzte Stelle immer 0)
+    const preisProGast = Math.round((gesamtPreis / totalGuests) * 10) / 10;
     
     let confirmMsg = `UMLAGE durchführen?\n\n${fehlendeOffen.length} fehlende Getränke\nGesamtwert: ${Utils.formatCurrency(gesamtPreis)}\n\n${Utils.formatCurrency(preisProGast)} x ${totalGuests} Gäste`;
     if (ausgenommen > 0) {
@@ -10893,9 +10896,46 @@ Router.register('dashboard', async () => {
 
 Router.register('buchen', async () => {
     if (!State.currentUser) { Router.navigate('login'); return; }
-    
+
     // SyncManager starten für Hintergrund-Synchronisation
     SyncManager.startBackgroundSync();
+
+    // Auto-Refresh: alle 10 Sekunden prüfen ob sich Buchungen geändert haben
+    // (z.B. Admin hat storniert) und dann Seite automatisch neu rendern.
+    // Gleichzeitig werden Nachrichten/Menü-Updates mit übernommen.
+    if (window._buchenRefreshInterval) clearInterval(window._buchenRefreshInterval);
+    window._buchenRefreshInterval = setInterval(async () => {
+        // Abbrechen wenn Gast nicht mehr auf Buchen-Seite
+        if (State.currentPage !== 'buchen' || !State.currentUser) {
+            clearInterval(window._buchenRefreshInterval);
+            window._buchenRefreshInterval = null;
+            return;
+        }
+        try {
+            const gId = State.currentUser.id || State.currentUser.gast_id;
+            if (!gId || !supabaseClient || !isOnline) return;
+            // Leichtgewichtige Signatur: Anzahl + Summe + storno-Count
+            const { data } = await supabaseClient
+                .from('buchungen')
+                .select('preis, menge, storniert, buchung_id, bezahlt')
+                .eq('user_id', gId);
+            if (!data) return;
+            const sig = data
+                .filter(b => !b.storniert && b.bezahlt !== true && !b.buchung_id?.startsWith('STORNO_'))
+                .reduce((s, b) => s + (b.preis || 0) * (b.menge || 0), 0)
+                .toFixed(2) + '|' + data.length;
+            if (window._letzteBuchenSig && window._letzteBuchenSig !== sig) {
+                console.log('🔄 Buchungen haben sich geändert - Seite wird aktualisiert');
+                window._letzteBuchenSig = sig;
+                // Nur re-rendern wenn Gast nicht gerade interagiert (z.B. Warenkorb offen)
+                Router.navigate('buchen');
+            } else {
+                window._letzteBuchenSig = sig;
+            }
+        } catch(e) {
+            console.warn('Buchen-Auto-Refresh Fehler:', e);
+        }
+    }, 10000);
     
     // i18n Setup
     const t = (key, params) => i18n.t(key, params);
