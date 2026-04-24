@@ -1,7 +1,50 @@
 // ================================
-// SEOLLERHAUS KASSA - MAIN APP v3.6
+// SEOLLERHAUS KASSA - MAIN APP v3.7
 // Supabase Multi-Device Version
 // ================================
+
+// ================================
+// AUTO-UPDATE: prüft alle 3 Min ob eine neue app.js-Version auf dem Server liegt,
+// und reloaded die Seite automatisch. So sehen Gäste neue Features/Menüs ohne
+// manuellen Pull-to-Refresh.
+// ================================
+(function setupAutoUpdate() {
+    const CHECK_INTERVAL_MS = 3 * 60 * 1000; // 3 Minuten
+    let lastSignature = null;
+
+    async function checkForUpdate() {
+        try {
+            // HEAD-Request auf app.js mit Cache-Buster - holt nur Header
+            const resp = await fetch('./app.js?_u=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
+            if (!resp.ok) return;
+            const sig = resp.headers.get('etag') || resp.headers.get('last-modified') || resp.headers.get('content-length') || '';
+            if (!sig) return;
+            if (lastSignature && lastSignature !== sig) {
+                console.log('🔄 Neue App-Version erkannt - Seite wird automatisch neu geladen');
+                // Sanfter Reload: wenn User gerade im Warenkorb-Flow ist, abwarten
+                const warenkorbAktiv = document.querySelector('#warenkorb-details > div');
+                if (warenkorbAktiv) {
+                    console.log('⏸️ Warenkorb nicht leer - Reload nach Abmeldung');
+                    window._pendingAppReload = true;
+                } else {
+                    // Harter Reload ohne Cache
+                    window.location.reload();
+                }
+            }
+            lastSignature = sig;
+        } catch(e) {
+            // Offline oder Fetch-Fehler - kein Problem, nächster Check in 3 Min
+        }
+    }
+
+    // Erstes Check sofort (um Baseline-Signatur zu setzen), dann periodisch
+    if (typeof window !== 'undefined') {
+        window.addEventListener('load', () => {
+            checkForUpdate();
+            setInterval(checkForUpdate, CHECK_INTERVAL_MS);
+        });
+    }
+})();
 
 // ================================
 // SUPABASE KONFIGURATION
@@ -11517,12 +11560,26 @@ window.handleBuchenUndAbmelden = async () => {
 window.handleGastAbmelden = async () => {
     // SyncManager stoppen
     SyncManager.stopBackgroundSync();
-    
+
+    // Buchen-Auto-Refresh stoppen
+    if (window._buchenRefreshInterval) {
+        clearInterval(window._buchenRefreshInterval);
+        window._buchenRefreshInterval = null;
+    }
+
     // Noch ausstehende Buchungen synchronisieren bevor Abmeldung
     await SyncManager.syncPending();
-    
+
     await Buchungen.fixSessionBuchungen();
     State.clearUser();
+
+    // Wenn während der Session eine neue App-Version erkannt wurde → jetzt reloaden
+    if (window._pendingAppReload) {
+        console.log('🔄 Pending App-Reload nach Abmelden');
+        window.location.reload();
+        return;
+    }
+
     Router.navigate('login');
     Utils.showToast(i18n.t('goodbye'), 'success');
 };
