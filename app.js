@@ -11454,15 +11454,14 @@ window.bucheMitMenge = async (artikelId) => {
     }
 };
 
-// Storno durch Gast
+// Storno durch Gast - ohne Popup, direkt stornieren mit Toast-Feedback
 window.stornoBuchung = async (buchung_id) => {
-    if (confirm(i18n.t('cancel_booking'))) {
-        try {
-            await Buchungen.storno(buchung_id);
-            Router.navigate('buchen');
-        } catch (e) {
-            Utils.showToast(e.message, 'error');
-        }
+    try {
+        await Buchungen.storno(buchung_id);
+        Utils.showToast('✅ Storniert', 'success');
+        Router.navigate('buchen');
+    } catch (e) {
+        Utils.showToast(e.message, 'error');
     }
 };
 
