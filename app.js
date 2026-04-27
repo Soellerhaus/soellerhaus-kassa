@@ -1773,11 +1773,157 @@ const CheeseOrders = {
 // Global verfügbar machen
 window.CheeseOrders = CheeseOrders;
 
+// ================================
+// SMART HOME - Tuya-Geräte (Kaffeemaschine, Lichterkette, etc.)
+// ================================
+const SmartHome = {
+    // Default-Geräte (werden beim ersten Aufruf in Supabase gespeichert)
+    DEFAULT_GERAETE: [
+        { id: 'kaffee',    name: 'Kaffeemaschine', icon: '☕',
+          url_on:  'http://185.237.252.90:5002/tuya/ein/bf43e7571551e0ec57hnr2',
+          url_off: 'http://185.237.252.90:5002/tuya/aus/bf43e7571551e0ec57hnr2' },
+        { id: 'lichter',   name: 'Lichterkette',   icon: '✨',
+          url_on:  'http://185.237.252.90:5002/tuya/ein/64488816d8f15b837674',
+          url_off: 'http://185.237.252.90:5002/tuya/aus/64488816d8f15b837674' }
+    ],
+
+    async isEnabled() {
+        try {
+            if (supabaseClient && isOnline) {
+                const { data } = await supabaseClient.from('settings').select('value').eq('key', 'smarthome_aktiv').single();
+                if (data?.value !== undefined) return data.value === true || data.value === 'true';
+            }
+            const local = await db.settings.get('smarthome_aktiv');
+            if (local?.value !== undefined) return local.value === true || local.value === 'true';
+        } catch(e) {}
+        return false;
+    },
+
+    async setEnabled(aktiv) {
+        await db.settings.put({ key: 'smarthome_aktiv', value: aktiv });
+        if (supabaseClient && isOnline) {
+            try { await supabaseClient.from('settings').upsert({ key: 'smarthome_aktiv', value: aktiv }); } catch(e) {}
+        }
+    },
+
+    async getGeraete() {
+        try {
+            if (supabaseClient && isOnline) {
+                const { data } = await supabaseClient.from('settings').select('value').eq('key', 'smarthome_geraete').single();
+                if (data?.value) {
+                    const v = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                    if (Array.isArray(v) && v.length > 0) return v;
+                }
+            }
+            const local = await db.settings.get('smarthome_geraete');
+            if (local?.value) {
+                const v = typeof local.value === 'string' ? JSON.parse(local.value) : local.value;
+                if (Array.isArray(v) && v.length > 0) return v;
+            }
+        } catch(e) { console.warn('SmartHome.getGeraete:', e); }
+        // Erstes Mal: Defaults speichern
+        await this.saveGeraete(this.DEFAULT_GERAETE);
+        return this.DEFAULT_GERAETE;
+    },
+
+    async saveGeraete(geraete) {
+        await db.settings.put({ key: 'smarthome_geraete', value: JSON.stringify(geraete) });
+        if (supabaseClient && isOnline) {
+            try { await supabaseClient.from('settings').upsert({ key: 'smarthome_geraete', value: geraete }); } catch(e) {}
+        }
+    },
+
+    // URL aufrufen - mit Fallbacks gegen Mixed-Content-Blocking
+    async triggerUrl(url) {
+        // 1. Versuch: fetch no-cors (fire-and-forget)
+        try {
+            await fetch(url, { mode: 'no-cors', cache: 'no-store' });
+            return true;
+        } catch(e) {
+            console.warn('fetch fehlgeschlagen, versuche Image-Trick:', e);
+        }
+        // 2. Fallback: Image-Trick (manche Browser erlauben passive HTTP)
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.style.display = 'none';
+            const cleanup = () => { try { img.remove(); } catch(_){} resolve(true); };
+            img.onload = cleanup; img.onerror = cleanup;
+            img.src = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+            document.body.appendChild(img);
+            setTimeout(cleanup, 4000);
+        });
+    },
+
+    async showModal() {
+        const geraete = await this.getGeraete();
+        const html = `
+        <div id="smarthome-modal-overlay" onclick="if(event.target===this)SmartHome.closeModal()" style="
+            position:fixed;top:0;left:0;right:0;bottom:0;
+            background:rgba(0,0,0,0.7);
+            display:flex;align-items:center;justify-content:center;
+            z-index:9999;padding:16px;">
+            <div style="background:white;border-radius:18px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,0.4);">
+                <div style="background:linear-gradient(135deg,#3498db,#2c3e50);color:white;padding:18px 22px;border-radius:18px 18px 0 0;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="font-size:1.3rem;font-weight:800;">🏠 Smart Home</div>
+                    <button onclick="SmartHome.closeModal()" style="background:rgba(255,255,255,0.2);color:white;border:none;width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;">✕</button>
+                </div>
+                <div style="padding:18px;">
+                    ${geraete.map(g => `
+                    <div style="border:1px solid #e0e0e0;border-radius:14px;padding:14px;margin-bottom:12px;">
+                        <div style="font-size:1.05rem;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+                            <span style="font-size:1.6rem;">${g.icon || '⚡'}</span>
+                            <span>${g.name}</span>
+                        </div>
+                        <div style="display:flex;gap:10px;">
+                            <button onclick="SmartHome.action('${g.id}','on',this)" style="flex:1;background:linear-gradient(135deg,#27ae60,#229954);color:white;border:none;border-radius:10px;padding:14px;font-size:1.05rem;font-weight:700;cursor:pointer;">▶ EIN</button>
+                            <button onclick="SmartHome.action('${g.id}','off',this)" style="flex:1;background:linear-gradient(135deg,#7f8c8d,#566060);color:white;border:none;border-radius:10px;padding:14px;font-size:1.05rem;font-weight:700;cursor:pointer;">■ AUS</button>
+                        </div>
+                    </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', html);
+    },
+
+    closeModal() {
+        document.getElementById('smarthome-modal-overlay')?.remove();
+    },
+
+    async action(geraetId, ein_aus, btn) {
+        const geraete = await this.getGeraete();
+        const g = geraete.find(x => x.id === geraetId);
+        if (!g) return;
+        const url = ein_aus === 'on' ? g.url_on : g.url_off;
+        const orig = btn.textContent;
+        btn.textContent = '⏳';
+        btn.disabled = true;
+        try {
+            await this.triggerUrl(url);
+            btn.textContent = '✓';
+            Utils.showToast(`${g.icon} ${g.name} ${ein_aus === 'on' ? 'eingeschaltet' : 'ausgeschaltet'}`, 'success');
+        } catch(e) {
+            btn.textContent = '✕';
+            Utils.showToast('Fehler: ' + (e.message || 'unbekannt'), 'error');
+        }
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+    }
+};
+window.SmartHome = SmartHome;
+
 window.toggleKaese = async () => {
     const aktiv = await CheeseOrders.isEnabled();
     await CheeseOrders.setEnabled(!aktiv);
     Utils.showToast(aktiv ? 'Käsebestellung deaktiviert' : 'Käsebestellung aktiviert', 'success');
     Router.navigate('admin');
+};
+
+window.toggleSmartHome = async (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    const aktiv = await SmartHome.isEnabled();
+    await SmartHome.setEnabled(!aktiv);
+    Utils.showToast(aktiv ? 'Smart Home deaktiviert' : 'Smart Home aktiviert', 'success');
+    Router.navigate('admin-dashboard');
 };
 
 const Utils = {
@@ -2115,7 +2261,7 @@ const i18n = {
     },
     
     // Button HTML für Startseite mit Sprache UND WhatsApp - STICKY KIOSK VERSION
-    renderLangButtonWithWhatsApp(kaeseAktiv = false) {
+    renderLangButtonWithWhatsApp(kaeseAktiv = false, smartHomeAktiv = false) {
         const flag = this.currentLang === 'de' ? '🇬🇧' : '🇩🇪';
         const label = this.currentLang === 'de' ? 'English' : 'Deutsch';
         const kaeseBtn = kaeseAktiv ? `<button onclick="CheeseOrders.showModal()" style="
@@ -2134,9 +2280,26 @@ const i18n = {
             ">
                 🧀 Käsebestellung
             </button>` : '';
+        const smartHomeBtn = smartHomeAktiv ? `<button onclick="SmartHome.showModal()" style="
+                background:linear-gradient(135deg, #3498db, #2c3e50);
+                color:white;
+                border:none;
+                border-radius:25px;
+                padding:10px 16px;
+                font-size:0.85rem;
+                font-weight:600;
+                cursor:pointer;
+                box-shadow:0 2px 8px rgba(52,152,219,0.3);
+                display:flex;
+                align-items:center;
+                gap:6px;
+            ">
+                🏠 Smart Home
+            </button>` : '';
         return `
         <div style="position:sticky;top:0;left:0;right:0;z-index:1000;background:linear-gradient(135deg,#f8f9fa,#e9ecef);padding:12px 16px;display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;box-shadow:0 2px 12px rgba(0,0,0,0.08);border-bottom:1px solid rgba(44,95,124,0.1);">
             ${kaeseBtn}
+            ${smartHomeBtn}
             <button onclick="window.location.href='http://185.237.252.90:3000/sauna.html'" style="
                 background:linear-gradient(135deg, #e74c3c, #c0392b);
                 color:white;
@@ -4856,9 +5019,11 @@ Router.register('login', async () => {
     
     // Käse-Feature aktiv?
     const kaeseAktiv = await CheeseOrders.isEnabled();
+    // Smart Home aktiv?
+    const smartHomeAktiv = await SmartHome.isEnabled();
 
     // Sprachauswahl Button mit WhatsApp (nur auf Startseite)
-    const langBtn = i18n.renderLangButtonWithWhatsApp(kaeseAktiv);
+    const langBtn = i18n.renderLangButtonWithWhatsApp(kaeseAktiv, smartHomeAktiv);
     
     UI.render(`${langBtn}<div class="main-content"><div style="text-align:center;margin-top:40px;"><div style="margin:0 auto 24px;"><img src="data:image/webp;base64,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" alt="Söllerhaus" style="height:52px;width:auto;"></div><h1 style="font-family:var(--font-display);font-size:var(--text-3xl);margin-bottom:8px;">${t('app_title')}</h1><p style="color:var(--color-stone-dark);margin-bottom:24px;">${t('app_subtitle')}</p>${nachrichtHtml}${tagesMenuHtml}${gastNachrichtenHtml}${fehlendeHtml}<div style="max-width:600px;margin:0 auto;"><div class="alphabet-container"><div class="alphabet-title">${t('select_first_letter')}</div><div class="alphabet-grid">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => `<button class="alphabet-btn" onclick="handleLetterSelect('${l}')">${l}</button>`).join('')}</div></div><div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--color-stone-medium);"><p style="color:var(--color-stone-dark);margin-bottom:16px;">${t('no_account')}</p><button class="btn btn-primary btn-block" style="max-width:400px;margin:0 auto;" onclick="handleRegisterClick()">${t('register_new')}</button></div><div style="margin-top:24px;display:flex;justify-content:center;align-items:center;gap:12px;"><a href="#" onclick="handleAdminClick();return false;" style="color:#999;font-size:0.75rem;text-decoration:none;">⚙️</a><span style="color:#bbb;font-size:0.65rem;">v3.6 © 2026 • Entwickelt von: Claudio • App: ${new Date().toLocaleString('de-AT')}</span></div></div></div></div>`);
 });
@@ -5159,10 +5324,12 @@ Router.register('admin-dashboard', async () => {
     // Offene Käse-Bestellungen laden + Status
     let openCheeseOrders = [];
     let kaeseAktiv = false;
+    let smartHomeAktiv = false;
     try {
         openCheeseOrders = await CheeseOrders.getOpenOrders();
         kaeseAktiv = await CheeseOrders.isEnabled();
-    } catch(e) { console.error('cheese orders error:', e); }
+        smartHomeAktiv = await SmartHome.isEnabled();
+    } catch(e) { console.error('cheese/smarthome status:', e); }
     const cheeseCount = openCheeseOrders.length;
     
     const heute = Utils.getBuchungsDatum();
@@ -5258,6 +5425,14 @@ Router.register('admin-dashboard', async () => {
             <button class="btn btn-block" onclick="Router.navigate('admin-checkout-uebersicht')" style="padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, #0984e3, #6c5ce7);color:white;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(9,132,227,0.3);">
                 🧾 Checkout-Übersicht (alle Gäste)
             </button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px;">
+            <div style="position:relative;">
+                <button class="btn btn-block" onclick="Router.navigate('admin-smarthome')" style="width:100%;padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, #3498db, #2c3e50);color:white;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(52,152,219,0.3);${!smartHomeAktiv ? 'opacity:0.5;' : ''}">
+                    🏠 Smart Home (Geräte)
+                </button>
+                <button onclick="toggleSmartHome()" style="position:absolute;top:4px;right:4px;background:${smartHomeAktiv ? '#27ae60' : '#e74c3c'};color:white;border:none;border-radius:12px;padding:2px 8px;font-size:0.65rem;font-weight:700;cursor:pointer;">${smartHomeAktiv ? 'AN' : 'AUS'}</button>
+            </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
             <button class="btn" onclick="Router.navigate('admin-fehlende')" style="padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, #e67e22, #f39c12);color:white;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(230,126,34,0.3);">
@@ -8012,6 +8187,111 @@ window.deaktiviereNachricht = async () => {
 // ================================
 // ADMIN: KAeSE-BESTELLUNGEN
 // ================================
+// ===== ADMIN: SMART HOME GERÄTE-VERWALTUNG =====
+Router.register('admin-smarthome', async () => {
+    if (!State.isAdmin) { Router.navigate('admin-login'); return; }
+
+    const aktiv = await SmartHome.isEnabled();
+    const geraete = await SmartHome.getGeraete();
+
+    UI.render(`<div class="app-header"><div class="header-left"><button class="menu-btn" onclick="Router.navigate('admin-dashboard')">←</button><div class="header-title">🏠 Smart Home Geräte</div></div><div class="header-right"><button class="btn btn-secondary" onclick="handleLogout()">Abmelden</button></div></div>
+    <div class="main-content">
+        <div class="card mb-3" style="background:#fffde7;">
+            <div class="card-body" style="padding:14px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-weight:700;font-size:1.05rem;">Status: ${aktiv ? '✅ Aktiviert' : '⛔ Deaktiviert'}</div>
+                    <div style="font-size:0.85rem;color:#666;">Wenn aktiviert, sehen Gäste den 🏠 Smart-Home-Button auf der Startseite.</div>
+                </div>
+                <button onclick="toggleSmartHome()" style="background:${aktiv ? '#e74c3c' : '#27ae60'};color:white;border:none;border-radius:10px;padding:10px 18px;font-weight:700;cursor:pointer;">
+                    ${aktiv ? 'Deaktivieren' : 'Aktivieren'}
+                </button>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h3 style="margin-top:0;">Geräte (${geraete.length})</h3>
+                <div id="smarthome-list">
+                    ${geraete.map((g, i) => `
+                    <div style="border:1px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:12px;background:#fafafa;">
+                        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                            <input type="text" id="sh-icon-${i}" value="${g.icon||''}" maxlength="3" style="width:54px;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:1.4rem;text-align:center;">
+                            <input type="text" id="sh-name-${i}" value="${g.name||''}" placeholder="Gerätename" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;">
+                            <input type="text" id="sh-id-${i}" value="${g.id||''}" placeholder="id" style="width:90px;padding:8px;border:1px solid #ccc;border-radius:6px;">
+                        </div>
+                        <div style="margin-bottom:6px;">
+                            <label style="font-size:0.8rem;font-weight:600;">URL EIN:</label>
+                            <input type="text" id="sh-on-${i}" value="${g.url_on||''}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:0.85rem;font-family:monospace;">
+                        </div>
+                        <div style="margin-bottom:8px;">
+                            <label style="font-size:0.8rem;font-weight:600;">URL AUS:</label>
+                            <input type="text" id="sh-off-${i}" value="${g.url_off||''}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:0.85rem;font-family:monospace;">
+                        </div>
+                        <div style="display:flex;gap:6px;">
+                            <button onclick="testSmartHomeUrl(${i},'on')" style="background:#27ae60;color:white;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:0.85rem;">Test EIN</button>
+                            <button onclick="testSmartHomeUrl(${i},'off')" style="background:#7f8c8d;color:white;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:0.85rem;">Test AUS</button>
+                            <button onclick="deleteSmartHomeGeraet(${i})" style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:0.85rem;margin-left:auto;">🗑 Löschen</button>
+                        </div>
+                    </div>
+                    `).join('')}
+                </div>
+                <button onclick="addSmartHomeGeraet()" style="background:#3498db;color:white;border:none;border-radius:10px;padding:12px 20px;font-weight:700;cursor:pointer;width:100%;margin-top:8px;">+ Neues Gerät hinzufügen</button>
+            </div>
+        </div>
+
+        <button onclick="saveSmartHomeGeraete()" class="btn btn-primary btn-block" style="padding:14px;font-size:1.1rem;">💾 Speichern</button>
+    </div>`);
+
+    window._smarthomeGeraete = JSON.parse(JSON.stringify(geraete));
+});
+
+window.addSmartHomeGeraet = () => {
+    const list = window._smarthomeGeraete || [];
+    list.push({ id: 'gerat' + (list.length + 1), name: 'Neues Gerät', icon: '⚡', url_on: '', url_off: '' });
+    window._smarthomeGeraete = readSmartHomeFromForm(list.length - 1, list);
+    Router.navigate('admin-smarthome');
+};
+
+window.deleteSmartHomeGeraet = (idx) => {
+    if (!confirm('Gerät wirklich löschen?')) return;
+    const list = readSmartHomeFromForm(-1, window._smarthomeGeraete || []);
+    list.splice(idx, 1);
+    window._smarthomeGeraete = list;
+    Router.navigate('admin-smarthome');
+};
+
+window.testSmartHomeUrl = async (idx, ein_aus) => {
+    const list = readSmartHomeFromForm(-1, window._smarthomeGeraete || []);
+    const g = list[idx];
+    const url = ein_aus === 'on' ? g.url_on : g.url_off;
+    if (!url) { Utils.showToast('Keine URL hinterlegt', 'error'); return; }
+    Utils.showToast('Sende Befehl...', 'info');
+    await SmartHome.triggerUrl(url);
+    Utils.showToast('Befehl gesendet ✓', 'success');
+};
+
+window.saveSmartHomeGeraete = async () => {
+    const list = readSmartHomeFromForm(-1, window._smarthomeGeraete || []);
+    await SmartHome.saveGeraete(list);
+    Utils.showToast('💾 Geräte gespeichert', 'success');
+    Router.navigate('admin-smarthome');
+};
+
+// Helper: liest die aktuellen Form-Werte und gibt eine aktualisierte Geräte-Liste zurück
+function readSmartHomeFromForm(skipIdx, baseList) {
+    const result = [];
+    for (let i = 0; i < baseList.length; i++) {
+        if (i === skipIdx) { result.push(baseList[i]); continue; }
+        const icon = document.getElementById('sh-icon-' + i)?.value ?? baseList[i].icon;
+        const name = document.getElementById('sh-name-' + i)?.value ?? baseList[i].name;
+        const id   = document.getElementById('sh-id-' + i)?.value   ?? baseList[i].id;
+        const u_on = document.getElementById('sh-on-' + i)?.value   ?? baseList[i].url_on;
+        const u_off= document.getElementById('sh-off-' + i)?.value  ?? baseList[i].url_off;
+        result.push({ id, name, icon, url_on: u_on, url_off: u_off });
+    }
+    return result;
+}
+
 Router.register('admin-cheese', async () => {
     if (!State.isAdmin) { Router.navigate('admin-login'); return; }
     
