@@ -1833,56 +1833,46 @@ const SmartHome = {
         }
     },
 
-    // URL aufrufen - mit mehreren Fallbacks gegen Mixed-Content-Blocking
-    async triggerUrl(url) {
-        // 1. Versuch: fetch (no-cors) - klappt wenn Server CORS+HTTPS unterstützt
-        let fetchOk = false;
+    // URL SYNCHRON triggern - MUSS im User-Gesture-Kontext aufgerufen werden!
+    // Gibt das geöffnete Window zurück (oder null bei Popup-Block).
+    triggerUrlSync(url) {
+        // Mini-Popup öffnen (bleibt im User-Gesture-Kontext, umgeht Mixed-Content
+        // weil Top-Level-Navigation zu HTTP von HTTPS-Seite aus erlaubt ist).
+        // KEIN noopener, sonst können wir das Fenster nicht schließen.
         try {
-            await fetch(url, { mode: 'no-cors', cache: 'no-store' });
-            fetchOk = true;
-            console.log('✅ fetch erfolgreich:', url);
-        } catch(e) {
-            console.warn('fetch geblockt:', e.message);
-        }
-
-        // 2. Versuch: HTTPS-Variante (falls Server HTTPS spricht)
-        if (!fetchOk && url.startsWith('http://')) {
-            try {
-                const httpsUrl = 'https://' + url.substring(7);
-                await fetch(httpsUrl, { mode: 'no-cors', cache: 'no-store' });
-                fetchOk = true;
-                console.log('✅ HTTPS-fetch erfolgreich:', httpsUrl);
-            } catch(e) {
-                console.warn('HTTPS-fetch ebenfalls geblockt:', e.message);
+            const w = window.open(url, 'sh_action_' + Date.now(),
+                'width=300,height=150,left=99999,top=99999');
+            if (w) {
+                // Nach 1.5s automatisch schließen
+                setTimeout(() => { try { w.close(); } catch(_){} }, 1500);
+                console.log('✅ Smart-Home via window.open getriggert:', url);
+                return w;
+            } else {
+                console.warn('⚠️ Popup blockiert vom Browser - bitte Pop-ups erlauben');
             }
-        }
+        } catch(e) { console.warn('window.open fehlgeschlagen:', e); }
 
-        // 3. Fallback: Mini-Popup öffnen + sofort schließen (umgeht Mixed-Content,
-        //    weil Top-Level-Navigation in neuem Window erlaubt ist)
-        if (!fetchOk) {
-            try {
-                const w = window.open(url, 'sh_action_' + Date.now(),
-                    'width=200,height=100,left=99999,top=99999,noopener,noreferrer');
-                if (w) {
-                    setTimeout(() => { try { w.close(); } catch(_){} }, 1200);
-                    console.log('✅ via window.open getriggert');
-                    return true;
-                } else {
-                    console.warn('Popup blockiert');
-                }
-            } catch(e) { console.warn('window.open fehlgeschlagen:', e); }
-        }
-
-        // 4. Letzter Fallback: Image-Trick
-        return new Promise((resolve) => {
+        // Fallback: Image-Tag (selten erfolgreich bei HTTP-aus-HTTPS aber ein Versuch)
+        try {
             const img = new Image();
             img.style.display = 'none';
-            const cleanup = () => { try { img.remove(); } catch(_){} resolve(true); };
-            img.onload = cleanup; img.onerror = cleanup;
             img.src = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
             document.body.appendChild(img);
-            setTimeout(cleanup, 3000);
-        });
+            setTimeout(() => { try { img.remove(); } catch(_){} }, 3000);
+        } catch(_){}
+
+        return null;
+    },
+
+    // Async-Variante (nur als Fallback für nicht-Klick-Kontexte wie Test-Buttons)
+    async triggerUrl(url) {
+        // Direkt sync versuchen
+        const w = this.triggerUrlSync(url);
+        if (w) return true;
+        // Sonst per fetch (no-cors) - klappt nur wenn HTTPS oder CORS-erlaubt
+        try { await fetch(url, { mode: 'no-cors', cache: 'no-store' }); return true; }
+        catch(e) { console.warn('fetch ebenfalls fehlgeschlagen:', e); }
+        return false;
     },
 
     // Inline-Render für Startseite (nicht als Modal sondern als sichtbare Karte)
@@ -1948,23 +1938,38 @@ const SmartHome = {
         document.getElementById('smarthome-modal-overlay')?.remove();
     },
 
-    async action(geraetId, ein_aus, btn) {
-        const geraete = await this.getGeraete();
-        const g = geraete.find(x => x.id === geraetId);
-        if (!g) return;
-        const url = ein_aus === 'on' ? g.url_on : g.url_off;
+    // WICHTIG: Diese Funktion wird direkt aus onclick aufgerufen → User-Gesture aktiv.
+    // window.open MUSS synchron passieren bevor irgendein await läuft, sonst blockt
+    // der Browser das Popup wegen "no user gesture".
+    action(geraetId, ein_aus, btn) {
         const orig = btn.textContent;
-        btn.textContent = '⏳';
-        btn.disabled = true;
-        try {
-            await this.triggerUrl(url);
+        // 1. Geräte aus dem In-Memory-Cache nehmen (synchron, kein await!)
+        const cached = window._smartHomeCache;
+        const useUrl = (geraete) => {
+            const g = (geraete || []).find(x => x.id === geraetId);
+            if (!g) { Utils.showToast('Gerät nicht gefunden', 'error'); return; }
+            const url = ein_aus === 'on' ? g.url_on : g.url_off;
+            if (!url) { Utils.showToast('Keine URL hinterlegt', 'error'); return; }
+            // SYNCHRON triggern - User-Gesture noch aktiv!
+            this.triggerUrlSync(url);
             btn.textContent = '✓';
-            Utils.showToast(`${g.icon} ${g.name} ${ein_aus === 'on' ? 'eingeschaltet' : 'ausgeschaltet'}`, 'success');
-        } catch(e) {
-            btn.textContent = '✕';
-            Utils.showToast('Fehler: ' + (e.message || 'unbekannt'), 'error');
+            Utils.showToast(`${g.icon} ${g.name} ${ein_aus === 'on' ? 'EIN' : 'AUS'}`, 'success');
+            setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+        };
+
+        btn.disabled = true;
+        if (cached && cached.length > 0) {
+            // Cache verfügbar → sofort triggern (User-Gesture aktiv)
+            useUrl(cached);
+        } else {
+            // Erstmaliges Laden: Geräte holen, dann triggern.
+            // ABER User-Gesture geht durch await verloren → Toast als Hinweis.
+            btn.textContent = '⏳';
+            this.getGeraete().then(g => {
+                window._smartHomeCache = g;
+                useUrl(g);
+            });
         }
-        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
     }
 };
 window.SmartHome = SmartHome;
@@ -5082,6 +5087,8 @@ Router.register('login', async () => {
     let smartHomeInlineHtml = '';
     if (smartHomeAktiv) {
         const sg = await SmartHome.getGeraete();
+        // In Cache legen damit triggerUrlSync ohne await arbeiten kann (User-Gesture!)
+        window._smartHomeCache = sg;
         smartHomeInlineHtml = SmartHome.renderInlineHtml(sg);
     }
 

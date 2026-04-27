@@ -2,7 +2,7 @@
 // SEOLLERHAUS KASSA - SERVICE WORKER
 // ================================
 
-const CACHE_NAME = 'seollerhaus-kassa-v6-smarthome-inline';
+const CACHE_NAME = 'seollerhaus-kassa-v7-smarthome-sync';
 const urlsToCache = [
     '/kassa/',
     '/kassa/index.html',
