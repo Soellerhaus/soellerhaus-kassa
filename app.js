@@ -1987,6 +1987,25 @@ window.toggleSmartHome = async (e) => {
     Router.navigate('admin-dashboard');
 };
 
+window.toggleGeoLock = async () => {
+    if (!supabaseClient) { Utils.showToast('Supabase nicht verfügbar', 'error'); return; }
+    let aktuell = false;
+    try {
+        const { data } = await supabaseClient.from('settings').select('value').eq('key', 'geolock_aktiv').single();
+        aktuell = data?.value === true || data?.value === 'true';
+    } catch(_){}
+    const neu = !aktuell;
+    if (neu && !confirm('Geo-Lock aktivieren?\n\nDie App ist dann NUR noch aus Österreich erreichbar.\nAlle Zugriffe aus dem Ausland werden blockiert.')) return;
+    try {
+        await supabaseClient.from('settings').upsert({ key: 'geolock_aktiv', value: neu });
+        await db.settings.put({ key: 'geolock_aktiv', value: neu });
+        Utils.showToast(neu ? '🔒 Geo-Lock aktiviert (nur AT)' : '🌍 Geo-Lock deaktiviert (weltweit)', 'success');
+        Router.navigate('admin-dashboard');
+    } catch(e) {
+        Utils.showToast('Fehler: ' + e.message, 'error');
+    }
+};
+
 const Utils = {
     uuid: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c=='x'?r:(r&0x3|0x8)).toString(16); }),
     getDeviceId() { let d = localStorage.getItem('device_id'); if(!d) { d = this.uuid(); localStorage.setItem('device_id', d); } return d; },
@@ -5394,11 +5413,17 @@ Router.register('admin-dashboard', async () => {
     let openCheeseOrders = [];
     let kaeseAktiv = false;
     let smartHomeAktiv = false;
+    let geoLockAktiv = false;
     try {
         openCheeseOrders = await CheeseOrders.getOpenOrders();
         kaeseAktiv = await CheeseOrders.isEnabled();
         smartHomeAktiv = await SmartHome.isEnabled();
-    } catch(e) { console.error('cheese/smarthome status:', e); }
+        // Geo-Lock Status aus Supabase
+        try {
+            const { data } = await supabaseClient.from('settings').select('value').eq('key', 'geolock_aktiv').single();
+            geoLockAktiv = data?.value === true || data?.value === 'true';
+        } catch(_){}
+    } catch(e) { console.error('status loading:', e); }
     const cheeseCount = openCheeseOrders.length;
     
     const heute = Utils.getBuchungsDatum();
@@ -5495,12 +5520,18 @@ Router.register('admin-dashboard', async () => {
                 🧾 Checkout-Übersicht (alle Gäste)
             </button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <div style="position:relative;">
                 <button class="btn btn-block" onclick="Router.navigate('admin-smarthome')" style="width:100%;padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, #3498db, #2c3e50);color:white;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(52,152,219,0.3);${!smartHomeAktiv ? 'opacity:0.5;' : ''}">
-                    🏠 Smart Home (Geräte)
+                    🏠 Smart Home
                 </button>
                 <button onclick="toggleSmartHome()" style="position:absolute;top:4px;right:4px;background:${smartHomeAktiv ? '#27ae60' : '#e74c3c'};color:white;border:none;border-radius:12px;padding:2px 8px;font-size:0.65rem;font-weight:700;cursor:pointer;">${smartHomeAktiv ? 'AN' : 'AUS'}</button>
+            </div>
+            <div style="position:relative;">
+                <button class="btn btn-block" onclick="toggleGeoLock()" style="width:100%;padding:12px;font-size:0.95rem;font-weight:600;background:linear-gradient(135deg, ${geoLockAktiv ? '#c0392b, #8b0000' : '#27ae60, #16a085'});color:white;border:none;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                    ${geoLockAktiv ? '🔒 Geo-Lock (nur AT)' : '🌍 Weltweit erreichbar'}
+                </button>
+                <span style="position:absolute;top:4px;right:4px;background:${geoLockAktiv ? '#e74c3c' : '#27ae60'};color:white;border-radius:12px;padding:2px 8px;font-size:0.65rem;font-weight:700;">${geoLockAktiv ? 'AT' : 'WELT'}</span>
             </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
@@ -12833,28 +12864,49 @@ window.saveEditArticle = async () => {
 // Init
 (async function initApp() {
     console.log(' Seollerhaus Kassa v3.0 (Supabase) startet...');
-    
-    // Geo-Lock: Nur Zugriff aus Österreich erlauben
-    try {
-        const response = await fetch('https://ipapi.co/json/');
-        const data = await response.json();
-        if (data.country_code !== 'AT') {
-            document.body.innerHTML = `
-                <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#2C5F7C;">
-                    <div style="text-align:center;padding:60px 40px;background:white;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,0.3);max-width:500px;">
-                        <div style="font-size:4rem;margin-bottom:20px;">🔒</div>
-                        <h1 style="color:#2C5F7C;margin-bottom:20px;font-size:1.8rem;">Zugriff verweigert</h1>
-                        <p style="color:#666;font-size:1.1rem;line-height:1.6;">Diese Anwendung ist ausschließlich vor Ort im Söllerhaus verfügbar.</p>
-                        <p style="color:#999;font-size:0.9rem;margin-top:30px;">Bei Fragen wenden Sie sich bitte an die Rezeption.</p>
-                    </div>
-                </div>
-            `;
-            return; // App-Start abbrechen
+
+    // Geo-Lock: Nur aktiv wenn explizit eingeschaltet (über Supabase-Setting 'geolock_aktiv').
+    // Standardmäßig deaktiviert → App ist weltweit erreichbar.
+    // Bypass-Möglichkeit: ?nogeolock in der URL (für Admin-Zugriff von zuhause).
+    if (!window.location.search.includes('nogeolock')) {
+        try {
+            // Setting aus Supabase laden (direct REST call - Client noch nicht initialisiert)
+            let geolockAktiv = false;
+            try {
+                const settingResp = await fetch(SUPABASE_URL + '/rest/v1/settings?key=eq.geolock_aktiv&select=value', {
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+                });
+                const settingData = await settingResp.json();
+                if (settingData?.[0]?.value === true || settingData?.[0]?.value === 'true') {
+                    geolockAktiv = true;
+                }
+            } catch(e) { /* Setting nicht erreichbar → kein Geo-Lock */ }
+
+            if (geolockAktiv) {
+                const response = await fetch('https://ipapi.co/json/');
+                const data = await response.json();
+                if (data.country_code !== 'AT') {
+                    document.body.innerHTML = `
+                        <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#2C5F7C;">
+                            <div style="text-align:center;padding:60px 40px;background:white;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,0.3);max-width:500px;">
+                                <div style="font-size:4rem;margin-bottom:20px;">🔒</div>
+                                <h1 style="color:#2C5F7C;margin-bottom:20px;font-size:1.8rem;">Zugriff verweigert</h1>
+                                <p style="color:#666;font-size:1.1rem;line-height:1.6;">Diese Anwendung ist ausschließlich vor Ort im Söllerhaus verfügbar.</p>
+                                <p style="color:#999;font-size:0.9rem;margin-top:30px;">Bei Fragen wenden Sie sich bitte an die Rezeption.</p>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                console.log('✅ Geo-Check OK (Österreich)');
+            } else {
+                console.log('🌍 Geo-Lock deaktiviert - weltweiter Zugriff möglich');
+            }
+        } catch(e) {
+            console.warn('⚠️ Geo-Check fehlgeschlagen - erlaube Zugriff:', e);
         }
-        console.log('✅ Geo-Check OK');
-    } catch(e) {
-        console.warn('⚠️ Geo-Check fehlgeschlagen - erlaube Zugriff:', e);
-        // Bei Fehler (z.B. offline) → Zugriff erlauben
+    } else {
+        console.log('🌍 Geo-Lock per URL-Parameter umgangen');
     }
     
     // Funktion um Loading Screen zu verstecken und App zu zeigen
