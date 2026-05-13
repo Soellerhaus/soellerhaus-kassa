@@ -1833,46 +1833,51 @@ const SmartHome = {
         }
     },
 
-    // URL SYNCHRON triggern - MUSS im User-Gesture-Kontext aufgerufen werden!
-    // Gibt das geöffnete Window zurück (oder null bei Popup-Block).
-    triggerUrlSync(url) {
-        // Mini-Popup öffnen (bleibt im User-Gesture-Kontext, umgeht Mixed-Content
-        // weil Top-Level-Navigation zu HTTP von HTTPS-Seite aus erlaubt ist).
-        // KEIN noopener, sonst können wir das Fenster nicht schließen.
-        try {
-            const w = window.open(url, 'sh_action_' + Date.now(),
-                'width=300,height=150,left=99999,top=99999');
-            if (w) {
-                // Nach 1.5s automatisch schließen
-                setTimeout(() => { try { w.close(); } catch(_){} }, 1500);
-                console.log('✅ Smart-Home via window.open getriggert:', url);
-                return w;
-            } else {
-                console.warn('⚠️ Popup blockiert vom Browser - bitte Pop-ups erlauben');
-            }
-        } catch(e) { console.warn('window.open fehlgeschlagen:', e); }
+    // Öffentliche HTTPS-Proxies (Fallback-Reihenfolge).
+    // Damit klappt der Aufruf von HTTP-URLs aus HTTPS-Seiten heraus
+    // (z.B. von github.io aus). Funktioniert von überall auf der Welt.
+    PROXIES: [
+        u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+        u => 'https://corsproxy.io/?' + encodeURIComponent(u),
+        u => 'https://cors.eu.org/' + u
+    ],
 
-        // Fallback: Image-Tag (selten erfolgreich bei HTTP-aus-HTTPS aber ein Versuch)
+    // URL triggern - nutzt HTTPS-Proxy damit es weltweit funktioniert.
+    // Sync-Aufruf: feuert mehrere parallele fetch-Requests (no-cors) ab.
+    triggerUrlSync(url) {
+        let anyStarted = false;
+        // 1. Direkter Versuch (falls Server doch HTTPS oder CORS unterstützt)
+        try {
+            fetch(url, { mode: 'no-cors', cache: 'no-store' }).catch(() => {});
+            anyStarted = true;
+        } catch(_){}
+
+        // 2. Über alle Proxies parallel feuern - egal welcher ankommt, Tuya
+        //    bekommt den GET-Request und schaltet.
+        for (const buildProxy of this.PROXIES) {
+            try {
+                const proxyUrl = buildProxy(url);
+                fetch(proxyUrl, { mode: 'no-cors', cache: 'no-store' }).catch(() => {});
+                anyStarted = true;
+            } catch(_){}
+        }
+
+        // 3. Zusätzlich Image-Tag als allerletzter Fallback
         try {
             const img = new Image();
             img.style.display = 'none';
-            img.src = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+            img.src = this.PROXIES[0](url) + (this.PROXIES[0](url).includes('?') ? '&' : '?') + '_t=' + Date.now();
             document.body.appendChild(img);
             setTimeout(() => { try { img.remove(); } catch(_){} }, 3000);
         } catch(_){}
 
-        return null;
+        console.log('✅ Smart-Home Request via Proxies losgeschickt:', url);
+        return anyStarted;
     },
 
-    // Async-Variante (nur als Fallback für nicht-Klick-Kontexte wie Test-Buttons)
+    // Async-Variante (gleicher Effekt, für Test-Buttons im Admin)
     async triggerUrl(url) {
-        // Direkt sync versuchen
-        const w = this.triggerUrlSync(url);
-        if (w) return true;
-        // Sonst per fetch (no-cors) - klappt nur wenn HTTPS oder CORS-erlaubt
-        try { await fetch(url, { mode: 'no-cors', cache: 'no-store' }); return true; }
-        catch(e) { console.warn('fetch ebenfalls fehlgeschlagen:', e); }
-        return false;
+        return this.triggerUrlSync(url);
     },
 
     // Inline-Render für Startseite (nicht als Modal sondern als sichtbare Karte)
@@ -1898,7 +1903,7 @@ const SmartHome = {
                 </div>
                 `).join('')}
             </div>
-            <div style="font-size:0.7rem;text-align:center;opacity:0.85;margin-top:8px;padding-bottom:4px;">Falls Browser fragt: 'Unsichere Inhalte zulassen' bestätigen</div>
+            <div style="font-size:0.7rem;text-align:center;opacity:0.85;margin-top:8px;padding-bottom:4px;">Funktioniert weltweit via HTTPS-Proxy</div>
         </div>`;
     },
 
@@ -1938,19 +1943,15 @@ const SmartHome = {
         document.getElementById('smarthome-modal-overlay')?.remove();
     },
 
-    // WICHTIG: Diese Funktion wird direkt aus onclick aufgerufen → User-Gesture aktiv.
-    // window.open MUSS synchron passieren bevor irgendein await läuft, sonst blockt
-    // der Browser das Popup wegen "no user gesture".
+    // Klick-Handler: triggert Tuya via HTTPS-Proxy (funktioniert weltweit)
     action(geraetId, ein_aus, btn) {
         const orig = btn.textContent;
-        // 1. Geräte aus dem In-Memory-Cache nehmen (synchron, kein await!)
         const cached = window._smartHomeCache;
         const useUrl = (geraete) => {
             const g = (geraete || []).find(x => x.id === geraetId);
             if (!g) { Utils.showToast('Gerät nicht gefunden', 'error'); return; }
             const url = ein_aus === 'on' ? g.url_on : g.url_off;
             if (!url) { Utils.showToast('Keine URL hinterlegt', 'error'); return; }
-            // SYNCHRON triggern - User-Gesture noch aktiv!
             this.triggerUrlSync(url);
             btn.textContent = '✓';
             Utils.showToast(`${g.icon} ${g.name} ${ein_aus === 'on' ? 'EIN' : 'AUS'}`, 'success');
@@ -1959,11 +1960,8 @@ const SmartHome = {
 
         btn.disabled = true;
         if (cached && cached.length > 0) {
-            // Cache verfügbar → sofort triggern (User-Gesture aktiv)
             useUrl(cached);
         } else {
-            // Erstmaliges Laden: Geräte holen, dann triggern.
-            // ABER User-Gesture geht durch await verloren → Toast als Hinweis.
             btn.textContent = '⏳';
             this.getGeraete().then(g => {
                 window._smartHomeCache = g;
