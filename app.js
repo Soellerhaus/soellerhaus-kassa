@@ -1842,23 +1842,17 @@ const SmartHome = {
     ],
 
     // URL triggern - nutzt HTTPS-Proxy damit es weltweit funktioniert.
-    // Verwendet 'cors'-Modus auf codetabs damit wir Erfolg/Fehler erkennen können.
+    // codetabs ist als primärer Proxy getestet zuverlässig.
     triggerUrlSync(url) {
-        // Hauptweg: codetabs proxy mit echtem cors (= wir sehen Response)
         const primary = this.PROXIES[0](url);
         fetch(primary, { cache: 'no-store' })
             .then(r => console.log('✅ Smart-Home Status', r.status, 'für', url))
             .catch(e => {
-                console.warn('Primary-Proxy failed:', e.message);
-                // Fallback-Proxies parallel feuern
+                console.warn('Primary-Proxy failed:', e.message, '- versuche Fallbacks');
                 for (let i = 1; i < this.PROXIES.length; i++) {
                     try { fetch(this.PROXIES[i](url), { mode: 'no-cors' }).catch(() => {}); } catch(_){}
                 }
             });
-
-        // Direkter no-cors-Versuch (klappt im LAN wenn HTTP allowed)
-        try { fetch(url, { mode: 'no-cors', cache: 'no-store' }).catch(() => {}); } catch(_){}
-
         return true;
     },
 

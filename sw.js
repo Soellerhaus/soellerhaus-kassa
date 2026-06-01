@@ -2,7 +2,7 @@
 // SEOLLERHAUS KASSA - SERVICE WORKER
 // ================================
 
-const CACHE_NAME = 'seollerhaus-kassa-v10-codetabs-proxy';
+const CACHE_NAME = 'seollerhaus-kassa-v11-clean';
 const urlsToCache = [
     '/kassa/',
     '/kassa/index.html',
