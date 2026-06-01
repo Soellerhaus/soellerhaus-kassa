@@ -1833,49 +1833,35 @@ const SmartHome = {
         }
     },
 
-    // Öffentliche HTTPS-Proxies (Fallback-Reihenfolge).
-    // Damit klappt der Aufruf von HTTP-URLs aus HTTPS-Seiten heraus
-    // (z.B. von github.io aus). Funktioniert von überall auf der Welt.
+    // Getestete HTTPS-Proxies in Reihenfolge der Zuverlässigkeit.
+    // codetabs unterstützt non-Standard-Ports (5002), die meisten anderen nicht.
     PROXIES: [
+        u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
         u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
-        u => 'https://corsproxy.io/?' + encodeURIComponent(u),
-        u => 'https://cors.eu.org/' + u
+        u => 'https://corsproxy.io/?' + encodeURIComponent(u)
     ],
 
     // URL triggern - nutzt HTTPS-Proxy damit es weltweit funktioniert.
-    // Sync-Aufruf: feuert mehrere parallele fetch-Requests (no-cors) ab.
+    // Verwendet 'cors'-Modus auf codetabs damit wir Erfolg/Fehler erkennen können.
     triggerUrlSync(url) {
-        let anyStarted = false;
-        // 1. Direkter Versuch (falls Server doch HTTPS oder CORS unterstützt)
-        try {
-            fetch(url, { mode: 'no-cors', cache: 'no-store' }).catch(() => {});
-            anyStarted = true;
-        } catch(_){}
+        // Hauptweg: codetabs proxy mit echtem cors (= wir sehen Response)
+        const primary = this.PROXIES[0](url);
+        fetch(primary, { cache: 'no-store' })
+            .then(r => console.log('✅ Smart-Home Status', r.status, 'für', url))
+            .catch(e => {
+                console.warn('Primary-Proxy failed:', e.message);
+                // Fallback-Proxies parallel feuern
+                for (let i = 1; i < this.PROXIES.length; i++) {
+                    try { fetch(this.PROXIES[i](url), { mode: 'no-cors' }).catch(() => {}); } catch(_){}
+                }
+            });
 
-        // 2. Über alle Proxies parallel feuern - egal welcher ankommt, Tuya
-        //    bekommt den GET-Request und schaltet.
-        for (const buildProxy of this.PROXIES) {
-            try {
-                const proxyUrl = buildProxy(url);
-                fetch(proxyUrl, { mode: 'no-cors', cache: 'no-store' }).catch(() => {});
-                anyStarted = true;
-            } catch(_){}
-        }
+        // Direkter no-cors-Versuch (klappt im LAN wenn HTTP allowed)
+        try { fetch(url, { mode: 'no-cors', cache: 'no-store' }).catch(() => {}); } catch(_){}
 
-        // 3. Zusätzlich Image-Tag als allerletzter Fallback
-        try {
-            const img = new Image();
-            img.style.display = 'none';
-            img.src = this.PROXIES[0](url) + (this.PROXIES[0](url).includes('?') ? '&' : '?') + '_t=' + Date.now();
-            document.body.appendChild(img);
-            setTimeout(() => { try { img.remove(); } catch(_){} }, 3000);
-        } catch(_){}
-
-        console.log('✅ Smart-Home Request via Proxies losgeschickt:', url);
-        return anyStarted;
+        return true;
     },
 
-    // Async-Variante (gleicher Effekt, für Test-Buttons im Admin)
     async triggerUrl(url) {
         return this.triggerUrlSync(url);
     },
